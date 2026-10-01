@@ -3,7 +3,7 @@ id: DFC-AUTHORITY-INDEX
 title: dev-foundry-claude Repository Authority Index
 kind: authority-index
 status: active
-artifact_version: "2.1.0-local.8"
+artifact_version: "2.1.0-local.9"
 canonical: false
 
 subject:
@@ -150,6 +150,12 @@ routes:
     authority_class: task
     governs:
       - claude-operational-telemetry-instrumentation
+    section_id: null
+  - id: TSK-009
+    path: docs/70-tasks/70 [TSK-009] PROJECT - Perform Atomic Claude-Native Cutover.md
+    authority_class: task
+    governs:
+      - claude-native-cutover
     section_id: null
 
 bindings:

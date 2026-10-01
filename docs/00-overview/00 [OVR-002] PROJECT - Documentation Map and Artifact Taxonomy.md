@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.15"
+artifactVersion: "2.1.0-local.16"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -120,19 +120,21 @@ The current project authority is:
   task;
 - TSK-007 for the completed minimal Executor/Auditor subagent implementation
   task;
-- TSK-008 for the completed operational-telemetry instrumentation task.
+- TSK-008 for the completed operational-telemetry instrumentation task;
+- TSK-009 for the active atomic Claude-native cutover task.
 
-No MTP or follow-on product TSK is active.
+No MTP is active because TSK-009 is one bounded configured-state transition.
 Exactly `dev-foundry-executor` and `dev-foundry-auditor` now exist as the
 initial project subagent topology under SPC-003, while their target Capability
 Profiles remain unbound in the active POP.
 Synthetic runtime qualification is no longer a cutover prerequisite. TSK-008
 has established the local telemetry path for later empirical review using real
 Claude-native work.
-The atomic Claude-native cutover is the next separately governed product
-boundary; actual telemetry arrival is verified in the first real Claude-native
-session. Hooks, Skills, agent teams, model selection, and Claude
-settings/permissions remain unauthorized unless separately governed.
+TSK-009 is the active atomic Claude-native cutover boundary. Until it is
+promoted, the runner-bound ChatGPT POP remains the active configured state.
+Actual telemetry arrival is verified in the first real Claude-native session.
+Hooks, Skills, agent teams, model selection, and additional subagents remain
+unauthorized unless separately governed.
 
 The project Authority Index routes every current authoritative home. Missing
 future implementation authority does not authorize inventing requirements.
