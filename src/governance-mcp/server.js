@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
 import { resolveGovernedOperation } from './resolver.js';
+import { writeOperationMarker } from '../telemetry/telemetry.js';
 
 const projectRoot = process.env.CLAUDE_PROJECT_DIR;
 const server = new McpServer({
@@ -23,6 +24,23 @@ server.registerTool('resolve_governed_operation', {
   }).passthrough(),
 }, async (input) => {
   const result = await resolveGovernedOperation(input, { projectRoot });
+  if (result.ok === true && process.env.DEV_FOUNDRY_TELEMETRY_RUN_ID && process.env.DEV_FOUNDRY_TELEMETRY_DIR) {
+    const { resolution } = result;
+    try {
+      await writeOperationMarker({
+        requestedAction: resolution.requestedAction,
+        targetProject: resolution.targetProject,
+        taskId: resolution.taskId,
+        boundaryId: resolution.boundaryId,
+        selectedRoleId: resolution.role.id,
+        actorProfilePath: resolution.role.actorProfilePath,
+        capabilityProfilePaths: resolution.role.capabilityProfilePaths,
+        contextFingerprint: resolution.contextFingerprint,
+      });
+    } catch {
+      console.error('Governance telemetry operation marker could not be written.');
+    }
+  }
   return { content: [{ type: 'text', text: JSON.stringify(result) }] };
 });
 

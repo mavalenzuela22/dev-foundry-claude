@@ -167,7 +167,8 @@ test('SPC-002 defines future Claude role mappings with active dedicated Executor
     }
   }
   const audit = section(contract, '7. Isolation and audit boundary').replace(/\s+/g, ' ');
-  assert.match(audit, /cutover SHALL NOT occur until the dedicated Executor and Auditor subagents are implemented and qualified under SPC-003\./);
+  assert.match(audit, /cutover SHALL NOT occur until the dedicated Executor and Auditor subagents are implemented and statically qualified under SPC-003 and the local operational-telemetry path is mechanically ready under SPC-004\./);
+  assert.match(audit, /Paid synthetic Claude benchmarking is not a cutover prerequisite\./);
   assert.match(audit, /independent Governance Audit, it is dispatched explicitly to `dev-foundry-auditor`\./);
   assert.match(audit, /main agent cannot issue that required independent verdict\./);
 });

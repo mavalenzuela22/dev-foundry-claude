@@ -4,8 +4,8 @@ artifact:
   id: TSK-008
   type: TSK
   title: Establish Claude Operational Telemetry for Empirical Tokenomics
-  status: IN_PROGRESS
-artifactVersion: "3"
+  status: COMPLETE
+artifactVersion: "4"
 authorityScope: tsk-008-claude-operational-telemetry
 ownerRole: governance-author
 canonical: true
@@ -40,7 +40,7 @@ traceability:
   dependsOn:
     - TSK-007
 lifecycle:
-  phase: in-progress
+  phase: complete
   dependsOn:
     - TSK-007
   promotionRequired: true
@@ -242,3 +242,58 @@ and focused telemetry test surfaces. It SHALL:
 - preserve every privacy, loopback, persistence, and no-Claude constraint.
 
 No additional path or capability is authorized by this observation.
+
+
+## 13. Completion result
+
+The third corrective execution,
+`execution_b0d37f02b49a3109ec7379b66562675d1880e4031b5ee7981f1efe30f5c96fc1`,
+completed PASS with executor exit code 0, runner exit code 0, zero path-policy
+violations, and the final corrective confined to the two authorized telemetry
+paths.
+
+The complete TSK-008 implementation surface is exactly:
+
+- `.gitignore`;
+- `scripts/telemetry/claude.mjs`;
+- `scripts/telemetry/collector.mjs`;
+- `src/governance-mcp/server.js`;
+- `src/telemetry/telemetry.js`;
+- `test/bootstrap/claude-cutover-readiness.test.js`;
+- `test/bootstrap/claude-telemetry.test.js`.
+
+Executor self-verification passed `npm ci`, `npm test`, and
+`git diff --check`. The full regression suite reported 48/48 tests passing.
+
+Separate governed mechanical validation
+`tsk008-final-mechanical-20261001` completed PASS with complete evidence and
+`executorInvoked:false`.
+
+Governance Author projection reconciliation is `projection match`. Semantic
+self-assessment confirmed:
+
+- the collector binds only to `127.0.0.1`;
+- OTLP metrics/logs use local `http/json` and beta traces remain disabled;
+- prompt/assistant/tool/raw-body telemetry flags are explicitly disabled;
+- sanitizer tests remove content-bearing, host-path, credential, and personal
+  identity fields while preserving the allowed measurement/correlation fields;
+- oversized requests are bounded and return HTTP 413 without requiring socket
+  reset as accepted behavior;
+- local telemetry persists only beneath the Git-ignored
+  `.dev-foundry/telemetry/local/` boundary;
+- operation markers remain opt-in, privacy-minimized, and do not change resolver
+  success/failure semantics;
+- exactly one governance MCP tool remains exposed;
+- no dependency, model selection, Hook, Skill, agent team, Claude setting, POP,
+  Platform Bootstrap, subagent definition, or framework-release mutation
+  occurred;
+- Claude Code was not invoked during TSK-008 and no synthetic benchmark cost was
+  incurred.
+
+No independent Governance Audit is required because the active POP contains no
+audit trigger for this boundary.
+
+TSK-008 completion establishes telemetry instrumentation readiness for the later
+atomic Claude-native cutover. Actual telemetry arrival is verified during the
+first real Claude-native session, and empirical tokenomics conclusions remain a
+later natural-work evidence boundary.

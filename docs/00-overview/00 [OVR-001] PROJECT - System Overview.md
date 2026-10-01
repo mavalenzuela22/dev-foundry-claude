@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: System Overview
   status: ACTIVE
-artifactVersion: "2.1.0-local.14"
+artifactVersion: "2.1.0-local.15"
 authorityScope: dev-foundry-claude-project
 ownerRole: governance-author
 canonical: false
@@ -79,9 +79,9 @@ TSK-004 establishes direct Claude project MCP launch compatibility, TSK-005
 completes repository-side cutover readiness, TSK-006 completes the
 role-isolation/token-economics architecture, TSK-007 completes the bounded
 implementation of exactly the Executor and Auditor project subagents, and
-TSK-008 is the active operational-telemetry instrumentation boundary.
+TSK-008 completes the local operational-telemetry instrumentation boundary.
 
-TSK-008 does not authorize:
+TSK-008 did not authorize:
 
 - activating Claude-native POP role bindings or switching the active Platform
   Bootstrap away from ChatGPT;
@@ -102,11 +102,12 @@ The initial Claude-native adapter architecture baseline, TSK-002 minimal
 governance MCP resolver, TSK-003 minimal root Claude project bootstrap, and
 TSK-004 project-scoped MCP launch compatibility, TSK-005 Claude-native cutover
 readiness, TSK-006 role-isolation/token-economics architecture, and TSK-007
-minimal Executor/Auditor subagent implementation are complete. Exactly two
-project subagents now exist and are statically qualified under SPC-003. TSK-008
-is active to prepare privacy-minimized local telemetry so empirical tokenomics
-can be measured from real post-cutover work without synthetic spend.
-Claude-native cutover remains deferred.
+minimal Executor/Auditor subagent implementation and TSK-008 local operational
+telemetry instrumentation are complete. Exactly two project subagents now exist
+and are statically qualified under SPC-003, and the SPC-004 telemetry path is
+mechanically ready without synthetic Claude spend.
+Claude-native cutover remains deferred as the next separately governed product
+boundary.
 
 Canonical DEV FOUNDRY 2.1.0 remains the selected reusable methodology.
 The local Project Operating Profile and Authority Index bind that release to
