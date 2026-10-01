@@ -5,7 +5,7 @@ artifact:
   type: TSK
   title: Implement Minimal Governed Executor and Auditor Subagents
   status: IN_PROGRESS
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: tsk-007-minimal-governed-subagents
 ownerRole: governance-author
 canonical: true
@@ -88,13 +88,16 @@ prepared configuration and is not the future cutover binding after TSK-007.
 
 ## 4. Material implementation boundary
 
-Codex may create exactly:
+Codex may change exactly:
 
-- `.claude/agents/dev-foundry-executor.md`;
-- `.claude/agents/dev-foundry-auditor.md`;
-- `test/bootstrap/claude-subagents.test.js`.
+- create `.claude/agents/dev-foundry-executor.md`;
+- create `.claude/agents/dev-foundry-auditor.md`;
+- create `test/bootstrap/claude-subagents.test.js`;
+- update `test/bootstrap/claude-cutover-readiness.test.js` only to reconcile
+  stale expectations from the prior SPC-002 cutover target with current SPC-002
+  v3.
 
-No existing implementation/runtime file is authorized for mutation.
+No other existing implementation/runtime file is authorized for mutation.
 
 ## 5. Executor subagent contract
 
@@ -154,9 +157,16 @@ The focused test SHALL prove at least:
 11. the two prepared Capability Profiles match the tested identities, platforms,
     tool lists, budgets, and nesting/Skills constraints;
 12. the current POP remains pre-cutover and does not bind either new profile;
-13. root `CLAUDE.md`, `.mcp.json`, runtime source, dependencies, and existing
-    tests remain unchanged;
-14. `npm ci`, `npm test`, and `git diff --check` pass.
+13. `test/bootstrap/claude-cutover-readiness.test.js` is reconciled so its
+    SPC-002 assertions expect the current future mappings:
+    `dev-foundry-executor` with
+    `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V2`, and
+    `dev-foundry-auditor` with
+    `DFC-GOVERNANCE-AUDITOR-CLAUDE-CODE-V1`; it must no longer require the
+    superseded main-agent/deferred-Auditor target;
+14. root `CLAUDE.md`, `.mcp.json`, runtime source, dependencies, and all other
+    existing tests remain unchanged;
+15. `npm ci`, `npm test`, and `git diff --check` pass.
 
 ## 8. Token-economics constraints
 
@@ -179,7 +189,7 @@ Claude Code is not invoked.
 TSK-007 is complete only when:
 
 - authority preparation and routing are coherent;
-- Codex changes exactly the three projected implementation/test paths;
+- Codex changes exactly the four projected implementation/test paths;
 - focused static proof and the full regression suite pass;
 - governed post-execution mechanical validation passes;
 - Governance Author projection reconciliation and semantic self-assessment pass;
@@ -189,3 +199,19 @@ TSK-007 is complete only when:
 Completion means the two subagents exist and are statically qualified for a
 later runtime/tokenomics qualification task. It does not activate them as current
 POP bindings and does not perform Claude-native cutover.
+
+## 11. Corrective baseline reconciliation
+
+The first TSK-007 execution stopped before implementation because the full
+regression suite exposed one stale assertion in
+`test/bootstrap/claude-cutover-readiness.test.js`.
+
+That test still encoded the superseded pre-TSK-006 cutover target where
+Implementation Executor and Governance Auditor mapped to `claude-main-agent`
+and the Auditor remained deferred. Current SPC-002 v3 instead requires dedicated
+`dev-foundry-executor` and `dev-foundry-auditor` implementations.
+
+The failed execution changed zero repository files, passed path policy, passed
+`npm ci` and `git diff --check`, and failed only the stale baseline assertion.
+This directly observed regression requires the smallest sufficient correction:
+reconcile that single existing readiness test and no other prior test.
