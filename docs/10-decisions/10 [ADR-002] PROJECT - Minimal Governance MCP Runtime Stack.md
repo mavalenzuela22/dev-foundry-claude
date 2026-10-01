@@ -5,7 +5,7 @@ artifact:
   type: ADR
   title: Minimal Governance MCP Runtime Stack
   status: ACCEPTED
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: dev-foundry-claude-governance-mcp-runtime
 ownerRole: governance-author
 canonical: true
@@ -60,6 +60,8 @@ The TSK-002 implementation stack is:
 - ECMAScript modules;
 - `@modelcontextprotocol/server` version `2.2.0`;
 - `zod` version `4.6.5` for tool input validation;
+- `yaml` version `2.9.1` for parsing project/configured authority and
+  DAT-008 frontmatter without a project-local parser;
 - Node's built-in test runner for focused tests;
 - `@modelcontextprotocol/client` version `2.2.0` as a development-only
   dependency when needed for the stdio MCP smoke test;
@@ -103,9 +105,12 @@ concrete usability need.
 ## 5. Dependency policy
 
 TSK-002 authorizes only the runtime and development dependencies named in this
-ADR. Adding another production or development dependency requires a directly
-necessary in-boundary justification that preserves OPS-007/OPS-008 semantics or
-new authority when it constitutes a material dependency decision.
+ADR. `yaml@2.9.1` is directly necessary because the resolver must parse the
+project POP, Authority Index, framework/configured YAML, and Markdown
+frontmatter; a bespoke YAML parser is outside the minimal safe boundary. Adding
+another production or development dependency requires a directly necessary
+in-boundary justification that preserves OPS-007/OPS-008 semantics or new
+authority when it constitutes a material dependency decision.
 
 ## 6. Consequences
 

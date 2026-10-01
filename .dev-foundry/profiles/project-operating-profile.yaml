@@ -3,7 +3,7 @@ id: DFC-PROJECT-OPERATING-PROFILE
 title: dev-foundry-claude Project Operating Profile
 kind: project-operating-profile
 status: active
-artifact_version: "2.1.0-local.2"
+artifact_version: "2.1.0-local.3"
 canonical: false
 
 repository:
