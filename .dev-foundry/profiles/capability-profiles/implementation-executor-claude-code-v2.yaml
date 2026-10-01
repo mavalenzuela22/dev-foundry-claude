@@ -1,0 +1,74 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V2
+status: active
+implementation_class: claude-code-project-subagent
+supported_actions:
+  - inspect_task_directed_repository_context
+  - create_update_delete_task_authorized_product_files
+  - use_native_read_search_edit_write_tools
+  - run_task_authorized_bash_build_and_test_commands
+  - call_project_governance_mcp_for_operation_resolution
+  - run_focused_self_verification
+  - report_changed_surface_and_projection_variances
+prohibited_actions:
+  - author_or_modify_product_authority_as_implementation_executor
+  - modify_canonical_framework_release
+  - issue_governance_audit_verdict_as_implementation_executor
+  - bypass_operator_reserved_side_effect_boundaries
+  - broaden_task_scope_or_cross_hard_exclusions
+  - add_undeclared_dependencies_or_runtime_services
+  - read_or_store_secrets_without_explicit_task_authority
+  - treat_claude_md_memory_or_generated_summaries_as_authority
+  - spawn_subagents_or_agent_teams
+  - preload_project_skills
+  - use_this_profile_before_project_cutover_binding_is_active
+limits:
+  repository: dev-foundry-claude
+  platform: claude-code
+  implementation_identity: dev-foundry-executor
+  operating_mode: project_subagent
+  repository_operations: native_claude_code_tools
+  allowed_tools:
+    - Read
+    - Grep
+    - Glob
+    - Edit
+    - Write
+    - Bash
+    - mcp__dev-foundry-governance__*
+  governance_mcp_server: dev-foundry-governance
+  governance_resolution: resolve_governed_operation
+  delegation_depth: 1
+  nested_agent_access: false
+  skills_preloaded: false
+  description_max_utf8_bytes: 240
+  definition_max_utf8_bytes: 8192
+  definition_max_nonempty_lines: 100
+  handoff_max_utf8_bytes: 8192
+  disposition_max_utf8_bytes: 4096
+  task_binding: exact_active_tsk_and_operation_scoped_role
+  promotion: operator_authorized_only
+  governance_mutation: prohibited_while_acting_as_implementation_executor
+proof_capabilities:
+  - native_repository_status_and_diff_inspection
+  - local_package_restore_build_and_test_execution
+  - focused_test_execution
+  - native_git_diff_check
+  - exact_changed_surface_reporting
+environment_constraints:
+  - direct_session_must_be_rooted_in_dev_foundry_claude
+  - project_claude_md_must_be_loaded
+  - project_governance_mcp_must_be_connected
+  - active_pop_must_bind_implementation_executor_to_this_profile
+  - one_operation_scoped_role_must_be_resolved_before_role_dependent_work
+  - repository_and_authority_mismatch_must_fail_closed
+stop_conditions:
+  - profile_is_not_the_active_pop_binding_for_implementation_executor
+  - governance_mcp_is_unavailable_or_returns_failure
+  - missing_or_conflicting_task_authority
+  - required_operator_authorization_is_absent
+  - requested_work_requires_governance_authoring_or_independent_audit
+  - requested_work_requires_unapproved_settings_hooks_skills_nested_agents_or_services
+  - static_context_budget_exceeded
+  - material_scope_expansion
+portability: configure

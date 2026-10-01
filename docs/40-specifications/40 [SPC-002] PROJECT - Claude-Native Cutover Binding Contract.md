@@ -5,7 +5,7 @@ artifact:
   type: SPC
   title: Claude-Native Cutover Binding Contract
   status: ACTIVE
-artifactVersion: "2"
+artifactVersion: "3"
 authorityScope: claude-native-cutover-binding-contract
 ownerRole: governance-author
 canonical: true
@@ -60,8 +60,10 @@ Before cutover:
   `DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V2`;
 - Mechanical Validator remains bound to the runner;
 - the current platform bootstrap remains `chatgpt-project`;
-- `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V1` may exist as active configured
-  capability but MUST remain unbound and MUST NOT be selected.
+- prepared Claude-native Executor and Auditor Capability Profiles may exist as
+  active configured capability but MUST remain unbound and MUST NOT be selected;
+- `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V1` is historical prepared
+  configuration and is not the target cutover binding.
 
 This pre-cutover state is intentional and remains authoritative until a separate
 cutover TSK is promoted.
@@ -76,7 +78,7 @@ that:
 - Implementation Executor -> canonical `implementation-executor-v2`, concrete
   implementation `dev-foundry-executor`, kind `subagent`, platform
   `claude-code`, capability profile
-  `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V1`, active;
+  `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V2`, active;
 - Evidence Custodian -> canonical `evidence-custodian-v1`, concrete
   implementation `claude-main-agent`, platform `claude-code`, active;
 - Mechanical Validator -> canonical `mechanical-validator-v2`, concrete
@@ -84,7 +86,8 @@ that:
   active;
 - Governance Auditor -> canonical `governance-auditor-v2`, concrete
   implementation `dev-foundry-auditor`, kind `subagent`, platform
-  `claude-code`, active.
+  `claude-code`, capability profile
+  `DFC-GOVERNANCE-AUDITOR-CLAUDE-CODE-V1`, active.
 
 The same `claude-main-agent` may be eligible for Governance Author and Evidence
 Custodian only through operation-scoped role selection under OPS-003/OPS-009.
