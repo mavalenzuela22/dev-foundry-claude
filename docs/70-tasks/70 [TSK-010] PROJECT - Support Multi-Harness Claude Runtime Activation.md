@@ -4,7 +4,7 @@ artifact:
   id: TSK-010
   type: TSK
   title: Support Multi-Harness Claude Runtime Activation
-  status: ACTIVE
+  status: IN_PROGRESS
 artifactVersion: "1"
 authorityScope: tsk-010-multi-harness-claude-runtime-activation
 ownerRole: governance-author
@@ -42,7 +42,7 @@ traceability:
     - TSK-008
     - TSK-009
 lifecycle:
-  phase: active
+  phase: in-progress
   dependsOn:
     - TSK-008
     - TSK-009
@@ -201,7 +201,19 @@ The Implementation Executor may change exactly:
 - `scripts/telemetry/run-claude.sh` (new, executable);
 - `.gitignore` (add only `docs/codemie/analytics/`);
 - `test/bootstrap/claude-telemetry.test.js` (reconcile launcher assertions);
-- `test/bootstrap/claude-launcher.test.js` (new).
+- `test/bootstrap/claude-launcher.test.js` (new);
+- `test/bootstrap/claude-cutover-readiness.test.js` (one assertion only, see 7.1).
+
+### 7.1 Operator-local Claude settings tolerance
+
+The first real post-cutover session revealed that the exact `.claude` tree
+assertion fails once the Operator approves the project MCP, because Claude Code
+writes `.claude/settings.local.json`. That file is Operator-local provider
+mechanics (Platform Bootstrap constraint: workspace trust and project MCP
+approval are Operator-side), is Git-ignored, and is never promoted. The assertion
+SHALL permit exactly that one file only when Git ignores it, and SHALL continue
+to reject `settings.json`, Hooks, Skills, teams, extra agents, and any other
+entry. No other assertion in that file changes.
 
 Hard exclusions: no change to the sanitizer, collector binding, resolver,
 `server.js`, subagent definitions, POP, Platform Bootstrap, Authority Index,
