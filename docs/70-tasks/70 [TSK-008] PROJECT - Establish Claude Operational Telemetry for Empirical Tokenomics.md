@@ -5,7 +5,7 @@ artifact:
   type: TSK
   title: Establish Claude Operational Telemetry for Empirical Tokenomics
   status: IN_PROGRESS
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: tsk-008-claude-operational-telemetry
 ownerRole: governance-author
 canonical: true
@@ -95,7 +95,11 @@ Codex may change exactly:
   after successful resolution;
 - create `test/bootstrap/claude-telemetry.test.js`;
 - update `.gitignore` only to ignore
-  `.dev-foundry/telemetry/local/`.
+  `.dev-foundry/telemetry/local/`;
+- update `test/bootstrap/claude-cutover-readiness.test.js` only to reconcile
+  the stale SPC-002 isolation/cutover prerequisite assertion with current
+  SPC-002 v4: statically qualified Executor/Auditor plus SPC-004 telemetry
+  readiness, with no paid synthetic benchmark prerequisite.
 
 No package dependency or package-script change is authorized.
 
@@ -162,7 +166,10 @@ The focused test SHALL prove at least:
 13. telemetry local storage is Git-ignored;
 14. no dependency, model, hook, Skill, agent-team, settings, POP, Platform
     Bootstrap, subagent definition, or authority-release mutation occurs;
-15. `npm ci`, `npm test`, and `git diff --check` pass.
+15. `test/bootstrap/claude-cutover-readiness.test.js` expects the current
+    SPC-002 v4 cutover prerequisite and no longer encodes the superseded
+    pre-TSK-008 wording;
+16. `npm ci`, `npm test`, and `git diff --check` pass.
 
 Tests use synthetic OTLP JSON directly against the collector implementation.
 They SHALL NOT invoke Claude Code or any model.
@@ -182,3 +189,32 @@ later atomic Claude-native cutover.
 
 It does not prove token savings, does not activate Claude-native bindings, and
 does not produce empirical tokenomics conclusions.
+
+## 11. Corrective after first implementation execution
+
+The first implementation execution,
+`execution_13635a9b5305c1ce19429be468029787cf1645e512350179e51b835102617be4`,
+changed exactly the original six authorized paths with zero path-policy
+violations. `npm ci` and `git diff --check` passed; `npm test` reported
+45/48 passing.
+
+Three failures were observed:
+
+1. one pre-existing cutover-readiness assertion still encoded SPC-002 v3 wording
+   and therefore contradicted the newly promoted SPC-002 v4 telemetry-readiness
+   prerequisite;
+2. the local collector's oversized-body path could reset the client connection
+   before returning the required 413 response;
+3. the post-close test assumed only `ECONNREFUSED`, while a closed local TCP
+   endpoint may observably reject the race with `ECONNRESET` instead.
+
+The smallest sufficient corrective is therefore:
+
+- reconcile only the stale SPC-002 assertion in the existing readiness test;
+- keep the oversized-body contract as an HTTP 413 and correct the collector
+  implementation so the body is safely drained before responding;
+- make the post-close assertion accept either connection-refused or
+  connection-reset as evidence that the collector no longer serves requests.
+
+No other task, authority, runtime, dependency, privacy boundary, or telemetry
+surface is expanded.
