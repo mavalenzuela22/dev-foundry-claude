@@ -48,6 +48,6 @@ test('project MCP configuration selects local stdio Node launch without alwaysLo
   assert.equal(servers.length, 1);
   assert.equal(servers[0].type, 'stdio');
   assert.equal(servers[0].command, 'node');
-  assert.deepEqual(servers[0].args, ['${CLAUDE_PROJECT_DIR}/src/governance-mcp/server.js']);
+  assert.deepEqual(servers[0].args, ['${CLAUDE_PROJECT_DIR:-.}/src/governance-mcp/server.js']);
   assert.notEqual(servers[0].alwaysLoad, true);
 });
