@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.7"
+artifactVersion: "2.1.0-local.8"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -87,6 +87,10 @@ The active POP binds:
   ChatGPT, that profile selects `codex-cli` and explicitly excludes Claude Code
   execution before cutover.
 
+The prepared `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V1` Capability Profile
+is routed as configured readiness authority but remains unbound; it is not
+eligible for Implementation Executor selection before the later cutover task.
+
 Capability does not grant authority, and the runner is product/runtime machinery,
 not reusable methodology. The governance-agent bootstrap is not an executor
 binding.
@@ -101,15 +105,17 @@ The current project authority is:
 - ADR-002 for the local stdio MCP runtime stack and dependency boundary;
 - ARC-001 for the active Claude Code adapter architecture baseline;
 - SPC-001 for governed-operation resolver behavior;
+- SPC-002 for the prepared Claude-native cutover binding contract;
 - DAT-001 for the exact resolver tool contract;
 - TSK-001 for the completed architecture-baseline task;
 - TSK-002 for the completed minimal resolver implementation task;
 - TSK-003 for the completed minimal Claude-native project bootstrap task;
-- TSK-004 for the completed Claude project MCP launch-compatibility task.
+- TSK-004 for the completed Claude project MCP launch-compatibility task;
+- TSK-005 for the active Claude-native cutover-readiness task.
 
-No MTP or follow-on product TSK is active.
-Claude-native role bindings, Hooks, Skills, subagents, agent teams, Claude
-settings/permissions, and direct Claude Code execution/cutover remain
+No MTP is active because TSK-005 is atomic.
+Actual Claude-native role activation, Hooks, Skills, subagents, agent teams,
+Claude settings/permissions, and direct Claude Code execution/cutover remain
 unauthorized follow-on work.
 
 The project Authority Index routes every current authoritative home. Missing
