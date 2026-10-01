@@ -1,0 +1,77 @@
+schema_version: dev-foundry.project-operating-profile.v2
+id: DFC-PROJECT-OPERATING-PROFILE
+title: dev-foundry-claude Project Operating Profile
+kind: project-operating-profile
+status: active
+artifact_version: "2.1.0-local.1"
+canonical: false
+
+repository:
+  name: dev-foundry-claude
+  classification: greenfield
+  authority_index: .dev-foundry/authority-index.yaml
+
+framework:
+  adopted_version: "2.1.0"
+  selected_authority_index: .dev-foundry/releases/2.1.0/authority-index.yaml
+  selected_manifest: .dev-foundry/releases/2.1.0/release-integrity-manifest.yaml
+  adoption_status: active
+
+operator:
+  kind: human
+  identity: Martin Valenzuela
+
+actor_bindings:
+  governance-author:
+    profile: .dev-foundry/releases/2.1.0/actor-profiles/governance-author-v3.yaml
+    implementation:
+      kind: agent
+      identity: operator-assisted-dev-foundry-copilot
+      platform: chatgpt-project
+    capability_profiles: []
+    status: active
+  governance-auditor:
+    profile: .dev-foundry/releases/2.1.0/actor-profiles/governance-auditor-v2.yaml
+    implementation:
+      kind: agent
+      identity: operator-assisted-dev-foundry-copilot
+      platform: chatgpt-project
+    capability_profiles: []
+    status: active
+  implementation-executor:
+    profile: .dev-foundry/releases/2.1.0/actor-profiles/implementation-executor-v2.yaml
+    implementation:
+      kind: other
+      identity: unbound-until-explicit-task-authorization
+    capability_profiles: []
+    status: deferred
+  mechanical-validator:
+    profile: .dev-foundry/releases/2.1.0/actor-profiles/mechanical-validator-v2.yaml
+    implementation:
+      kind: tool
+      identity: process-bound-runner
+      platform: chatgpt-project
+    capability_profiles: []
+    status: active
+  evidence-custodian:
+    profile: .dev-foundry/releases/2.1.0/actor-profiles/evidence-custodian-v1.yaml
+    implementation:
+      kind: agent
+      identity: operator-assisted-dev-foundry-copilot
+      platform: chatgpt-project
+    capability_profiles: []
+    status: active
+
+platform_bootstraps:
+  primary-governance-agent:
+    path: .dev-foundry/platform-bootstrap.yaml
+    status: prepared
+
+policies:
+  frontmatter_schema: dev-foundry.sot-document.v2
+  metadata_migration_mode: on-touch
+  audit_triggers: []
+  promotion_rules: []
+  default_role: governance-author
+
+deviations: []
