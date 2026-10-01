@@ -5,7 +5,7 @@ artifact:
   type: ARC
   title: Claude Code Adapter Architecture
   status: ACTIVE
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: dev-foundry-claude-adapter-architecture
 ownerRole: governance-author
 canonical: true
@@ -42,7 +42,7 @@ responsibilities onto Claude Code primitives while minimizing repeated context
 reconstruction and preserving repository-owned authority.
 
 This architecture is based on the Claude Code product surface observed from
-Anthropic documentation on 2026-09-30. Product mechanics may evolve; later
+Anthropic documentation through 2026-10-01. Product mechanics may evolve; later
 tasks must revalidate material host assumptions before implementation.
 
 ## 2. Responsibility map
@@ -56,8 +56,10 @@ tasks must revalidate material host assumptions before implementation.
 | Governed operation resolution | Dedicated Claude governance MCP | Primary deterministic governance entry point |
 | Hard tool/action enforcement | Hooks and Claude Code permission settings | Enforce mechanically where a concrete rule benefits from deterministic blocking |
 | Repeatable contextual workflows | Skills | Load workflow detail on demand instead of expanding permanent instructions |
-| Role/context isolation | Custom subagents | Candidate mechanism for Auditor and Executor roles when separately activated |
-| Primary operator-facing governance | Main Claude agent | Governance Author is the default project role unless a bounded operation resolves another eligible role |
+| Role/context isolation | Dedicated custom subagents | Initial dedicated subagents are limited to Implementation Executor and Governance Auditor; no agent exists merely for role symmetry |
+| Primary operator-facing governance | Main Claude agent | Governance Author remains direct on the main agent; orchestration is part of that operator-facing implementation, not a separate governed role |
+| Evidence custody | Main Claude agent | Evidence Custodian may use the same main implementation only in a separate operation after role re-selection |
+| Mechanical validation | Native deterministic validation | Do not spend a model/subagent call for deterministic proof when native validation satisfies the boundary |
 
 ## 3. Minimal bootstrap layer
 
@@ -127,17 +129,29 @@ copy canonical DEV FOUNDRY methodology into a parallel authority source.
 
 ## 7. Subagents
 
-Custom subagents run in separate context windows and can have distinct system
-prompts, models, tools, permissions, hooks, Skills, and scoped MCP access.
+Custom subagents provide separate context and role-specific tool surfaces. The
+initial project topology uses this mechanism only where the isolation benefit is
+material.
 
-This makes them the preferred candidate mechanism for later concrete bindings
-that need role isolation, especially Governance Auditor and Implementation
-Executor. The main Claude agent remains the initial operator-facing Governance
-Author.
+The main Claude agent remains the operator-facing Governance Author. It authors
+and reconciles project SoT directly while selected in that role; it is not
+reduced to a write-disabled dispatcher. Repository SoT, not conversational
+reasoning, is the durable record carried into later operations.
 
-No subagent is activated by this architecture baseline. Concrete bindings,
-model selection, tool restrictions, independence requirements, and cost policy
-require later governed tasks.
+Exactly two dedicated role implementations are planned initially:
+
+- `dev-foundry-executor` for Implementation Executor, to keep code exploration,
+  mutation, debugging, and implementation-local context out of the main agent;
+- `dev-foundry-auditor` for Governance Auditor, to provide fresh read-only
+  semantic evaluation and satisfy independence when required.
+
+Evidence Custodian remains on the main implementation in a separately selected
+operation. Mechanical Validator remains deterministic/native.
+
+No Author, Custodian, Validator, research, planning, helper, reviewer, or agent
+team is created by default. No subagent may spawn another subagent in the
+initial topology. SPC-003 owns the concrete isolation and token-economics
+contract.
 
 ## 8. Context and token policy
 
@@ -148,15 +162,24 @@ The current baseline is:
 
 - keep project startup instructions small and direct;
 - do not import the complete DEV FOUNDRY release into startup context;
+- preserve decisions through repository SoT rather than conversational
+  reasoning;
 - keep Skill and subagent descriptions concise because listings consume
   context;
 - keep MCP server instructions and tool descriptions concise;
 - use MCP tool search/deferred tool definitions when supported by the selected
   Claude Code deployment;
-- use subagents only when isolation, specialization, or cheaper-model routing
-  offsets the cost of an additional model request;
+- dispatch subagents only from an explicitly resolved role, not heuristic
+  auto-delegation;
+- permit no nested delegation or parallel agent fan-out in the initial topology;
+- use subagents only when measured context isolation, required independence, or
+  cheaper-model routing offsets their additional request cost;
 - prefer one governance resolution result plus directed reads over repeated
   broad repository exploration.
+
+The project rule is: **no agent without measured benefit**. SPC-003 defines the
+static context ceilings, handoff/disposition limits, qualification metrics, and
+retention rule.
 
 ## 9. Current host evidence
 

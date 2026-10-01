@@ -3,7 +3,7 @@ id: DFC-AUTHORITY-INDEX
 title: dev-foundry-claude Repository Authority Index
 kind: authority-index
 status: active
-artifact_version: "2.1.0-local.5"
+artifact_version: "2.1.0-local.6"
 canonical: false
 
 subject:
@@ -91,6 +91,15 @@ routes:
       - claude-native-cutover-transition
       - claude-native-role-implementation-map
     section_id: null
+  - id: claude-role-isolation-token-economics
+    path: docs/40-specifications/40 [SPC-003] PROJECT - Claude Role Isolation and Token Economics Contract.md
+    authority_class: product
+    governs:
+      - claude-main-agent-role-boundary
+      - claude-subagent-isolation-topology
+      - claude-static-context-budgets
+      - claude-runtime-tokenomics-qualification
+    section_id: null
   - id: TSK-002
     path: docs/70-tasks/70 [TSK-002] PROJECT - Implement Minimal Claude Governance MCP Resolver.md
     authority_class: task
@@ -114,6 +123,12 @@ routes:
     authority_class: task
     governs:
       - claude-native-cutover-readiness
+    section_id: null
+  - id: TSK-006
+    path: docs/70-tasks/70 [TSK-006] PROJECT - Establish Claude Role Isolation and Token Economics Architecture.md
+    authority_class: task
+    governs:
+      - claude-role-isolation-token-economics-architecture
     section_id: null
 
 bindings:

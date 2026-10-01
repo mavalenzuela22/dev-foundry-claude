@@ -5,7 +5,7 @@ artifact:
   type: SPC
   title: Claude-Native Cutover Binding Contract
   status: ACTIVE
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: claude-native-cutover-binding-contract
 ownerRole: governance-author
 canonical: true
@@ -25,7 +25,6 @@ scope:
     - model-selection
     - hooks
     - skills
-    - subagents
     - agent-teams
 authority:
   governedBy:
@@ -75,21 +74,23 @@ that:
 - Governance Author -> canonical `governance-author-v3`, concrete implementation
   `claude-main-agent`, platform `claude-code`, active;
 - Implementation Executor -> canonical `implementation-executor-v2`, concrete
-  implementation `claude-main-agent`, platform `claude-code`, capability
-  profile `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V1`, active;
+  implementation `dev-foundry-executor`, kind `subagent`, platform
+  `claude-code`, capability profile
+  `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V1`, active;
 - Evidence Custodian -> canonical `evidence-custodian-v1`, concrete
   implementation `claude-main-agent`, platform `claude-code`, active;
 - Mechanical Validator -> canonical `mechanical-validator-v2`, concrete
   implementation `claude-code-native-validation`, platform `claude-code`,
   active;
 - Governance Auditor -> canonical `governance-auditor-v2`, concrete
-  implementation `claude-main-agent`, platform `claude-code`, status
-  `deferred` until a separately governed independent-audit implementation is
-  activated.
+  implementation `dev-foundry-auditor`, kind `subagent`, platform
+  `claude-code`, active.
 
-The same `claude-main-agent` may be eligible for multiple active roles only
-through operation-scoped role selection under OPS-003/OPS-009. Role continuity
-across operations does not transfer authority.
+The same `claude-main-agent` may be eligible for Governance Author and Evidence
+Custodian only through operation-scoped role selection under OPS-003/OPS-009.
+It is not the Implementation Executor or Governance Auditor implementation in the
+initial cutover topology. Role continuity across operations does not transfer
+authority.
 
 ## 4. Platform bootstrap target
 
@@ -100,11 +101,11 @@ At cutover, the primary project Platform Bootstrap SHALL be reconciled to:
 - startup from the repository root;
 - POP and Authority Index as configured entry points;
 - Governance Author as the default role;
-- eligible profiles limited to Governance Author, Implementation Executor, and
-  Evidence Custodian because those roles share the `claude-main-agent`
-  implementation;
+- the main-agent bootstrap is eligible for Governance Author and Evidence
+  Custodian only, with Governance Author as the default;
+- Implementation Executor and Governance Auditor are dispatched explicitly to
+  their dedicated subagents after operation-scoped role resolution;
 - Mechanical Validator remains separately bound as native Claude Code tooling;
-- Governance Auditor is not bootstrap-eligible while deferred;
 - project `CLAUDE.md` and the project governance MCP are startup mechanisms,
   not authority.
 
@@ -137,21 +138,27 @@ authority, capability profile, and Operator side-effect authorization.
 The governance MCP remains read-oriented and resolves authority. It does not
 become a repository remote-control surface.
 
-## 7. Audit boundary
+## 7. Isolation and audit boundary
 
-The initial cutover does not activate a custom Auditor subagent merely for
-symmetry.
+The cutover SHALL NOT occur until the dedicated Executor and Auditor subagents
+are implemented and qualified under SPC-003.
 
-When a bounded operation requires independent Governance Audit while the Auditor
-binding is deferred, the operation MUST stop until a separately eligible
-independent implementation is governed and activated.
+The Auditor exists because fresh read-only semantic isolation can satisfy a real
+independence need, not for role symmetry. When a bounded operation triggers
+independent Governance Audit, it is dispatched explicitly to
+`dev-foundry-auditor`. The main agent cannot issue that required independent
+verdict.
+
+The Executor exists to isolate implementation-local context from the main
+Governance Author. The main agent cannot silently implement product work instead
+of dispatching the selected Implementation Executor role.
 
 ## 8. Cutover acceptance
 
 The future cutover TSK is complete only when repository-configured bindings,
-Platform Bootstrap, active capability routing, overview state, and any
-non-authoritative platform derivative are mutually consistent and mechanically
-validated.
+Platform Bootstrap, active capability routing, qualified SPC-003 subagent
+topology, overview state, and any non-authoritative platform derivative are
+mutually consistent and mechanically validated.
 
 Runtime trust/MCP approval is verified by the Operator in the first direct Claude
 Code session and is not fabricated as repository evidence.
