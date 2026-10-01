@@ -51,7 +51,7 @@ routes:
       - claude-code-primitive-responsibility-map
       - claude-code-context-loading-boundary
     section_id: null
-  - id: tsk-001-claude-native-adapter-architecture
+  - id: TSK-001
     path: docs/70-tasks/70 [TSK-001] PROJECT - Establish Claude-Native Adapter Architecture Baseline.md
     authority_class: task
     governs:
