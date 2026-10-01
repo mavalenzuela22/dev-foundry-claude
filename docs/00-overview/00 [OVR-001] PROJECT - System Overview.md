@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: System Overview
   status: ACTIVE
-artifactVersion: "2.1.0-local.5"
+artifactVersion: "2.1.0-local.6"
 authorityScope: dev-foundry-claude-project
 ownerRole: governance-author
 canonical: false
@@ -74,10 +74,11 @@ The approved direction is to:
 ## 4. Current Non-Goals
 
 The completed TSK-002 boundary delivers the minimal Claude governance MCP
-resolver, and TSK-003 delivers the minimal Claude-native project bootstrap. No
-follow-on implementation TSK is active yet.
+resolver, and TSK-003 delivers the minimal Claude-native project bootstrap.
+TSK-004 is the active bounded compatibility task for direct Claude project MCP
+startup.
 
-TSK-003 did not authorize:
+TSK-004 does not authorize:
 
 - Hooks, Skills, subagents, agent teams, Claude settings/permissions, or
   bootstrap behavior beyond the minimal root `CLAUDE.md`;
@@ -92,7 +93,8 @@ Those require separate follow-on governed tasks.
 
 The initial Claude-native adapter architecture baseline, TSK-002 minimal
 governance MCP resolver, and TSK-003 minimal root Claude project bootstrap are
-complete. No follow-on product task is currently active.
+complete. TSK-004 is active and limited to project-scoped MCP launch
+compatibility plus focused proof.
 
 Canonical DEV FOUNDRY 2.1.0 remains the selected reusable methodology.
 The local Project Operating Profile and Authority Index bind that release to
