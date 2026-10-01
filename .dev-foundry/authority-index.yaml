@@ -3,7 +3,7 @@ id: DFC-AUTHORITY-INDEX
 title: dev-foundry-claude Repository Authority Index
 kind: authority-index
 status: active
-artifact_version: "2.1.0-local.9"
+artifact_version: "2.1.0-local.10"
 canonical: false
 
 subject:
@@ -178,7 +178,7 @@ bindings:
     path: .dev-foundry/profiles/capability-profiles/implementation-executor-runner-v2.yaml
     kind: capability-profile
     authority_class: configured
-    required: true
+    required: false
   - id: implementation-executor-capability-claude-cutover-prepared-v1-history
     path: .dev-foundry/profiles/capability-profiles/implementation-executor-claude-code-v1.yaml
     kind: capability-profile
@@ -188,12 +188,12 @@ bindings:
     path: .dev-foundry/profiles/capability-profiles/implementation-executor-claude-code-v2.yaml
     kind: capability-profile
     authority_class: configured
-    required: false
+    required: true
   - id: governance-auditor-capability-claude-cutover-prepared
     path: .dev-foundry/profiles/capability-profiles/governance-auditor-claude-code-v1.yaml
     kind: capability-profile
     authority_class: configured
-    required: false
+    required: true
 
 rules:
   single_authoritative_home_required: true

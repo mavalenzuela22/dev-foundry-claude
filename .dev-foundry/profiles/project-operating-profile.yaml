@@ -3,7 +3,7 @@ id: DFC-PROJECT-OPERATING-PROFILE
 title: dev-foundry-claude Project Operating Profile
 kind: project-operating-profile
 status: active
-artifact_version: "2.1.0-local.4"
+artifact_version: "2.1.0-local.5"
 canonical: false
 
 repository:
@@ -26,48 +26,49 @@ actor_bindings:
     profile: .dev-foundry/releases/2.1.0/actor-profiles/governance-author-v3.yaml
     implementation:
       kind: agent
-      identity: operator-assisted-dev-foundry-copilot
-      platform: chatgpt-project
+      identity: claude-main-agent
+      platform: claude-code
     capability_profiles: []
     status: active
   governance-auditor:
     profile: .dev-foundry/releases/2.1.0/actor-profiles/governance-auditor-v2.yaml
     implementation:
       kind: agent
-      identity: operator-assisted-dev-foundry-copilot
-      platform: chatgpt-project
-    capability_profiles: []
+      identity: dev-foundry-auditor
+      platform: claude-code
+    capability_profiles:
+      - .dev-foundry/profiles/capability-profiles/governance-auditor-claude-code-v1.yaml
     status: active
   implementation-executor:
     profile: .dev-foundry/releases/2.1.0/actor-profiles/implementation-executor-v2.yaml
     implementation:
-      kind: tool
-      identity: process-bound-runner-code-executor
-      platform: chatgpt-project
+      kind: agent
+      identity: dev-foundry-executor
+      platform: claude-code
     capability_profiles:
-      - .dev-foundry/profiles/capability-profiles/implementation-executor-runner-v2.yaml
+      - .dev-foundry/profiles/capability-profiles/implementation-executor-claude-code-v2.yaml
     status: active
   mechanical-validator:
     profile: .dev-foundry/releases/2.1.0/actor-profiles/mechanical-validator-v2.yaml
     implementation:
       kind: tool
-      identity: process-bound-runner
-      platform: chatgpt-project
+      identity: claude-code-native-validation
+      platform: claude-code
     capability_profiles: []
     status: active
   evidence-custodian:
     profile: .dev-foundry/releases/2.1.0/actor-profiles/evidence-custodian-v1.yaml
     implementation:
       kind: agent
-      identity: operator-assisted-dev-foundry-copilot
-      platform: chatgpt-project
+      identity: claude-main-agent
+      platform: claude-code
     capability_profiles: []
     status: active
 
 platform_bootstraps:
   primary-governance-agent:
     path: .dev-foundry/platform-bootstrap.yaml
-    status: prepared
+    status: active
 
 policies:
   frontmatter_schema: dev-foundry.sot-document.v2
