@@ -4,8 +4,8 @@ artifact:
   id: TSK-004
   type: TSK
   title: Establish Claude Project MCP Launch Compatibility
-  status: IN_PROGRESS
-artifactVersion: "1"
+  status: COMPLETE
+artifactVersion: "2"
 authorityScope: tsk-004-claude-project-mcp-launch-compatibility
 ownerRole: governance-author
 canonical: true
@@ -40,7 +40,7 @@ traceability:
     - TSK-002
     - TSK-003
 lifecycle:
-  phase: in-progress
+  phase: complete
   dependsOn:
     - TSK-002
     - TSK-003
@@ -116,3 +116,28 @@ Completion evidence includes the exact two-path changed surface, full test resul
 TSK-004 may become COMPLETE only after exact-scope implementation, governed mechanical validation, and Governance Author self-assessment satisfy the acceptance boundary.
 
 Completion establishes repository-side MCP launch compatibility. It does not establish Claude-native role bindings and does not perform the Claude Code cutover.
+
+## 10. Completion result
+
+TSK-004 completed with an exact projection match. Codex changed only:
+
+- `.mcp.json`;
+- `test/governance-mcp/server.test.js`.
+
+Governed execution
+`execution_6867caa5f8ccca8482d8ae49e59f51309041394e6b8bf4eb29400c214814d12a`
+completed PASS with path policy PASS, zero violations, executor exit code 0, and
+runner exit code 0. `npm ci`, `npm test`, and `git diff --check` passed.
+The full suite reported 22/22 tests passing, including the existing bootstrap and
+governance-MCP regression coverage.
+
+Governance Author projection reconciliation is `projection match`. Semantic
+self-assessment found the launch expression exactly aligned with ADR-002 and the
+TSK-004 acceptance boundary, with no runtime-source, dependency, bootstrap,
+binding, settings, permission, or Claude Code execution changes.
+
+No independent Governance Audit is required for this completion boundary because
+no framework, project, task, separation-of-duty, or Operator trigger applies.
+
+Claude-native role bindings and direct Claude Code cutover remain separate future
+governed work.
