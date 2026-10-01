@@ -5,7 +5,7 @@ artifact:
   type: TSK
   title: Establish Claude Operational Telemetry for Empirical Tokenomics
   status: IN_PROGRESS
-artifactVersion: "2"
+artifactVersion: "3"
 authorityScope: tsk-008-claude-operational-telemetry
 ownerRole: governance-author
 canonical: true
@@ -218,3 +218,27 @@ The smallest sufficient corrective is therefore:
 
 No other task, authority, runtime, dependency, privacy boundary, or telemetry
 surface is expanded.
+
+## 12. Second corrective observation
+
+The second corrective execution,
+`execution_426a706ae799a2abc825853331d893a8fff7fae9bc2f2d88f00806d50a2f165f`,
+changed exactly the three authorized corrective paths with zero path-policy
+violations. `npm ci` and `git diff --check` passed; `npm test` improved to
+47/48 passing.
+
+The cutover-readiness reconciliation passed, and the post-close network
+assertion passed. The only remaining failure is the oversized-body collector
+test: the client still observes `ECONNRESET` instead of receiving the required
+HTTP 413 response.
+
+The next corrective remains inside the already-authorized telemetry collector
+and focused telemetry test surfaces. It SHALL:
+
+- determine the exact request-handling condition that resets the client;
+- preserve bounded memory and the configured body-size limit;
+- drain or otherwise handle the request safely enough to deliver HTTP 413;
+- keep the test requiring HTTP 413 rather than weakening it to accept a reset;
+- preserve every privacy, loopback, persistence, and no-Claude constraint.
+
+No additional path or capability is authorized by this observation.
