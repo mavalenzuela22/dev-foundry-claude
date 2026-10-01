@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.9"
+artifactVersion: "2.1.0-local.11"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -106,16 +106,21 @@ The current project authority is:
 - ARC-001 for the active Claude Code adapter architecture baseline;
 - SPC-001 for governed-operation resolver behavior;
 - SPC-002 for the prepared Claude-native cutover binding contract;
+- SPC-003 for Claude role isolation and token-economics constraints;
 - DAT-001 for the exact resolver tool contract;
 - TSK-001 for the completed architecture-baseline task;
 - TSK-002 for the completed minimal resolver implementation task;
 - TSK-003 for the completed minimal Claude-native project bootstrap task;
 - TSK-004 for the completed Claude project MCP launch-compatibility task;
-- TSK-005 for the completed Claude-native cutover-readiness task.
+- TSK-005 for the completed Claude-native cutover-readiness task;
+- TSK-006 for the completed role-isolation and token-economics architecture
+  task.
 
 No MTP or follow-on product TSK is active.
-The next separately governed boundary may perform the atomic Claude-native
-cutover defined by SPC-002. Hooks, Skills, subagents, agent teams, and Claude
+The next separately governed product boundary is the minimal implementation of
+exactly `dev-foundry-executor` and `dev-foundry-auditor` under SPC-003.
+The atomic Claude-native cutover remains deferred until runtime/tokenomics
+qualification is accepted. Hooks, Skills, agent teams, and Claude
 settings/permissions remain unauthorized unless separately governed.
 
 The project Authority Index routes every current authoritative home. Missing

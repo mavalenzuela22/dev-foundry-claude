@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: System Overview
   status: ACTIVE
-artifactVersion: "2.1.0-local.9"
+artifactVersion: "2.1.0-local.11"
 authorityScope: dev-foundry-claude-project
 ownerRole: governance-author
 canonical: false
@@ -75,15 +75,17 @@ The approved direction is to:
 
 The completed TSK-002 boundary delivers the minimal Claude governance MCP
 resolver, TSK-003 delivers the minimal Claude-native project bootstrap, and
-TSK-004 establishes direct Claude project MCP launch compatibility, and TSK-005
-completes repository-side readiness for the later Claude-native cutover. No
-follow-on implementation TSK is active yet.
+TSK-004 establishes direct Claude project MCP launch compatibility, TSK-005
+completes repository-side cutover readiness, and TSK-006 completes the
+role-isolation/token-economics architecture before any subagent implementation
+or cutover.
 
-TSK-005 did not authorize:
+TSK-006 did not authorize:
 
 - activating Claude-native POP role bindings or switching the active Platform
   Bootstrap away from ChatGPT;
-- Hooks, Skills, subagents, agent teams, or Claude settings/permissions;
+- creating Claude subagent files, Hooks, Skills, agent teams, or Claude
+  settings/permissions;
 - another MCP tool or generic repository-control MCP surface;
 - remote MCP transport, authentication, cloud deployment, or telemetry;
 - automatic provider routing or secret handling;
@@ -95,9 +97,11 @@ Those require separate follow-on governed tasks.
 
 The initial Claude-native adapter architecture baseline, TSK-002 minimal
 governance MCP resolver, TSK-003 minimal root Claude project bootstrap, and
-TSK-004 project-scoped MCP launch compatibility and TSK-005 Claude-native
-cutover readiness are complete. The repository is ready for one final atomic
-cutover task; that cutover has not occurred yet.
+TSK-004 project-scoped MCP launch compatibility, TSK-005 Claude-native cutover
+readiness, and TSK-006 role-isolation/token-economics architecture are complete.
+The next product boundary is the minimal implementation of exactly two dedicated
+subagents: Executor and Auditor. Runtime qualification and Claude-native cutover
+remain deferred.
 
 Canonical DEV FOUNDRY 2.1.0 remains the selected reusable methodology.
 The local Project Operating Profile and Authority Index bind that release to
@@ -106,7 +110,8 @@ The local Project Operating Profile and Authority Index bind that release to
 ADR-001 owns the Claude-native repository versus governance-MCP boundary.
 ADR-002 owns the initial local stdio runtime stack. ARC-001 defines the adapter
 architecture. SPC-001 and DAT-001 close the resolver behavior and tool contract.
-SPC-002 owns the prepared Claude-native cutover binding contract.
+SPC-002 owns the prepared Claude-native cutover binding contract. SPC-003 owns
+the role-isolation and token-economics contract.
 
 While governance is hosted from ChatGPT, the Implementation Executor is
 separately bound to the runner through
