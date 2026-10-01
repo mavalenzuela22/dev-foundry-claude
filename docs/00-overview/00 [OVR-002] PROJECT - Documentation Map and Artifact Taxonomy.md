@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.13"
+artifactVersion: "2.1.0-local.14"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -109,6 +109,7 @@ The current project authority is:
 - SPC-001 for governed-operation resolver behavior;
 - SPC-002 for the prepared Claude-native cutover binding contract;
 - SPC-003 for Claude role isolation and token-economics constraints;
+- SPC-004 for local operational telemetry and empirical tokenomics evidence;
 - DAT-001 for the exact resolver tool contract;
 - TSK-001 for the completed architecture-baseline task;
 - TSK-002 for the completed minimal resolver implementation task;
@@ -118,15 +119,18 @@ The current project authority is:
 - TSK-006 for the completed role-isolation and token-economics architecture
   task;
 - TSK-007 for the completed minimal Executor/Auditor subagent implementation
-  task.
+  task;
+- TSK-008 for the active operational-telemetry instrumentation task.
 
-No MTP or follow-on product TSK is active.
+No MTP is active because TSK-008 is one bounded local instrumentation
+capability.
 Exactly `dev-foundry-executor` and `dev-foundry-auditor` now exist as the
 initial project subagent topology under SPC-003, while their target Capability
 Profiles remain unbound in the active POP.
-Runtime/tokenomics qualification is the next separately governed boundary, and
-the atomic Claude-native cutover remains deferred until that qualification is
-accepted. Hooks, Skills, agent teams, model selection, and Claude
+Synthetic runtime qualification is no longer a cutover prerequisite. TSK-008
+prepares telemetry for later empirical review using real Claude-native work.
+The atomic Claude-native cutover remains deferred until telemetry readiness is
+established. Hooks, Skills, agent teams, model selection, and Claude
 settings/permissions remain unauthorized unless separately governed.
 
 The project Authority Index routes every current authoritative home. Missing
