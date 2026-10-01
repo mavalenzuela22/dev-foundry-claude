@@ -96,7 +96,7 @@ The current project authority is:
 - ADR-001 for the accepted Claude-native repository versus governance-MCP
   decision;
 - ARC-001 for the active Claude Code adapter architecture baseline;
-- TSK-001 for the in-progress architecture-baseline task.
+- TSK-001 for the completed architecture-baseline task.
 
 No SPC, product DAT, or MTP is active.
 No product runtime implementation is authorized.

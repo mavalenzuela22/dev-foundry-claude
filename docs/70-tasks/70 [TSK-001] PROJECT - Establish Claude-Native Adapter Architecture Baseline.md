@@ -4,7 +4,7 @@ artifact:
   id: TSK-001
   type: TSK
   title: Establish Claude-Native Adapter Architecture Baseline
-  status: IN_PROGRESS
+  status: COMPLETE
 artifactVersion: "1"
 authorityScope: tsk-001-claude-native-adapter-architecture-baseline
 ownerRole: governance-author
@@ -35,7 +35,7 @@ traceability:
     - ADR-001
     - ARC-001
 lifecycle:
-  phase: in-progress
+  phase: complete
   promotionRequired: true
 portability: project-specific
 ---
@@ -144,3 +144,22 @@ project POP adds no audit trigger, and TSK-001 introduces none.
 Completion of TSK-001 does not authorize its follow-on implementation tasks.
 Any MCP, hook, Skill, subagent, or runtime implementation requires a separately
 resolved governed operation and an appropriate concrete implementation binding.
+
+## 9. Completion evidence and known limit
+
+The architecture baseline was completed from repository authority plus current
+official Claude Code documentation covering direct repository/Git operation,
+project instructions, Skills, custom subagents, Hooks, permissions, and MCP tool
+search.
+
+The current process-bound runner's `resolve_governed_operation` returned
+`GOVERNANCE_RESOLUTION_AUTHORITY_INVALID` for TSK-001 across inspect, author,
+validate, promote, and close probes even after the task was persisted and routed.
+This result is not treated as a successful governance resolution.
+
+For TSK-001 authoring, the Governance Author role was resolved directly from the
+active POP and OPS-009, and the applicable authority was retrieved from the
+repository. The resolver incompatibility is therefore retained as an explicit
+implementation input for the future Claude governance MCP: task discovery and
+pre-TSK governance authoring must be deterministic without synthetic authority
+or repository archaeology.

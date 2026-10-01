@@ -95,8 +95,8 @@ The local Project Operating Profile and Authority Index bind that release to
 `dev-foundry-claude`.
 
 ADR-001 records the accepted Claude-native repository versus governance-MCP
-boundary. ARC-001 defines the active adapter architecture baseline. TSK-001 is
-the in-progress task establishing that baseline.
+boundary. ARC-001 defines the active adapter architecture baseline. TSK-001 has
+completed the bounded architecture-baseline task.
 
 The Implementation Executor binding remains deferred.
 No product runtime implementation or execution is authorized by TSK-001.
