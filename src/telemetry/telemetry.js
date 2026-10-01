@@ -5,6 +5,7 @@ import path from 'node:path';
 export const DEFAULT_HOST = '127.0.0.1';
 export const DEFAULT_PORT = 4318;
 export const MAX_BODY_BYTES = 1024 * 1024;
+export const LAUNCH_MODES = Object.freeze(['direct', 'dial', 'codemie']);
 
 const normalize = (key) => key.replace(/[^a-z0-9]/gi, '').toLowerCase();
 const safeKeys = new Set([
@@ -63,10 +64,12 @@ async function appendRecord(telemetryDir, prefix, record, timestamp) {
   await appendFile(filename, `${JSON.stringify(record)}\n`, { encoding: 'utf8', mode: 0o600 });
 }
 
-export function buildTelemetryEnvironment({ telemetryDir, telemetryRunId, port = DEFAULT_PORT, baseEnv = process.env }) {
+export function buildTelemetryEnvironment({ telemetryDir, telemetryRunId, port = DEFAULT_PORT, baseEnv = process.env, launchMode }) {
   validatePort(port);
+  if (launchMode !== undefined && !LAUNCH_MODES.includes(launchMode)) throw new Error('Invalid launch mode.');
   validateStorage(telemetryDir, telemetryRunId);
   const env = { ...baseEnv };
+  delete env.DEV_FOUNDRY_CLAUDE_LAUNCH_MODE;
   // Per-signal overrides otherwise take precedence over the generic endpoint.
   for (const key of Object.keys(env)) {
     if (/^OTEL_EXPORTER_OTLP_(?:METRICS|LOGS|TRACES)_(?:ENDPOINT|PROTOCOL)$/.test(key) || key === 'BETA_TRACING_ENDPOINT') delete env[key];
@@ -93,6 +96,7 @@ export function buildTelemetryEnvironment({ telemetryDir, telemetryRunId, port =
     OTEL_METRICS_INCLUDE_REPOSITORY: 'true',
     DEV_FOUNDRY_TELEMETRY_RUN_ID: telemetryRunId,
     DEV_FOUNDRY_TELEMETRY_DIR: telemetryDir,
+    ...(launchMode === undefined ? {} : { DEV_FOUNDRY_CLAUDE_LAUNCH_MODE: launchMode }),
   });
 }
 
@@ -196,5 +200,7 @@ export async function writeOperationMarker(input, { env = process.env } = {}) {
     if (typeof input[key] === 'string') marker[key] = input[key];
   }
   if (Array.isArray(input.capabilityProfilePaths)) marker.capabilityProfilePaths = input.capabilityProfilePaths.filter((item) => typeof item === 'string');
+  const launchMode = env.DEV_FOUNDRY_CLAUDE_LAUNCH_MODE;
+  if (LAUNCH_MODES.includes(launchMode)) marker.launchMode = launchMode;
   await appendRecord(telemetryDir, 'operations', marker, timestamp);
 }

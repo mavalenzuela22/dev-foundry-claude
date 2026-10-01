@@ -5,7 +5,7 @@ artifact:
   type: SPC
   title: Claude Operational Telemetry and Empirical Tokenomics Contract
   status: ACTIVE
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: claude-operational-telemetry-and-empirical-tokenomics
 ownerRole: governance-author
 canonical: true
@@ -93,8 +93,10 @@ The project telemetry path is local-only:
 - the collector binds only to `127.0.0.1`;
 - no wildcard, LAN, public, tunnel, cloud, or externally reachable telemetry
   listener is authorized;
-- the default endpoint is loopback port 4318 and may be overridden only by a
-  local launcher option;
+- the standalone collector defaults to loopback port 4318; the canonical launcher
+  lets the OS select a free loopback port (`port: 0`) and uses the actual bound
+  port, and accepts an explicit safe local port only through
+  `DEV_FOUNDRY_TELEMETRY_PORT`;
 - telemetry is persisted under
   `.dev-foundry/telemetry/local/`;
 - that directory is ignored by Git and SHALL NOT be promoted.
@@ -111,15 +113,37 @@ A versioned local launcher SHALL:
 
 1. establish a telemetry run identifier;
 2. start the loopback collector and wait until it is ready;
-3. launch the installed `claude` executable in the current repository with
-   metrics and logs exporters pointed at that collector;
-4. pass through user Claude CLI arguments;
+3. launch Claude Code through exactly one governed runtime (section 5.1) in the
+   repository root with metrics and logs exporters pointed at that collector;
+4. pass through user Claude CLI arguments after a mandatory `--` boundary;
 5. preserve interactive stdio;
 6. stop the collector after Claude exits;
 7. return Claude's exit status.
 
 The launcher SHALL NOT store credentials, select a Claude model, modify
-authentication, or invoke any synthetic prompt.
+authentication, alter DIAL or CodeMie provider routing, enable remote telemetry,
+or invoke any synthetic prompt.
+
+### 5.1 Launch modes
+
+The single launcher `scripts/telemetry/claude.mjs` accepts
+`--runtime <direct|dial|codemie> -- <claude args>` and deterministically maps:
+
+- `direct` -> `claude <claude args>`;
+- `dial` -> `dial run --harness claude-code -- <claude args>`;
+- `codemie` -> `codemie-claude -- <claude args>`.
+
+Unknown runtimes and malformed launcher syntax fail closed before any collector
+or child process starts. Mode-specific launcher copies are not authorized. A
+convenience script `scripts/telemetry/run-claude.sh <mode> -- <claude args>` may
+only delegate to the launcher. All modes receive the identical section 6 policy.
+
+### 5.2 Generated CodeMie analytics
+
+CodeMie writes per-session analytics reports to `docs/codemie/analytics/` in the
+working directory and offers no supported destination override. That subtree is
+generated runtime evidence, SHALL be Git-ignored, and SHALL NOT be promoted. The
+rest of `docs/codemie/` is not ignored by this contract.
 
 ## 6. Privacy boundary
 
@@ -151,7 +175,10 @@ correlation and analysis.
 The local launcher SHALL set a unique `DEV_FOUNDRY_TELEMETRY_RUN_ID` and a
 repository-local `DEV_FOUNDRY_TELEMETRY_DIR`.
 
-When those variables are present, the existing
+The launcher also sets `DEV_FOUNDRY_CLAUDE_LAUNCH_MODE` to `direct`, `dial`, or
+`codemie`; no other value is valid.
+
+When the run id and directory variables are present, the existing
 `resolve_governed_operation` MCP implementation MAY append a privacy-minimized
 operation marker after a successful resolution.
 
@@ -165,7 +192,9 @@ A marker contains only:
 - selected role id;
 - Actor Profile path;
 - Capability Profile paths;
-- context fingerprint.
+- context fingerprint;
+- optionally, `launchMode`, only when the launch-mode variable holds one of the
+  three closed values.
 
 It contains no authority bodies, prompt text, model output, tool payloads, file
 contents, credentials, or conversation transcript.

@@ -311,13 +311,15 @@ test('server source keeps one tool and opt-in marker after resolver success; lau
   assert.ok(gate > resolution);
   assert.ok(server.indexOf('await writeOperationMarker', gate) > gate);
   assert.ok(server.indexOf("return { content: [{ type: 'text', text: JSON.stringify(result) }] }") > gate);
-  const launcher = await readFile(path.join(repoRoot, 'scripts/telemetry/claude.mjs'), 'utf8');
-  assert.match(launcher, /const projectRoot = process\.cwd\(\)/);
+  const entry = await readFile(path.join(repoRoot, 'scripts/telemetry/claude.mjs'), 'utf8');
+  assert.match(entry, /runLauncher\(\{ argv: process\.argv\.slice\(2\) \}\)/);
+  const launcher = await readFile(path.join(repoRoot, 'src/telemetry/launch.js'), 'utf8');
+  assert.match(launcher, /projectRoot = process\.cwd\(\)/);
   assert.match(launcher, /const telemetryRunId = randomUUID\(\)/);
-  assert.match(launcher, /spawn\('claude', process\.argv\.slice\(2\), \{ stdio: 'inherit', cwd: projectRoot, env \}\)/);
-  assert.ok(launcher.indexOf('await startCollector') < launcher.indexOf("spawn('claude'"));
+  assert.match(launcher, /spawn\(plan\.executable, plan\.args, \{ stdio: 'inherit', cwd: projectRoot, env: childEnv, shell: false \}\)/);
+  assert.ok(launcher.indexOf('await startCollector') < launcher.indexOf('spawn(plan.executable'));
   assert.match(launcher, /finally \{\s*if \(collector\) await collector\.close\(\)/);
-  for (const script of ['claude.mjs', 'collector.mjs']) execFileSync(process.execPath, ['--check', path.join(repoRoot, 'scripts/telemetry', script)]);
+  for (const script of ['scripts/telemetry/claude.mjs', 'scripts/telemetry/collector.mjs', 'src/telemetry/launch.js']) execFileSync(process.execPath, ['--check', path.join(repoRoot, script)]);
 });
 
 test('local telemetry directory is Git-ignored', async () => {
