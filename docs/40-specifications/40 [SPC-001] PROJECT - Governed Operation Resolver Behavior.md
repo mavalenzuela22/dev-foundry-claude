@@ -5,7 +5,7 @@ artifact:
   type: SPC
   title: Governed Operation Resolver Behavior
   status: ACTIVE
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: dev-foundry-claude-governed-operation-resolution
 ownerRole: governance-author
 canonical: true
@@ -146,8 +146,37 @@ When `requestedRole` is present it MUST name an active POP binding compatible
 with the requested action. An incompatible, deferred, missing, or unresolved
 binding fails closed.
 
+Compatibility is closed as follows:
+
+| requestedAction | compatible requested role(s) |
+| --- | --- |
+| `inspect` | any active POP-bound role |
+| `author` | `governance-author` |
+| `implement` | `implementation-executor` |
+| `validate` | `mechanical-validator` |
+| `audit` | `governance-auditor` |
+| `promote` | `governance-author` |
+| `close` | `evidence-custodian` |
+
 The resolver SHALL return the selected Actor Profile and configured Capability
 Profiles without copying their complete contents into the tool result.
+
+### 7.1 Assessment and gate mapping
+
+The resolver SHALL return the following exact ordered identifiers:
+
+| requestedAction | requiredAssessments | requiredGates |
+| --- | --- | --- |
+| `inspect` | `boundary_state` | `authority_resolved` |
+| `author` | `boundary_state`, `authorization_intent`, `audit_trigger` | `authority_resolved`, `semantic_self_assessment`, `independent_audit_if_triggered`, `operator_authorization` |
+| `implement` | `boundary_state`, `authorization_intent` | `authority_resolved`, `executor_fit`, `implementation_self_verification`, `projection_reconciliation_if_needed`, `mechanical_validation` |
+| `validate` | `validation_coverage`, `failure_causality` | `authority_resolved`, `mechanical_validation` |
+| `audit` | `audit_trigger`, `audit_disposition` | `authority_resolved`, `independent_audit_if_triggered` |
+| `promote` | `boundary_state`, `authorization_intent`, `audit_disposition` | `authority_resolved`, `mechanical_validation`, `semantic_self_assessment`, `independent_audit_if_triggered`, `operator_authorization`, `promotion_state_revalidation` |
+| `close` | `closure_readiness`, `audit_disposition` | `authority_resolved`, `closure_evidence`, `operator_authorization` |
+
+These arrays are routing outputs, not claims that any listed assessment or gate
+has already passed.
 
 ## 8. Authority retrieval
 
