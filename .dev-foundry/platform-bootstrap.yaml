@@ -3,7 +3,7 @@ id: DFC-PLATFORM-BOOTSTRAP
 title: dev-foundry-claude Platform Bootstrap
 kind: platform-bootstrap
 status: prepared
-artifact_version: "2.1.0-local.1"
+artifact_version: "2.1.0-local.2"
 canonical: false
 methodology_authority: false
 
@@ -45,5 +45,6 @@ constraints:
   - role selection is operation-scoped
   - independent audit eligibility is established from actual prior participation and active separation-of-duty rules
   - runner runtime state and product mechanics are not reusable methodology
-  - implementation-executor remains deferred until an explicitly governed implementation task activates it
+  - implementation-executor is separately bound in the POP to the process-bound runner code executor for explicitly governed implementation tasks
+  - this governance-agent bootstrap does not make its concrete implementation eligible to self-select the implementation-executor role
   - the deployed project system prompt is a non-authoritative derivative and must remain semantically aligned with this bootstrap

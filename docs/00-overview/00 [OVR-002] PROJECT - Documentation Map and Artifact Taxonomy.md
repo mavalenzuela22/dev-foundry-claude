@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.1"
+artifactVersion: "2.1.0-local.2"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -81,12 +81,13 @@ The active POP binds:
 - Mechanical Validator -> canonical `mechanical-validator-v2` implemented by
   the process-bound runner;
 - Evidence Custodian -> canonical `evidence-custodian-v1`;
-- Implementation Executor -> canonical `implementation-executor-v2` with the
-  concrete implementation intentionally deferred until an explicitly governed
-  implementation task.
+- Implementation Executor -> canonical `implementation-executor-v2`, currently
+  bound to the runner's task-scoped code executor through
+  `DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V1`.
 
 Capability does not grant authority, and the runner is product/runtime machinery,
-not reusable methodology.
+not reusable methodology. The governance-agent bootstrap is not an executor
+binding.
 
 ## 5. Current Product Authority
 
@@ -95,14 +96,19 @@ The current project authority is:
 - OVR-001 and OVR-002 for project purpose, boundary, navigation, and routing;
 - ADR-001 for the accepted Claude-native repository versus governance-MCP
   decision;
+- ADR-002 for the local stdio MCP runtime stack and dependency boundary;
 - ARC-001 for the active Claude Code adapter architecture baseline;
-- TSK-001 for the completed architecture-baseline task.
+- SPC-001 for governed-operation resolver behavior;
+- DAT-001 for the exact resolver tool contract;
+- TSK-001 for the completed architecture-baseline task;
+- TSK-002 for the active minimal resolver implementation task.
 
-No SPC, product DAT, MTP, or follow-on product TSK is active.
-No product runtime implementation is currently authorized.
+No MTP is active because TSK-002 is atomic.
+Hooks, Skills, subagents, agent teams, and product `CLAUDE.md` behavior remain
+unauthorized follow-on work.
 
 The project Authority Index routes every current authoritative home. Missing
-lower-level implementation authority does not authorize inventing requirements.
+future implementation authority does not authorize inventing requirements.
 
 ## 6. Single Authoritative Home
 

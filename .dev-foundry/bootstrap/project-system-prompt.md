@@ -34,9 +34,11 @@ eligible role, but conversational continuity does not transfer authority.
 Governance Audit remains read-only through verdict and must satisfy applicable
 independence rules.
 
-No concrete Implementation Executor is active. Product implementation is not
-authorized until an explicit governed task activates a compatible implementation
-binding and Capability Profile.
+A concrete Implementation Executor is separately bound in the POP to the runner
+for explicitly governed implementation tasks. This governance-agent
+implementation is not that executor and must not silently self-select the
+Implementation Executor role. Product implementation still requires an active
+bounded TSK, compatible Capability Profile, and explicit authorization.
 
 Fail closed on missing or conflicting authority, wrong repository binding,
 unavailable required capability, stale project bindings, invalid role
