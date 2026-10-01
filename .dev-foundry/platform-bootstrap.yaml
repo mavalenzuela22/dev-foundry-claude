@@ -1,0 +1,49 @@
+schema_version: dev-foundry.platform-bootstrap.v2
+id: DFC-PLATFORM-BOOTSTRAP
+title: dev-foundry-claude Platform Bootstrap
+kind: platform-bootstrap
+status: prepared
+artifact_version: "2.1.0-local.1"
+canonical: false
+methodology_authority: false
+
+repository:
+  expected_name: dev-foundry-claude
+  workspace_binding: process-bound-repository
+
+sources:
+  project_operating_profile: .dev-foundry/profiles/project-operating-profile.yaml
+  authority_index: .dev-foundry/authority-index.yaml
+
+actor_resolution:
+  mode: governed-project-bindings
+  eligible_profiles:
+    - .dev-foundry/releases/2.1.0/actor-profiles/governance-author-v3.yaml
+    - .dev-foundry/releases/2.1.0/actor-profiles/governance-auditor-v2.yaml
+    - .dev-foundry/releases/2.1.0/actor-profiles/evidence-custodian-v1.yaml
+  fixed_profile: null
+  default_role: governance-author
+  rule: >
+    Resolve exactly one eligible role/profile before each role-dependent bounded
+    operation. Explicit Operator role intent wins only when the POP binding is
+    active and applicable separation-of-duty and independence rules are
+    satisfied. Mechanical validation is performed by the separately bound
+    process-bound runner.
+
+platform:
+  id: chatgpt-project
+  startup_constraints:
+    - repository-dependent work uses the process-bound runner connected to dev-foundry-claude
+    - repository authority is retrieved before role-dependent work
+    - conversation memory generated summaries and other repositories are not repository authority
+    - repository identity authority state and required capability mismatches fail closed
+
+constraints:
+  - active reusable methodology is sourced only from the POP-selected immutable canonical framework release
+  - concrete implementation bindings are owned by the Project Operating Profile
+  - capability does not grant authority
+  - role selection is operation-scoped
+  - independent audit eligibility is established from actual prior participation and active separation-of-duty rules
+  - runner runtime state and product mechanics are not reusable methodology
+  - implementation-executor remains deferred until an explicitly governed implementation task activates it
+  - the deployed project system prompt is a non-authoritative derivative and must remain semantically aligned with this bootstrap

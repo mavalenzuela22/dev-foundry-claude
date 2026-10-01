@@ -1,0 +1,9 @@
+# DEV FOUNDRY runtime-owned records
+execution-requests/
+repository-transactions/
+executions/
+telemetry/
+
+# Canonical methodology releases are governed repository content.
+!releases/
+!releases/**

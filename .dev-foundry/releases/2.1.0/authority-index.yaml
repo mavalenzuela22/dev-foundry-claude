@@ -1,0 +1,210 @@
+schema_version: dev-foundry.authority-index.v2
+id: DF-FRAMEWORK-2.1.0-AUTHORITY-INDEX
+title: DEV FOUNDRY Framework 2.1.0 Authority Index
+kind: authority-index
+status: active
+artifact_version: "2.1.0"
+canonical: true
+
+subject:
+  kind: framework-release
+  id: DF-FRAMEWORK-2.1.0
+  version: "2.1.0"
+  base_version: "2.0.0"
+  manifest: .dev-foundry/releases/2.1.0/release-integrity-manifest.yaml
+
+routes:
+  - id: framework-overview
+    path: .dev-foundry/releases/2.1.0/docs/00-overview/00 [OVR-001] DF - Framework Overview.md
+    authority_class: methodology
+    governs:
+      - framework-purpose
+      - framework-terminology
+      - framework-authority-direction
+      - source-of-truth-definition
+      - self-containment-principle
+    section_id: null
+  - id: artifact-taxonomy
+    path: .dev-foundry/releases/2.1.0/docs/00-overview/00 [OVR-002] DF - Documentation Map and Artifact Taxonomy.md
+    authority_class: methodology
+    governs:
+      - documentation-map
+      - artifact-taxonomy
+      - artifact-authority-map
+      - artifact-reference-direction
+      - portability-model
+      - operational-artifact-classification
+    section_id: null
+  - id: governed-lifecycle
+    path: .dev-foundry/releases/2.1.0/docs/30-operations/30 [OPS-001] DF - Governed Planning and Delivery Lifecycle.md
+    authority_class: methodology
+    governs:
+      - governed-lifecycle
+      - lifecycle-stage-separation
+      - task-and-microtask-operation
+      - lifecycle-stop-conditions
+    section_id: null
+  - id: implementation-fit
+    path: .dev-foundry/releases/2.1.0/docs/30-operations/30 [OPS-002] DF - Implementation Capability Profiles and Workload Fit.md
+    authority_class: methodology
+    governs:
+      - capability-profile-semantics
+      - implementation-fit-assessment
+      - workload-decomposition
+      - execution-scope-fit
+    section_id: null
+  - id: roles-and-separation
+    path: .dev-foundry/releases/2.1.0/docs/30-operations/30 [OPS-003] DF - Roles Responsibilities and Separation of Duties.md
+    authority_class: methodology
+    governs:
+      - role-model
+      - actor-role-implementation-platform-separation
+      - separation-of-duties
+      - role-handoffs
+      - boundary-exception-semantics
+    section_id: null
+  - id: validation-audit-evidence
+    path: .dev-foundry/releases/2.1.0/docs/30-operations/30 [OPS-004] DF - Validation Audit Evidence and Corrective Model.md
+    authority_class: methodology
+    governs:
+      - mechanical-validation-semantics
+      - governance-audit-semantics
+      - audit-trigger-model
+      - audit-finding-freeze
+      - corrective-review-convergence
+      - evidence-semantics
+      - verdict-model
+    section_id: null
+  - id: adoption-and-versioning
+    path: .dev-foundry/releases/2.1.0/docs/30-operations/30 [OPS-005] DF - Project Adoption Versioning and Framework Evolution.md
+    authority_class: methodology
+    governs:
+      - project-adoption
+      - greenfield-adoption
+      - brownfield-adoption
+      - portability-actions
+      - project-operating-profile-requirements
+      - framework-versioning
+      - framework-evolution
+      - deviation-semantics
+    section_id: null
+  - id: metadata-policy
+    path: .dev-foundry/releases/2.1.0/docs/30-operations/30 [OPS-006] DF - Source of Truth Metadata and Frontmatter Policy.md
+    authority_class: methodology
+    governs:
+      - source-of-truth-metadata-policy
+      - metadata-body-consistency
+      - metadata-adoption-modes
+      - section-registry-policy
+      - metadata-validation-responsibilities
+    section_id: null
+  - id: minimal-sufficient-change
+    path: .dev-foundry/releases/2.1.0/docs/30-operations/30 [OPS-007] DF - Minimal Sufficient Change and Sufficiency Review.md
+    authority_class: methodology
+    governs:
+      - necessity-assessment
+      - reuse-assessment
+      - minimal-sufficient-change
+      - sufficiency-review
+      - evidence-triggered-evolution
+    section_id: null
+  - id: side-effect-authorization
+    path: .dev-foundry/releases/2.1.0/docs/30-operations/30 [OPS-008] DF - Side Effect Authorization and Promotion Safety.md
+    authority_class: methodology
+    governs:
+      - side-effect-authorization
+      - standing-authorization-semantics
+      - promotion-gate-separation
+      - state-revalidation
+      - indeterminate-side-effect-handling
+      - implementation-projection-reconciliation
+    section_id: null
+  - id: profile-and-bootstrap-operation
+    path: .dev-foundry/releases/2.1.0/docs/30-operations/30 [OPS-009] DF - Actor Profiles Project Bindings and Platform Bootstrap.md
+    authority_class: methodology
+    governs:
+      - actor-profile-operation
+      - actor-binding-operation
+      - project-operating-profile-operation
+      - platform-bootstrap-operation
+      - profile-versioning
+      - operation-scoped-role-selection
+    section_id: null
+  - id: sot-frontmatter-contract
+    path: .dev-foundry/releases/2.1.0/docs/60-data-contracts/60 [DAT-008] DF - Source of Truth Frontmatter Contract.md
+    authority_class: methodology
+    governs:
+      - sot-frontmatter-schema
+      - governance-metadata-field-contract
+      - section-registry-contract
+      - lifecycle-field-contract
+      - portability-field-contract
+      - frontmatter-validation-findings
+    section_id: null
+  - id: profile-contracts
+    path: .dev-foundry/releases/2.1.0/docs/60-data-contracts/60 [DAT-016] DF - Actor Capability Project Profile and Platform Bootstrap Contracts.md
+    authority_class: methodology
+    governs:
+      - actor-profile-v2-contract
+      - capability-profile-v1-contract
+      - project-operating-profile-v2-contract
+      - platform-bootstrap-v2-contract
+      - project-actor-binding-contract
+    section_id: null
+  - id: authority-index-contract
+    path: .dev-foundry/releases/2.1.0/docs/60-data-contracts/60 [DAT-020] DF - Authority Index Contract.md
+    authority_class: methodology
+    governs:
+      - authority-index-v2-contract
+      - authority-route-contract
+      - authoritative-home-uniqueness
+    section_id: null
+  - id: framework-integrity-contracts
+    path: .dev-foundry/releases/2.1.0/docs/60-data-contracts/60 [DAT-021] DF - Framework Candidate and Release Integrity Contracts.md
+    authority_class: methodology
+    governs:
+      - framework-candidate-manifest-v2-contract
+      - release-integrity-manifest-v2-contract
+      - candidate-release-hash-binding
+      - integrity-dag-contract
+    section_id: null
+  - id: governance-author-profile
+    path: .dev-foundry/releases/2.1.0/actor-profiles/governance-author-v3.yaml
+    authority_class: methodology
+    governs:
+      - governance-author-role-profile
+    section_id: null
+  - id: implementation-executor-profile
+    path: .dev-foundry/releases/2.1.0/actor-profiles/implementation-executor-v2.yaml
+    authority_class: methodology
+    governs:
+      - implementation-executor-role-profile
+    section_id: null
+  - id: mechanical-validator-profile
+    path: .dev-foundry/releases/2.1.0/actor-profiles/mechanical-validator-v2.yaml
+    authority_class: methodology
+    governs:
+      - mechanical-validator-role-profile
+    section_id: null
+  - id: governance-auditor-profile
+    path: .dev-foundry/releases/2.1.0/actor-profiles/governance-auditor-v2.yaml
+    authority_class: methodology
+    governs:
+      - governance-auditor-role-profile
+    section_id: null
+  - id: evidence-custodian-profile
+    path: .dev-foundry/releases/2.1.0/actor-profiles/evidence-custodian-v1.yaml
+    authority_class: methodology
+    governs:
+      - evidence-custodian-role-profile
+    section_id: null
+
+bindings: []
+
+rules:
+  single_authoritative_home_required: true
+  unindexed_active_authority_forbidden: true
+  evidence_is_normative: false
+  consumer_copy_is_canonical: false
+  runtime_capability_grants_authority: false
+  automatic_framework_upgrade: false
