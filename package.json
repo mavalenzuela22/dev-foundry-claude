@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "node src/governance-mcp/server.js",
-    "test": "node --test test/governance-mcp/*.test.js"
+    "test": "node --test test/governance-mcp/*.test.js test/bootstrap/*.test.js"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.2.0",
