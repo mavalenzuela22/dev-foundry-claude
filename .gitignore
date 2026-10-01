@@ -429,3 +429,5 @@ FodyWeavers.xsd
 *.msp
 
 .dev-foundry/telemetry/local/
+
+docs/codemie/analytics/

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { lstat, readFile, readdir } from 'node:fs/promises';
 import { relative, resolve, sep } from 'node:path';
 import test from 'node:test';
@@ -235,7 +236,12 @@ test('project has exactly the two authorized subagents and no Claude settings, H
   // An exact tree excludes settings variants, Hooks, Skills, teams, extra
   // agents, nested definitions, and dangling configuration links.
   assert.ok((await lstat(resolve(root, '.claude'))).isDirectory());
-  assert.deepEqual(await readdir(resolve(root, '.claude')), ['agents']);
+  // Operator-local settings.local.json is tolerated only when Git ignores it.
+  const claudeEntries = (await readdir(resolve(root, '.claude'))).sort();
+  if (claudeEntries.includes('settings.local.json')) {
+    execFileSync('git', ['check-ignore', '-q', '.claude/settings.local.json'], { cwd: root });
+  }
+  assert.deepEqual(claudeEntries.filter((name) => name !== 'settings.local.json'), ['agents']);
   assert.ok((await lstat(resolve(root, '.claude/agents'))).isDirectory());
   const definitions = ['dev-foundry-auditor.md', 'dev-foundry-executor.md'];
   assert.deepEqual((await readdir(resolve(root, '.claude/agents'))).sort(), definitions);

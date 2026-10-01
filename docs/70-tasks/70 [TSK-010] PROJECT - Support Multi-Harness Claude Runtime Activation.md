@@ -4,7 +4,7 @@ artifact:
   id: TSK-010
   type: TSK
   title: Support Multi-Harness Claude Runtime Activation
-  status: IN_PROGRESS
+  status: COMPLETE
 artifactVersion: "1"
 authorityScope: tsk-010-multi-harness-claude-runtime-activation
 ownerRole: governance-author
@@ -42,7 +42,7 @@ traceability:
     - TSK-008
     - TSK-009
 lifecycle:
-  phase: in-progress
+  phase: complete
   dependsOn:
     - TSK-008
     - TSK-009
@@ -258,3 +258,40 @@ self-assessment is PASS, evidence is recorded, the exact candidate is promoted t
 `main`, reconciliation confirms a clean `main`, and the task branch is cleaned up.
 Actual telemetry arrival through the new launcher remains a first-use runtime
 fact to verify in the next real session.
+
+## 11. Completion result
+
+The Implementation Executor operation (`dev-foundry-executor`, resolved as
+`implementation-executor` with Capability Profile
+`DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V2`) changed exactly the eight paths
+authorized in section 7 and no other path, and self-verified before hand-back.
+
+Native mechanical validation (`claude-code-native-validation`, run independently
+of the Executor) PASSED: `npm ci`, `npm test` 62/62 (49 baseline plus 13 new,
+including the previously failing `.claude` tree test), `git diff --check`, and an
+exact eight-path change-set check. `scripts/telemetry/run-claude.sh` is mode 755.
+No Claude, DIAL, CodeMie, or model process was invoked.
+
+Governance Author semantic self-assessment is PASS:
+
+- one canonical launcher; the three runtimes map exactly per section 4;
+- unknown runtime and malformed syntax fail closed before any collector or child
+  starts;
+- the default collector port is OS-selected and the bound port feeds
+  `OTEL_EXPORTER_OTLP_ENDPOINT`; the collector stays loopback-only;
+- the SPC-004 privacy flags, sanitizer, resolver, `server.js`, subagents, POP,
+  bindings, dependencies, and provider/model settings are unchanged;
+- `launchMode` is limited to `direct | dial | codemie` in environment and markers;
+- the shell script only delegates;
+- only `docs/codemie/analytics/` is ignored.
+
+No independent Governance Audit is required: the POP has no audit trigger and no
+framework-required trigger applies.
+
+Known limit: the `.claude/settings.local.json` tolerance depends on that file
+being ignored; it is ignored today through the Operator's global Git ignore. The
+file does not exist in a clean checkout.
+
+First-use runtime facts remain open and are not fabricated: whether `dial run`
+and `codemie-claude` forward the launcher's telemetry environment to Claude Code
+is verified by the next real session started through the launcher.
