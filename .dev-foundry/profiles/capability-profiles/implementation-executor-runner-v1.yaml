@@ -1,0 +1,62 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V1
+status: active
+implementation_class: process-bound-runner-code-executor
+supported_actions:
+  - inspect_task_directed_repository_context
+  - create_update_delete_task_authorized_product_files
+  - install_explicitly_authorized_npm_dependencies
+  - run_node_package_scripts
+  - run_focused_node_tests
+  - run_local_stdio_process_smoke_tests
+  - report_changed_surface_and_projection_variances
+  - produce_focused_implementation_proof
+prohibited_actions:
+  - author_or_modify_product_authority
+  - modify_canonical_framework_release
+  - modify_project_operating_profile_or_platform_bootstrap
+  - create_or_modify_governance_audit_verdict
+  - commit_push_create_pull_request_or_merge
+  - mutate_outside_process_bound_repository
+  - add_undeclared_runtime_or_development_dependencies
+  - expose_network_listener_or_remote_service
+  - read_or_store_secrets
+  - perform_adjacent_cleanup
+limits:
+  repository: dev-foundry-claude
+  implementation_boundary: TSK-002
+  dependency_policy:
+    runtime:
+      - "@modelcontextprotocol/server@2.2.0"
+      - "zod@4.6.5"
+    development:
+      - "@modelcontextprotocol/client@2.2.0"
+  mutation_surface_projection:
+    - package.json
+    - package-lock.json
+    - .mcp.json
+    - src/governance-mcp/**
+    - test/governance-mcp/**
+  transport: local-stdio-only
+  node_runtime: ">=20"
+  network_runtime: no-listening-socket
+proof_capabilities:
+  - npm_dependency_restore
+  - node_builtin_test_runner
+  - mcp_stdio_client_server_smoke
+  - git_status_and_diff_reporting
+environment_constraints:
+  - process_bound_repository_must_be_dev_foundry_claude
+  - node_20_or_newer_must_be_available
+  - npm_must_be_available
+  - package_registry_access_may_be_used_only_for_declared_dependency_restore
+  - implementation_runtime_must_not_require_public_or_local_network_listener
+stop_conditions:
+  - required_node_or_npm_runtime_unavailable
+  - declared_dependency_restore_fails_indeterminately
+  - task_requires_governance_or_framework_mutation
+  - task_requires_dependency_not_authorized_by_ADR_002
+  - task_requires_network_transport_or_authentication
+  - task_requires_scope_outside_TSK_002
+  - observed_repository_state_conflicts_with_directed_authority
+portability: configure

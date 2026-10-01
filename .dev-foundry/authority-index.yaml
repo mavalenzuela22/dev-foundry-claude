@@ -3,7 +3,7 @@ id: DFC-AUTHORITY-INDEX
 title: dev-foundry-claude Repository Authority Index
 kind: authority-index
 status: active
-artifact_version: "2.1.0-local.1"
+artifact_version: "2.1.0-local.2"
 canonical: false
 
 subject:
@@ -57,6 +57,38 @@ routes:
     governs:
       - claude-native-adapter-architecture-baseline
     section_id: null
+  - id: minimal-governance-mcp-runtime-stack
+    path: docs/10-decisions/10 [ADR-002] PROJECT - Minimal Governance MCP Runtime Stack.md
+    authority_class: decision
+    governs:
+      - governance-mcp-transport
+      - governance-mcp-runtime-stack
+      - governance-mcp-dependency-boundary
+    section_id: null
+  - id: governed-operation-resolver-behavior
+    path: docs/40-specifications/40 [SPC-001] PROJECT - Governed Operation Resolver Behavior.md
+    authority_class: product
+    governs:
+      - governed-operation-resolution-behavior
+      - resolver-authority-selection
+      - resolver-role-selection
+      - resolver-staleness-detection
+    section_id: null
+  - id: governed-operation-resolver-contract
+    path: docs/60-data-contracts/60 [DAT-001] PROJECT - Governed Operation Resolver Contract.md
+    authority_class: product
+    governs:
+      - governed-operation-resolver-input
+      - governed-operation-resolver-output
+      - governed-operation-resolver-errors
+      - governed-operation-context-fingerprint
+    section_id: null
+  - id: TSK-002
+    path: docs/70-tasks/70 [TSK-002] PROJECT - Implement Minimal Claude Governance MCP Resolver.md
+    authority_class: task
+    governs:
+      - minimal-claude-governance-mcp-resolver
+    section_id: null
 
 bindings:
   - id: project-operating-profile
@@ -67,6 +99,11 @@ bindings:
   - id: platform-bootstrap
     path: .dev-foundry/platform-bootstrap.yaml
     kind: platform-bootstrap
+    authority_class: configured
+    required: true
+  - id: implementation-executor-capability
+    path: .dev-foundry/profiles/capability-profiles/implementation-executor-runner-v1.yaml
+    kind: capability-profile
     authority_class: configured
     required: true
 

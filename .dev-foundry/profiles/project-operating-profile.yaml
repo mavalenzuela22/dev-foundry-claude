@@ -3,7 +3,7 @@ id: DFC-PROJECT-OPERATING-PROFILE
 title: dev-foundry-claude Project Operating Profile
 kind: project-operating-profile
 status: active
-artifact_version: "2.1.0-local.1"
+artifact_version: "2.1.0-local.2"
 canonical: false
 
 repository:
@@ -41,10 +41,12 @@ actor_bindings:
   implementation-executor:
     profile: .dev-foundry/releases/2.1.0/actor-profiles/implementation-executor-v2.yaml
     implementation:
-      kind: other
-      identity: unbound-until-explicit-task-authorization
-    capability_profiles: []
-    status: deferred
+      kind: tool
+      identity: process-bound-runner-code-executor
+      platform: chatgpt-project
+    capability_profiles:
+      - .dev-foundry/profiles/capability-profiles/implementation-executor-runner-v1.yaml
+    status: active
   mechanical-validator:
     profile: .dev-foundry/releases/2.1.0/actor-profiles/mechanical-validator-v2.yaml
     implementation:
