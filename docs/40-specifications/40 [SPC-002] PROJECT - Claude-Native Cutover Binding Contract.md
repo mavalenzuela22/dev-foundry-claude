@@ -5,7 +5,7 @@ artifact:
   type: SPC
   title: Claude-Native Cutover Binding Contract
   status: ACTIVE
-artifactVersion: "3"
+artifactVersion: "4"
 authorityScope: claude-native-cutover-binding-contract
 ownerRole: governance-author
 canonical: true
@@ -144,7 +144,11 @@ become a repository remote-control surface.
 ## 7. Isolation and audit boundary
 
 The cutover SHALL NOT occur until the dedicated Executor and Auditor subagents
-are implemented and qualified under SPC-003.
+are implemented and statically qualified under SPC-003 and the local
+operational-telemetry path is mechanically ready under SPC-004.
+
+Paid synthetic Claude benchmarking is not a cutover prerequisite. Empirical
+tokenomics review occurs later from real governed work captured after cutover.
 
 The Auditor exists because fresh read-only semantic isolation can satisfy a real
 independence need, not for role symmetry. When a bounded operation triggers
@@ -159,9 +163,14 @@ of dispatching the selected Implementation Executor role.
 ## 8. Cutover acceptance
 
 The future cutover TSK is complete only when repository-configured bindings,
-Platform Bootstrap, active capability routing, qualified SPC-003 subagent
-topology, overview state, and any non-authoritative platform derivative are
-mutually consistent and mechanically validated.
+Platform Bootstrap, active capability routing, statically qualified SPC-003
+subagent topology, SPC-004 telemetry instrumentation readiness, overview state,
+and any non-authoritative platform derivative are mutually consistent and
+mechanically validated.
 
 Runtime trust/MCP approval is verified by the Operator in the first direct Claude
 Code session and is not fabricated as repository evidence.
+
+The first real Claude-native session also verifies actual telemetry arrival.
+That verification is runtime evidence after cutover, not a paid pre-cutover
+benchmark.

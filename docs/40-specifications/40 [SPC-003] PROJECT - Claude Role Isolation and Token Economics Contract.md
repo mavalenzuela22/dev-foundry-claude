@@ -5,7 +5,7 @@ artifact:
   type: SPC
   title: Claude Role Isolation and Token Economics Contract
   status: ACTIVE
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: claude-role-isolation-and-token-economics
 ownerRole: governance-author
 canonical: true
@@ -14,7 +14,7 @@ scope:
     - claude-main-agent-role-boundary
     - claude-subagent-isolation-topology
     - claude-static-context-budgets
-    - claude-runtime-tokenomics-qualification
+    - claude-empirical-tokenomics-retention
   appliesTo:
     components:
       - dev-foundry-claude
@@ -97,7 +97,7 @@ subagents, or subagent-to-subagent delegation.
 
 ## 5. Static token-economics budgets
 
-The following project-specific ceilings apply before runtime qualification:
+The following project-specific ceilings apply before empirical runtime review:
 
 - root `CLAUDE.md` remains at or below 40 non-empty lines;
 - exactly two project subagent definitions are permitted by the initial
@@ -149,52 +149,69 @@ A subagent disposition contains only:
 
 Narrative reconstruction of the agent's internal exploration is not required.
 
-## 8. Runtime qualification metrics
+## 8. Empirical measurement policy
 
-Before Claude-native cutover, a qualification task SHALL execute controlled
-Claude Code scenarios and record, when the runtime exposes them:
+The initial two-subagent topology is a bounded probationary topology justified
+before measurement by two concrete needs:
+
+- Executor context isolation keeps implementation-local exploration out of the
+  operator-facing Governance Author context;
+- Auditor isolation provides a fresh read-only implementation for a real
+  independence boundary.
+
+The project SHALL NOT pay for synthetic Claude workloads solely to benchmark
+that topology before cutover.
+
+Instead, SPC-004 governs privacy-minimized operational telemetry collected from
+real Claude-native work after cutover. A later empirical review evaluates, when
+the runtime exposes them:
 
 - model and effort/routing configuration;
 - model invocation count;
 - input tokens;
 - output tokens;
-- cache creation/write tokens;
+- cache creation tokens;
 - cache read tokens;
 - reported cost;
-- context utilization;
-- persistent startup context contribution;
-- handoff bytes;
-- disposition bytes;
-- authority bytes read;
-- number and depth of subagent launches.
+- request duration;
+- main versus subagent query source;
+- compaction/subagent completion activity;
+- handoff/disposition sizes where separately observable.
 
-When a provider/runtime does not expose a metric, evidence records
-`unavailable`. The project SHALL NOT fabricate token or dollar estimates and
-present them as runtime measurement.
+When a provider/runtime does not expose a metric or natural work has not
+produced a sample, evidence records `unavailable`. The project SHALL NOT
+fabricate token or dollar estimates and present them as runtime measurement.
 
-## 9. Qualification scenarios
+## 9. Natural-work sampling
 
-At minimum, qualification SHALL measure:
+Empirical review uses naturally occurring governed work.
 
-1. cold project startup plus governed `inspect` resolution;
-2. direct main-agent Governance Author operation with no subagent;
-3. bounded implementation using `dev-foundry-executor`;
-4. triggered read-only Governance Audit using `dev-foundry-auditor`.
+It does not create artificial Governance Author, Executor, Auditor, Validator,
+or Evidence Custodian workloads merely to fill a benchmark matrix.
 
-The qualification compares measured delegated operations against an equivalent
-direct-main baseline where safe and meaningful.
+If representative implementation work occurs, Executor behavior is measured.
+If an independent Governance Audit is actually triggered, Auditor behavior is
+measured. If no such audit occurs, Auditor empirical cost remains
+`unavailable` rather than forcing a paid audit simulation.
+
+Direct measurement, time-window correlation, and inference MUST be identified
+separately in the review.
 
 ## 10. Retention rule
 
-A subagent may remain in the cutover topology only when qualification shows its
-declared benefit and no unacceptable token/cost/context regression.
+The two initial subagents may enter cutover after static qualification and
+SPC-004 telemetry readiness. Their long-term retention is then subject to
+empirical review of real work.
 
-The Executor must demonstrate material context isolation or cheaper routing
-benefit for representative implementation work.
+The Executor should demonstrate material context-isolation value or a favorable
+token/cost tradeoff for representative implementation work. The Auditor may
+remain justified primarily by independence/context isolation even when its total
+token cost is higher, but observed overhead must still be reported.
 
-The Auditor's primary benefit may be independence/context isolation rather than
-lower total token cost, but its measured overhead still must be recorded and
-accepted by the Operator.
+The project principle remains **no agent without measured benefit** as a
+long-term retention rule. The initial two-agent topology is the explicitly
+governed probationary exception needed to collect that measurement without
+synthetic spend.
 
 No additional Author, Custodian, Validator, research, planning, reviewer, or
 helper subagent may be added before separate measurement and governance justify
@@ -205,8 +222,8 @@ it.
 TSK-006 does not select concrete Claude models.
 
 Initial subagent implementation SHALL avoid provider/model specialization unless
-a later governed task explicitly authorizes it. Runtime qualification may compare
-model-routing alternatives after the topology itself is proven.
+a later governed task explicitly authorizes it. Empirical review may compare
+observed model-routing alternatives only after real workload evidence exists.
 
 ## 12. Fail-closed conditions
 
@@ -215,7 +232,9 @@ Stop before cutover when:
 - subagent topology exceeds the initial two-agent boundary;
 - automatic or nested delegation is required;
 - static budgets are exceeded without a governed fit reassessment;
-- qualification evidence is unavailable for a claimed measured benefit;
+- SPC-004 telemetry instrumentation required for empirical review is not ready
+  at cutover;
+- a claimed measured benefit is presented without observed evidence;
 - role routing conflicts with POP/SPC-002;
 - a required independent Auditor implementation cannot satisfy independence;
 - the main agent would need to implement product code while acting as Governance

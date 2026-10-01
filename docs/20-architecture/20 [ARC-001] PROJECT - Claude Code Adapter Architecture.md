@@ -5,7 +5,7 @@ artifact:
   type: ARC
   title: Claude Code Adapter Architecture
   status: ACTIVE
-artifactVersion: "2"
+artifactVersion: "3"
 authorityScope: dev-foundry-claude-adapter-architecture
 ownerRole: governance-author
 canonical: true
@@ -60,6 +60,7 @@ tasks must revalidate material host assumptions before implementation.
 | Primary operator-facing governance | Main Claude agent | Governance Author remains direct on the main agent; orchestration is part of that operator-facing implementation, not a separate governed role |
 | Evidence custody | Main Claude agent | Evidence Custodian may use the same main implementation only in a separate operation after role re-selection |
 | Mechanical validation | Native deterministic validation | Do not spend a model/subagent call for deterministic proof when native validation satisfies the boundary |
+| Operational tokenomics telemetry | Claude Code OTel + repo-local loopback collector/launcher | Capture privacy-minimized real-work usage without synthetic model spend or public telemetry services |
 
 ## 3. Minimal bootstrap layer
 
@@ -178,8 +179,9 @@ The current baseline is:
   broad repository exploration.
 
 The project rule is: **no agent without measured benefit**. SPC-003 defines the
-static context ceilings, handoff/disposition limits, qualification metrics, and
-retention rule.
+static context ceilings and empirical retention rule. SPC-004 defines the local
+telemetry path used to obtain that measurement from real work rather than paid
+synthetic benchmarks.
 
 ## 9. Current host evidence
 
@@ -190,7 +192,9 @@ The architecture relied on current Anthropic documentation for:
 - Skills and deferred skill-body loading;
 - custom subagent context/tool/model/permission isolation;
 - Hooks including `PreToolUse`, `PermissionRequest`, and `SubagentStart`;
-- MCP project scoping and tool-search deferral.
+- MCP project scoping and tool-search deferral;
+- OpenTelemetry metrics/logs export, OTLP `http/json`, privacy gates, and the
+  fact that repository settings cannot select/route OTLP exporters.
 
 These are observed provider mechanics, not DEV FOUNDRY methodology authority.
 A later implementation task must revalidate any material version-sensitive
