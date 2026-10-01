@@ -4,8 +4,8 @@ artifact:
   id: TSK-007
   type: TSK
   title: Implement Minimal Governed Executor and Auditor Subagents
-  status: IN_PROGRESS
-artifactVersion: "3"
+  status: COMPLETE
+artifactVersion: "4"
 authorityScope: tsk-007-minimal-governed-subagents
 ownerRole: governance-author
 canonical: true
@@ -40,7 +40,7 @@ traceability:
   dependsOn:
     - TSK-006
 lifecycle:
-  phase: in-progress
+  phase: complete
   dependsOn:
     - TSK-006
   promotionRequired: true
@@ -230,6 +230,49 @@ execution identified one additional directly affected stale expectation in the
 same readiness test: it still required all custom subagents to be absent, which
 would contradict TSK-007's authorized creation of exactly two project subagents.
 
-The smallest sufficient correction remains confined to that single existing
-readiness test. It may be reconciled to the complete current pre-cutover state
-listed in the Static proof contract, but no other existing test may change.
+The smallest sufficient correction remained confined to that single existing
+readiness test. It was reconciled to the complete current pre-cutover state
+listed in the Static proof contract, and no other existing test changed.
+
+## 12. Completion result
+
+The third governed implementation execution,
+`execution_9a9b79db5e1c1788c70ce27e36a7b093379ad4f5cd1cf514dba4fdff650008d9`,
+completed PASS with exactly four changed paths, zero path-policy violations,
+executor exit code 0, and runner exit code 0.
+
+The completed implementation surface is exactly:
+
+- `.claude/agents/dev-foundry-executor.md`;
+- `.claude/agents/dev-foundry-auditor.md`;
+- `test/bootstrap/claude-subagents.test.js`;
+- `test/bootstrap/claude-cutover-readiness.test.js`.
+
+Executor self-verification passed `npm ci`, `npm test`, and
+`git diff --check`. The full regression suite reported 38/38 tests passing.
+
+Separate governed mechanical validation
+`tsk007-final-mechanical-r3-20261001` completed PASS with complete evidence and
+`executorInvoked:false`.
+
+Governance Author projection reconciliation is `projection match`. Semantic
+self-assessment confirmed:
+
+- exactly the two authorized project subagents exist;
+- Executor tool access is bounded to Read/Grep/Glob/Edit/Write/Bash plus the
+  governance MCP namespace;
+- Auditor tool access is read-only and has no Bash/Edit/Write;
+- neither subagent exposes Agent nesting, Skills, model selection, hooks,
+  settings, memory, or agent teams;
+- both definitions remain within SPC-003 static byte/line budgets;
+- target Claude Capability Profiles remain configured but unbound;
+- the active POP and Platform Bootstrap remain pre-cutover on
+  `chatgpt-project`;
+- no runtime token/cost savings or Claude runtime qualification is claimed.
+
+No independent Governance Audit is required because no framework, project,
+task, separation-of-duty, or Operator audit trigger applies.
+
+TSK-007 completion statically qualifies the two project subagents for the next
+separately governed Claude runtime/tokenomics qualification boundary. It does
+not activate Claude-native bindings or perform cutover.

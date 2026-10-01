@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { lstat, readFile } from 'node:fs/promises';
+import { lstat, readFile, readdir } from 'node:fs/promises';
 import { relative, resolve, sep } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -7,7 +7,9 @@ import { parse } from 'yaml';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const runnerPath = '.dev-foundry/profiles/capability-profiles/implementation-executor-runner-v2.yaml';
-const claudePath = '.dev-foundry/profiles/capability-profiles/implementation-executor-claude-code-v1.yaml';
+const historicalClaudePath = '.dev-foundry/profiles/capability-profiles/implementation-executor-claude-code-v1.yaml';
+const claudePath = '.dev-foundry/profiles/capability-profiles/implementation-executor-claude-code-v2.yaml';
+const auditorPath = '.dev-foundry/profiles/capability-profiles/governance-auditor-claude-code-v1.yaml';
 const contractPath = 'docs/40-specifications/40 [SPC-002] PROJECT - Claude-Native Cutover Binding Contract.md';
 
 async function readProjectFile(path) {
@@ -68,8 +70,8 @@ test('project MCP has exactly one stdio Node server with the current project-dir
   assert.deepEqual(server.args, ['${CLAUDE_PROJECT_DIR:-.}/src/governance-mcp/server.js']);
 });
 
-test('prepared Claude executor requires governance MCP and stops before an active POP binding', async () => {
-  const profile = await readYaml(claudePath);
+test('historical prepared Claude executor V1 retains its pre-cutover safeguards', async () => {
+  const profile = await readYaml(historicalClaudePath);
   assert.equal(profile.id, 'DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V1');
   assert.equal(profile.status, 'active');
   assert.equal(profile.implementation_class, 'claude-code-native-agent');
@@ -86,6 +88,31 @@ test('prepared Claude executor requires governance MCP and stops before an activ
   assert.ok(profile.prohibited_actions.includes('use_this_profile_before_project_cutover_binding_is_active'));
 });
 
+for (const [path, id, role, identity] of [
+  [claudePath, 'DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V2', 'implementation_executor', 'dev-foundry-executor'],
+  [auditorPath, 'DFC-GOVERNANCE-AUDITOR-CLAUDE-CODE-V1', 'governance_auditor', 'dev-foundry-auditor'],
+]) {
+  test(`prepared target ${id} requires governance MCP and an active POP binding`, async () => {
+    const profile = await readYaml(path);
+    assert.equal(profile.id, id);
+    assert.equal(profile.status, 'active');
+    assert.equal(profile.implementation_class, 'claude-code-project-subagent');
+    assert.equal(profile.limits.platform, 'claude-code');
+    assert.equal(profile.limits.implementation_identity, identity);
+    assert.equal(profile.limits.governance_mcp_server, 'dev-foundry-governance');
+    assert.equal(profile.limits.governance_resolution, 'resolve_governed_operation');
+    for (const constraint of [
+      'project_governance_mcp_must_be_connected',
+      `active_pop_must_bind_${role}_to_this_profile`,
+    ]) assert.ok(profile.environment_constraints.includes(constraint), constraint);
+    for (const condition of [
+      `profile_is_not_the_active_pop_binding_for_${role}`,
+      'governance_mcp_is_unavailable_or_returns_failure',
+    ]) assert.ok(profile.stop_conditions.includes(condition), condition);
+    assert.ok(profile.prohibited_actions.includes('use_this_profile_before_project_cutover_binding_is_active'));
+  });
+}
+
 test('active POP still binds Implementation Executor to the ChatGPT runner capability', async () => {
   const pop = await readYaml('.dev-foundry/profiles/project-operating-profile.yaml');
   const runner = await readYaml(runnerPath);
@@ -99,7 +126,9 @@ test('active POP still binds Implementation Executor to the ChatGPT runner capab
   assert.equal(runner.id, 'DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V2');
   assert.equal(runner.status, 'active');
   for (const binding of Object.values(pop.actor_bindings)) {
-    assert.ok(!binding.capability_profiles.includes(claudePath), 'Prepared Claude capability must remain unbound');
+    for (const path of [historicalClaudePath, claudePath, auditorPath]) {
+      assert.ok(!binding.capability_profiles.includes(path), `Prepared Claude capability must remain unbound: ${path}`);
+    }
   }
 });
 
@@ -109,7 +138,7 @@ test('current Platform Bootstrap still identifies chatgpt-project', async () => 
   assert.equal(bootstrap.platform.id, 'chatgpt-project');
 });
 
-test('SPC-002 defines future Claude role mappings and defers independent Governance Audit', async () => {
+test('SPC-002 defines future Claude role mappings with active dedicated Executor and Auditor targets', async () => {
   const contract = await readProjectFile(contractPath);
   const metadata = frontmatter(contract);
   assert.equal(metadata.artifact.id, 'SPC-002');
@@ -119,33 +148,40 @@ test('SPC-002 defines future Claude role mappings and defers independent Governa
   const mappings = target.split(/^- /m).slice(1).map((mapping) => mapping.split(/\r?\n\s*\r?\n/)[0].replace(/\s+/g, ' ').trim());
   const expected = [
     ['Governance Author', 'governance-author-v3', 'claude-main-agent'],
-    ['Implementation Executor', 'implementation-executor-v2', 'claude-main-agent'],
+    ['Implementation Executor', 'implementation-executor-v2', 'dev-foundry-executor', 'DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V2'],
     ['Evidence Custodian', 'evidence-custodian-v1', 'claude-main-agent'],
     ['Mechanical Validator', 'mechanical-validator-v2', 'claude-code-native-validation'],
-    ['Governance Auditor', 'governance-auditor-v2', 'claude-main-agent'],
+    ['Governance Auditor', 'governance-auditor-v2', 'dev-foundry-auditor', 'DFC-GOVERNANCE-AUDITOR-CLAUDE-CODE-V1'],
   ];
   assert.equal(mappings.length, expected.length);
-  for (const [role, profile, implementation] of expected) {
+  for (const [role, profile, implementation, capability] of expected) {
     const matches = mappings.filter((mapping) => mapping.startsWith(`${role} -> `));
     assert.equal(matches.length, 1, `${role} must have one future mapping`);
     assert.ok(matches[0].includes(`canonical \`${profile}\``), role);
     assert.ok(matches[0].includes(`concrete implementation \`${implementation}\``), role);
     assert.ok(matches[0].includes('platform `claude-code`'), role);
-    if (role === 'Governance Auditor') {
-      assert.match(matches[0], /status `deferred` until a separately governed independent-audit implementation is activated\./);
-    } else {
-      assert.match(matches[0], /, active;$/);
-    }
-    if (role === 'Implementation Executor') {
-      assert.ok(matches[0].includes('capability profile `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V1`'));
+    assert.match(matches[0], /, active[;.]$/);
+    if (capability) {
+      assert.ok(matches[0].includes(`capability profile \`${capability}\``), role);
+      assert.ok(matches[0].includes('kind `subagent`'), role);
     }
   }
-  const audit = section(contract, '7. Audit boundary').replace(/\s+/g, ' ');
-  assert.match(audit, /Auditor binding is deferred, the operation MUST stop until a separately eligible independent implementation is governed and activated\./);
+  const audit = section(contract, '7. Isolation and audit boundary').replace(/\s+/g, ' ');
+  assert.match(audit, /cutover SHALL NOT occur until the dedicated Executor and Auditor subagents are implemented and qualified under SPC-003\./);
+  assert.match(audit, /independent Governance Audit, it is dispatched explicitly to `dev-foundry-auditor`\./);
+  assert.match(audit, /main agent cannot issue that required independent verdict\./);
 });
 
-test('project has no Claude settings, Hooks, Skills, custom subagents, or agent-team definitions', async () => {
-  // Native project definitions live under .claude; .agents/skills is also a
-  // project skill discovery location. Reject even dangling configuration links.
-  for (const path of ['.claude', '.agents/skills']) await assertAbsent(path);
+test('project has exactly the two authorized subagents and no Claude settings, Hooks, Skills, or agent teams', async () => {
+  // An exact tree excludes settings variants, Hooks, Skills, teams, extra
+  // agents, nested definitions, and dangling configuration links.
+  assert.ok((await lstat(resolve(root, '.claude'))).isDirectory());
+  assert.deepEqual(await readdir(resolve(root, '.claude')), ['agents']);
+  assert.ok((await lstat(resolve(root, '.claude/agents'))).isDirectory());
+  const definitions = ['dev-foundry-auditor.md', 'dev-foundry-executor.md'];
+  assert.deepEqual((await readdir(resolve(root, '.claude/agents'))).sort(), definitions);
+  for (const name of definitions) {
+    assert.ok((await lstat(resolve(root, '.claude/agents', name))).isFile());
+  }
+  await assertAbsent('.agents/skills');
 });

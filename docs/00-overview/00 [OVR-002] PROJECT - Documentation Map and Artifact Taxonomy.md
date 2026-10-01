@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.12"
+artifactVersion: "2.1.0-local.13"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -117,12 +117,15 @@ The current project authority is:
 - TSK-005 for the completed Claude-native cutover-readiness task;
 - TSK-006 for the completed role-isolation and token-economics architecture
   task;
-- TSK-007 for the active minimal Executor/Auditor subagent implementation task.
+- TSK-007 for the completed minimal Executor/Auditor subagent implementation
+  task.
 
-No MTP is active because TSK-007 is one atomic two-role isolation capability
-under SPC-003.
-Runtime/tokenomics qualification remains a separate follow-on boundary, and the
-atomic Claude-native cutover remains deferred until that qualification is
+No MTP or follow-on product TSK is active.
+Exactly `dev-foundry-executor` and `dev-foundry-auditor` now exist as the
+initial project subagent topology under SPC-003, while their target Capability
+Profiles remain unbound in the active POP.
+Runtime/tokenomics qualification is the next separately governed boundary, and
+the atomic Claude-native cutover remains deferred until that qualification is
 accepted. Hooks, Skills, agent teams, model selection, and Claude
 settings/permissions remain unauthorized unless separately governed.
 

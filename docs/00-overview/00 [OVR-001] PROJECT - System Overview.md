@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: System Overview
   status: ACTIVE
-artifactVersion: "2.1.0-local.12"
+artifactVersion: "2.1.0-local.13"
 authorityScope: dev-foundry-claude-project
 ownerRole: governance-author
 canonical: false
@@ -77,10 +77,10 @@ The completed TSK-002 boundary delivers the minimal Claude governance MCP
 resolver, TSK-003 delivers the minimal Claude-native project bootstrap, and
 TSK-004 establishes direct Claude project MCP launch compatibility, TSK-005
 completes repository-side cutover readiness, TSK-006 completes the
-role-isolation/token-economics architecture, and TSK-007 is the active bounded
-implementation task for exactly the Executor and Auditor project subagents.
+role-isolation/token-economics architecture, and TSK-007 completes the bounded
+implementation of exactly the Executor and Auditor project subagents.
 
-TSK-007 does not authorize:
+TSK-007 did not authorize:
 
 - activating Claude-native POP role bindings or switching the active Platform
   Bootstrap away from ChatGPT;
@@ -99,10 +99,10 @@ Those require separate follow-on governed tasks.
 The initial Claude-native adapter architecture baseline, TSK-002 minimal
 governance MCP resolver, TSK-003 minimal root Claude project bootstrap, and
 TSK-004 project-scoped MCP launch compatibility, TSK-005 Claude-native cutover
-readiness, and TSK-006 role-isolation/token-economics architecture are complete.
-TSK-007 is active to implement exactly two dedicated project subagents: Executor
-and Auditor, plus focused static proof. Runtime qualification and Claude-native
-cutover remain deferred.
+readiness, TSK-006 role-isolation/token-economics architecture, and TSK-007
+minimal Executor/Auditor subagent implementation are complete. Exactly two
+project subagents now exist and are statically qualified under SPC-003. Runtime
+qualification and Claude-native cutover remain deferred.
 
 Canonical DEV FOUNDRY 2.1.0 remains the selected reusable methodology.
 The local Project Operating Profile and Authority Index bind that release to
