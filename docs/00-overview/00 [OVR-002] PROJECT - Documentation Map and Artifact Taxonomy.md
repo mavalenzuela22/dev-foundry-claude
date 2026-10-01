@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.8"
+artifactVersion: "2.1.0-local.9"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -111,12 +111,12 @@ The current project authority is:
 - TSK-002 for the completed minimal resolver implementation task;
 - TSK-003 for the completed minimal Claude-native project bootstrap task;
 - TSK-004 for the completed Claude project MCP launch-compatibility task;
-- TSK-005 for the active Claude-native cutover-readiness task.
+- TSK-005 for the completed Claude-native cutover-readiness task.
 
-No MTP is active because TSK-005 is atomic.
-Actual Claude-native role activation, Hooks, Skills, subagents, agent teams,
-Claude settings/permissions, and direct Claude Code execution/cutover remain
-unauthorized follow-on work.
+No MTP or follow-on product TSK is active.
+The next separately governed boundary may perform the atomic Claude-native
+cutover defined by SPC-002. Hooks, Skills, subagents, agent teams, and Claude
+settings/permissions remain unauthorized unless separately governed.
 
 The project Authority Index routes every current authoritative home. Missing
 future implementation authority does not authorize inventing requirements.
