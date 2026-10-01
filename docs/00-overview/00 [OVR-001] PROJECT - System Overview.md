@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: System Overview
   status: ACTIVE
-artifactVersion: "2.1.0-local.15"
+artifactVersion: "2.1.0-local.16"
 authorityScope: dev-foundry-claude-project
 ownerRole: governance-author
 canonical: false
@@ -106,8 +106,8 @@ minimal Executor/Auditor subagent implementation and TSK-008 local operational
 telemetry instrumentation are complete. Exactly two project subagents now exist
 and are statically qualified under SPC-003, and the SPC-004 telemetry path is
 mechanically ready without synthetic Claude spend.
-Claude-native cutover remains deferred as the next separately governed product
-boundary.
+TSK-009 is active to perform the atomic configured-state cutover to Claude Code.
+Until TSK-009 is promoted, the current ChatGPT/runner POP remains authoritative.
 
 Canonical DEV FOUNDRY 2.1.0 remains the selected reusable methodology.
 The local Project Operating Profile and Authority Index bind that release to
