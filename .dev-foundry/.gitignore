@@ -1,5 +1,8 @@
 # DEV FOUNDRY runtime-owned records
 execution-requests/
+execution-contracts/
+prompts/
+validations/
 repository-transactions/
 executions/
 telemetry/
