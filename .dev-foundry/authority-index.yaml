@@ -35,6 +35,28 @@ routes:
       - project-documentation-map
       - project-authority-routing
     section_id: null
+  - id: claude-native-governance-integration
+    path: docs/10-decisions/10 [ADR-001] PROJECT - Claude-Native Governance Integration Boundary.md
+    authority_class: decision
+    governs:
+      - claude-native-repository-operation-boundary
+      - claude-governance-mcp-boundary
+      - token-economy-architecture-principle
+    section_id: null
+  - id: claude-code-adapter-architecture
+    path: docs/20-architecture/20 [ARC-001] PROJECT - Claude Code Adapter Architecture.md
+    authority_class: product
+    governs:
+      - claude-code-adapter-components
+      - claude-code-primitive-responsibility-map
+      - claude-code-context-loading-boundary
+    section_id: null
+  - id: TSK-001
+    path: docs/70-tasks/70 [TSK-001] PROJECT - Establish Claude-Native Adapter Architecture Baseline.md
+    authority_class: task
+    governs:
+      - claude-native-adapter-architecture-baseline
+    section_id: null
 
 bindings:
   - id: project-operating-profile

@@ -90,13 +90,19 @@ not reusable methodology.
 
 ## 5. Current Product Authority
 
-At this adoption boundary:
+The current project authority is:
 
-- OVR-001 and OVR-002 are the only active project documentation authority;
-- no ADR, ARC, SPC, product DAT, TSK, or MTP is active;
-- no product implementation is authorized.
+- OVR-001 and OVR-002 for project purpose, boundary, navigation, and routing;
+- ADR-001 for the accepted Claude-native repository versus governance-MCP
+  decision;
+- ARC-001 for the active Claude Code adapter architecture baseline;
+- TSK-001 for the completed architecture-baseline task.
 
-Their absence does not authorize inventing requirements.
+No SPC, product DAT, or MTP is active.
+No product runtime implementation is authorized.
+
+The project Authority Index routes every current authoritative home. Missing
+lower-level implementation authority does not authorize inventing requirements.
 
 ## 6. Single Authoritative Home
 

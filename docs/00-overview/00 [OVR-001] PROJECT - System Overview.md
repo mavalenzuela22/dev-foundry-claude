@@ -73,29 +73,30 @@ The approved direction is to:
 
 ## 4. Current Non-Goals
 
-The current adoption boundary does not authorize:
+The active TSK-001 architecture boundary does not authorize:
 
-- product implementation;
+- product runtime implementation;
 - an active Implementation Executor or Capability Profile;
-- a context resolver implementation;
-- Skills, hooks, subagents, agent teams, or product `CLAUDE.md` behavior;
-- automatic authentication handling;
+- a concrete Claude governance MCP implementation;
+- concrete Skills, hooks, subagents, agent teams, or product `CLAUDE.md`
+  behavior;
+- automatic authentication handling or provider routing;
 - copying runtime implementation or task history from another project.
 
-Those require separate project authority and a governed task.
+Those require separate follow-on governed implementation tasks.
 
 ## 5. Current State
 
-The repository remains in greenfield governance bootstrap.
+The repository has moved from governance bootstrap into its first bounded
+product architecture task.
 
-Canonical DEV FOUNDRY 2.1.0 is the selected reusable methodology.
+Canonical DEV FOUNDRY 2.1.0 remains the selected reusable methodology.
 The local Project Operating Profile and Authority Index bind that release to
 `dev-foundry-claude`.
 
-No product TSK is active.
-The Implementation Executor binding is deferred.
-No product execution is authorized.
+ADR-001 records the accepted Claude-native repository versus governance-MCP
+boundary. ARC-001 defines the active adapter architecture baseline. TSK-001 has
+completed the bounded architecture-baseline task.
 
-The next product task may be activated only after this 2.1.0 adoption boundary is
-validated and reviewed as required, and the Operator explicitly authorizes that
-task.
+The Implementation Executor binding remains deferred.
+No product runtime implementation or execution is authorized by TSK-001.
