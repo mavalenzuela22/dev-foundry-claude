@@ -5,7 +5,7 @@ artifact:
   type: TSK
   title: Implement Minimal Governed Executor and Auditor Subagents
   status: IN_PROGRESS
-artifactVersion: "2"
+artifactVersion: "3"
 authorityScope: tsk-007-minimal-governed-subagents
 ownerRole: governance-author
 canonical: true
@@ -94,8 +94,10 @@ Codex may change exactly:
 - create `.claude/agents/dev-foundry-auditor.md`;
 - create `test/bootstrap/claude-subagents.test.js`;
 - update `test/bootstrap/claude-cutover-readiness.test.js` only to reconcile
-  stale expectations from the prior SPC-002 cutover target with current SPC-002
-  v3.
+  stale pre-TSK-006/TSK-007 readiness expectations with the current pre-cutover
+  state: SPC-002 v3 target mappings, target prepared Capability Profiles, and the
+  existence of exactly the two authorized project subagents while settings,
+  Hooks, Skills, and agent teams remain absent.
 
 No other existing implementation/runtime file is authorized for mutation.
 
@@ -164,9 +166,16 @@ The focused test SHALL prove at least:
     `dev-foundry-auditor` with
     `DFC-GOVERNANCE-AUDITOR-CLAUDE-CODE-V1`; it must no longer require the
     superseded main-agent/deferred-Auditor target;
-14. root `CLAUDE.md`, `.mcp.json`, runtime source, dependencies, and all other
+14. that same readiness test verifies the current pre-cutover prepared-profile
+    state: the target Executor V2 and Auditor V1 profiles exist but remain
+    unbound, while historical Executor V1 is not treated as the future cutover
+    target;
+15. that same readiness test allows exactly the two authorized custom subagents
+    under `.claude/agents/` while continuing to require Claude settings, Hooks,
+    Skills, and agent-team definitions to remain absent;
+16. root `CLAUDE.md`, `.mcp.json`, runtime source, dependencies, and all other
     existing tests remain unchanged;
-15. `npm ci`, `npm test`, and `git diff --check` pass.
+17. `npm ci`, `npm test`, and `git diff --check` pass.
 
 ## 8. Token-economics constraints
 
@@ -211,7 +220,16 @@ Implementation Executor and Governance Auditor mapped to `claude-main-agent`
 and the Auditor remained deferred. Current SPC-002 v3 instead requires dedicated
 `dev-foundry-executor` and `dev-foundry-auditor` implementations.
 
-The failed execution changed zero repository files, passed path policy, passed
-`npm ci` and `git diff --check`, and failed only the stale baseline assertion.
-This directly observed regression requires the smallest sufficient correction:
-reconcile that single existing readiness test and no other prior test.
+The first failed execution changed zero repository files, passed path policy,
+passed `npm ci` and `git diff --check`, and failed only the stale baseline
+assertion.
+
+The second execution also changed zero repository files and failed on the same
+pre-existing assertion before implementation began. Review before a third
+execution identified one additional directly affected stale expectation in the
+same readiness test: it still required all custom subagents to be absent, which
+would contradict TSK-007's authorized creation of exactly two project subagents.
+
+The smallest sufficient correction remains confined to that single existing
+readiness test. It may be reconciled to the complete current pre-cutover state
+listed in the Static proof contract, but no other existing test may change.
