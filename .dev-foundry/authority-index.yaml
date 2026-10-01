@@ -37,7 +37,7 @@ routes:
     section_id: null
   - id: claude-native-governance-integration
     path: docs/10-decisions/10 [ADR-001] PROJECT - Claude-Native Governance Integration Boundary.md
-    authority_class: product
+    authority_class: decision
     governs:
       - claude-native-repository-operation-boundary
       - claude-governance-mcp-boundary
@@ -53,7 +53,7 @@ routes:
     section_id: null
   - id: tsk-001-claude-native-adapter-architecture
     path: docs/70-tasks/70 [TSK-001] PROJECT - Establish Claude-Native Adapter Architecture Baseline.md
-    authority_class: product
+    authority_class: task
     governs:
       - claude-native-adapter-architecture-baseline
     section_id: null
