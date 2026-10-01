@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: System Overview
   status: ACTIVE
-artifactVersion: "2.1.0-local.3"
+artifactVersion: "2.1.0-local.4"
 authorityScope: dev-foundry-claude-project
 ownerRole: governance-author
 canonical: false
@@ -73,12 +73,14 @@ The approved direction is to:
 
 ## 4. Current Non-Goals
 
-The completed TSK-002 boundary delivers only the minimal Claude governance MCP
-resolver. No follow-on implementation TSK is active yet.
+The completed TSK-002 boundary delivers the minimal Claude governance MCP
+resolver. TSK-003 is now the active bounded implementation task for the minimal
+Claude-native project bootstrap.
 
-TSK-002 did not authorize:
+TSK-003 does not authorize:
 
-- Hooks, Skills, subagents, agent teams, or product `CLAUDE.md` behavior;
+- Hooks, Skills, subagents, agent teams, Claude settings/permissions, or
+  bootstrap behavior beyond the minimal root `CLAUDE.md`;
 - another MCP tool or generic repository-control MCP surface;
 - remote MCP transport, authentication, cloud deployment, or telemetry;
 - automatic provider routing or secret handling;
@@ -89,8 +91,8 @@ Those require separate follow-on governed tasks.
 ## 5. Current State
 
 The initial Claude-native adapter architecture baseline and TSK-002 minimal
-governance MCP resolver implementation are complete. No follow-on product task is
-currently active.
+governance MCP resolver implementation are complete. TSK-003 is active and is
+limited to the minimal root Claude project bootstrap plus focused proof.
 
 Canonical DEV FOUNDRY 2.1.0 remains the selected reusable methodology.
 The local Project Operating Profile and Authority Index bind that release to
@@ -100,7 +102,9 @@ ADR-001 owns the Claude-native repository versus governance-MCP boundary.
 ADR-002 owns the initial local stdio runtime stack. ARC-001 defines the adapter
 architecture. SPC-001 and DAT-001 close the resolver behavior and tool contract.
 
-The Implementation Executor remains separately bound to the runner through the
-TSK-002-scoped Capability Profile; TSK-002 completion does not broaden that
-binding to future implementation work. The governance-agent implementation
+While governance is hosted from ChatGPT, the Implementation Executor is
+separately bound to the runner through
+`DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V2`, which selects `codex-cli` for
+task-directed implementation. Claude Code is not used as an executor before the
+separately governed Claude-native cutover. The governance-agent implementation
 remains the Governance Author and does not self-select the executor role.

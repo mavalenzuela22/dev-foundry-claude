@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.3"
+artifactVersion: "2.1.0-local.4"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -82,8 +82,10 @@ The active POP binds:
   the process-bound runner;
 - Evidence Custodian -> canonical `evidence-custodian-v1`;
 - Implementation Executor -> canonical `implementation-executor-v2`, currently
-  bound to the runner's task-scoped code executor through
-  `DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V1`.
+  bound to the runner's task-directed code executor through
+  `DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V2`; while governance is hosted from
+  ChatGPT, that profile selects `codex-cli` and explicitly excludes Claude Code
+  execution before cutover.
 
 Capability does not grant authority, and the runner is product/runtime machinery,
 not reusable methodology. The governance-agent bootstrap is not an executor
@@ -101,11 +103,12 @@ The current project authority is:
 - SPC-001 for governed-operation resolver behavior;
 - DAT-001 for the exact resolver tool contract;
 - TSK-001 for the completed architecture-baseline task;
-- TSK-002 for the completed minimal resolver implementation task.
+- TSK-002 for the completed minimal resolver implementation task;
+- TSK-003 for the active minimal Claude-native project bootstrap task.
 
-No MTP or follow-on product TSK is active.
-Hooks, Skills, subagents, agent teams, and product `CLAUDE.md` behavior remain
-unauthorized follow-on work.
+No MTP is active because TSK-003 is atomic.
+Hooks, Skills, subagents, agent teams, Claude settings/permissions, and direct
+Claude Code execution/cutover remain unauthorized follow-on work.
 
 The project Authority Index routes every current authoritative home. Missing
 future implementation authority does not authorize inventing requirements.
