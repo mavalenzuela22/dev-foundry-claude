@@ -5,7 +5,7 @@ artifact:
   type: ADR
   title: Minimal Governance MCP Runtime Stack
   status: ACCEPTED
-artifactVersion: "2"
+artifactVersion: "3"
 authorityScope: dev-foundry-claude-governance-mcp-runtime
 ownerRole: governance-author
 canonical: true
@@ -44,8 +44,13 @@ Code. ARC-001 requires the MCP surface to remain small and context-efficient.
 
 Claude Code currently supports project-scoped local stdio MCP servers and sets
 `CLAUDE_PROJECT_DIR` for spawned stdio servers to the stable project root.
-Current Claude Code also defers MCP tool schemas through tool search in supported
-deployments, reducing always-loaded context.
+Current project configuration expansion semantics do not guarantee that
+`CLAUDE_PROJECT_DIR` is available while expanding `.mcp.json` `command` or
+`args`; provider documentation requires a default expression such as
+`${CLAUDE_PROJECT_DIR:-.}` for that launch-time use. Once the process is
+spawned, `CLAUDE_PROJECT_DIR` remains the authoritative runtime project-root
+input. Current Claude Code also defers MCP tool schemas through tool search in
+supported deployments, reducing always-loaded context.
 
 The official MCP TypeScript SDK v2 is the stable SDK line for the MCP
 2026-07-28 specification.
@@ -68,8 +73,11 @@ The TSK-002 implementation stack is:
 - a committed `package-lock.json` for deterministic dependency resolution.
 
 The project-scoped Claude Code connection SHALL be declared in `.mcp.json`.
-The server SHALL use `CLAUDE_PROJECT_DIR` as its project-root input and SHALL
-not depend on Claude Code's current shell working directory.
+Its stdio launch path SHALL use `${CLAUDE_PROJECT_DIR:-.}/src/governance-mcp/server.js` so configuration expansion can fall
+back to the project working directory before the server process exists. The
+server runtime itself SHALL require the injected absolute
+`CLAUDE_PROJECT_DIR` as its project-root input and SHALL NOT infer governance
+authority from process cwd.
 
 ## 3. Runtime boundary
 
@@ -115,7 +123,9 @@ authority when it constitutes a material dependency decision.
 ## 6. Consequences
 
 - The MCP can run locally without creating another network service.
-- Claude Code supplies stable project-root context.
+- Claude Code supplies stable project-root context to the spawned server.
+- The project MCP launch remains compatible when host-side configuration
+  expansion needs the documented project-relative fallback.
 - The runtime dependency surface stays small.
 - The server remains independently testable outside a full Claude session.
 - Generic repository operations remain native to Claude Code as required by
