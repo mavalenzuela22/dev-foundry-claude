@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: System Overview
   status: ACTIVE
-artifactVersion: "2.1.0-local.16"
+artifactVersion: "2.1.0-local.17"
 authorityScope: dev-foundry-claude-project
 ownerRole: governance-author
 canonical: false
@@ -106,8 +106,8 @@ minimal Executor/Auditor subagent implementation and TSK-008 local operational
 telemetry instrumentation are complete. Exactly two project subagents now exist
 and are statically qualified under SPC-003, and the SPC-004 telemetry path is
 mechanically ready without synthetic Claude spend.
-TSK-009 is active to perform the atomic configured-state cutover to Claude Code.
-Until TSK-009 is promoted, the current ChatGPT/runner POP remains authoritative.
+TSK-009 completes the atomic configured-state cutover to Claude Code.
+Claude Code is now the active configured project platform after promotion.
 
 Canonical DEV FOUNDRY 2.1.0 remains the selected reusable methodology.
 The local Project Operating Profile and Authority Index bind that release to
@@ -116,13 +116,18 @@ The local Project Operating Profile and Authority Index bind that release to
 ADR-001 owns the Claude-native repository versus governance-MCP boundary.
 ADR-002 owns the initial local stdio runtime stack. ARC-001 defines the adapter
 architecture. SPC-001 and DAT-001 close the resolver behavior and tool contract.
-SPC-002 owns the prepared Claude-native cutover binding contract. SPC-003 owns
-the role-isolation and token-economics contract. SPC-004 owns the operational
+SPC-002 owns the active Claude-native binding contract. SPC-003 owns the
+role-isolation and token-economics contract. SPC-004 owns the operational
 telemetry and empirical tokenomics evidence contract.
 
-While governance is hosted from ChatGPT, the Implementation Executor is
-separately bound to the runner through
-`DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V2`, which selects `codex-cli` for
-task-directed implementation. Claude Code is not used as an executor before the
-separately governed Claude-native cutover. The governance-agent implementation
-remains the Governance Author and does not self-select the executor role.
+The active POP now binds Governance Author and Evidence Custodian to the
+`claude-main-agent` through operation-scoped role selection, Implementation
+Executor to `dev-foundry-executor`, Governance Auditor to
+`dev-foundry-auditor`, and Mechanical Validator to
+`claude-code-native-validation`. The runner is no longer an active Executor or
+Validator binding.
+
+Exactly two project subagents remain authorized. Hooks, Skills, agent teams,
+model selection, additional subagents, and remote telemetry remain outside the
+completed cutover boundary. Actual telemetry arrival and any provider trust/MCP
+approval are first-session runtime facts.

@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.16"
+artifactVersion: "2.1.0-local.17"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -78,24 +78,25 @@ The active POP binds:
 
 - Governance Author -> canonical `governance-author-v3`;
 - Governance Auditor -> canonical `governance-auditor-v2`;
-- Mechanical Validator -> canonical `mechanical-validator-v2` implemented by
-  the process-bound runner;
-- Evidence Custodian -> canonical `evidence-custodian-v1`;
-- Implementation Executor -> canonical `implementation-executor-v2`, currently
-  bound to the runner's task-directed code executor through
-  `DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V2`; while governance is hosted from
-  ChatGPT, that profile selects `codex-cli` and explicitly excludes Claude Code
-  execution before cutover.
+- Mechanical Validator -> canonical `mechanical-validator-v2`, implemented by
+  `claude-code-native-validation` on `claude-code`;
+- Evidence Custodian -> canonical `evidence-custodian-v1`, implemented by
+  `claude-main-agent` on `claude-code`;
+- Implementation Executor -> canonical `implementation-executor-v2`,
+  implemented by dedicated subagent `dev-foundry-executor` through
+  `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V2`;
+- Governance Auditor -> canonical `governance-auditor-v2`, implemented by
+  read-only dedicated subagent `dev-foundry-auditor` through
+  `DFC-GOVERNANCE-AUDITOR-CLAUDE-CODE-V1`;
+- Governance Author -> canonical `governance-author-v3`, implemented by
+  `claude-main-agent` on `claude-code`.
 
-The historical prepared `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V1`
-Capability Profile remains unbound. The target prepared cutover profiles are
-`DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V2` and
-`DFC-GOVERNANCE-AUDITOR-CLAUDE-CODE-V1`; both are configured but unbound and
-are not eligible for selection before the later cutover task.
+The historical `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V1` and runner
+Capability Profiles remain configured history where indexed but are not active
+required Executor bindings.
 
-Capability does not grant authority, and the runner is product/runtime machinery,
-not reusable methodology. The governance-agent bootstrap is not an executor
-binding.
+Capability does not grant authority. Role selection remains operation-scoped,
+and the main agent is not the Executor or Auditor implementation.
 
 ## 5. Current Product Authority
 
@@ -121,20 +122,17 @@ The current project authority is:
 - TSK-007 for the completed minimal Executor/Auditor subagent implementation
   task;
 - TSK-008 for the completed operational-telemetry instrumentation task;
-- TSK-009 for the active atomic Claude-native cutover task.
+- TSK-009 for the completed atomic Claude-native cutover task.
 
-No MTP is active because TSK-009 is one bounded configured-state transition.
-Exactly `dev-foundry-executor` and `dev-foundry-auditor` now exist as the
-initial project subagent topology under SPC-003, while their target Capability
-Profiles remain unbound in the active POP.
-Synthetic runtime qualification is no longer a cutover prerequisite. TSK-008
-has established the local telemetry path for later empirical review using real
-Claude-native work.
-TSK-009 is the active atomic Claude-native cutover boundary. Until it is
-promoted, the runner-bound ChatGPT POP remains the active configured state.
-Actual telemetry arrival is verified in the first real Claude-native session.
-Hooks, Skills, agent teams, model selection, and additional subagents remain
-unauthorized unless separately governed.
+No MTP or follow-on product TSK is active.
+Exactly `dev-foundry-executor` and `dev-foundry-auditor` are the active
+dedicated project subagents under SPC-003, with their target Capability Profiles
+bound in the active POP.
+TSK-008 established the local telemetry path for empirical review using real
+Claude-native work; actual telemetry arrival is verified in the first real
+Claude-native session.
+Claude Code is the active platform. Hooks, Skills, agent teams, model selection,
+and additional subagents remain unauthorized unless separately governed.
 
 The project Authority Index routes every current authoritative home. Missing
 future implementation authority does not authorize inventing requirements.

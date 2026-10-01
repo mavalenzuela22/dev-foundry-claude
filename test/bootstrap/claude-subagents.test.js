@@ -8,6 +8,7 @@ const profileDirectory = '.dev-foundry/profiles/capability-profiles/';
 const roles = [
   {
     role: 'implementation-executor',
+    actorProfile: 'implementation-executor-v2',
     name: 'dev-foundry-executor',
     profile: 'implementation-executor-claude-code-v2.yaml',
     id: 'DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V2',
@@ -15,6 +16,7 @@ const roles = [
   },
   {
     role: 'governance-auditor',
+    actorProfile: 'governance-auditor-v2',
     name: 'dev-foundry-auditor',
     profile: 'governance-auditor-claude-code-v1.yaml',
     id: 'DFC-GOVERNANCE-AUDITOR-CLAUDE-CODE-V1',
@@ -113,20 +115,19 @@ for (const { role, name, profile, id, tools } of roles) {
   });
 }
 
-test('current POP stays chatgpt-project with both Claude target capabilities unbound', async () => {
+test('active POP binds Executor and Auditor to their dedicated Claude subagents and exact capabilities', async () => {
   const pop = await readYaml('.dev-foundry/profiles/project-operating-profile.yaml');
   assert.equal(pop.repository.name, 'dev-foundry-claude');
   assert.equal(pop.status, 'active');
-  for (const binding of Object.values(pop.actor_bindings)) {
-    assert.equal(binding.implementation.platform, 'chatgpt-project');
-    for (const { name, profile, id } of roles) {
-      assert.notEqual(binding.implementation.identity, name);
-      assert.ok(!binding.capability_profiles.includes(`${profileDirectory}${profile}`));
-      assert.ok(!binding.capability_profiles.includes(id));
-    }
+  for (const { role, actorProfile, name, profile } of roles) {
+    const binding = pop.actor_bindings[role];
+    assert.equal(binding.status, 'active', role);
+    assert.equal(binding.profile, `.dev-foundry/releases/2.1.0/actor-profiles/${actorProfile}.yaml`, role);
+    assert.deepEqual(binding.implementation, {
+      kind: 'agent', identity: name, platform: 'claude-code',
+    }, role);
+    assert.deepEqual(binding.capability_profiles, [`${profileDirectory}${profile}`], role);
   }
-  assert.deepEqual(pop.actor_bindings['implementation-executor'].capability_profiles,
-    [`${profileDirectory}implementation-executor-runner-v2.yaml`]);
   const config = JSON.parse(await readProjectFile('.mcp.json'));
   assert.ok(Object.hasOwn(config.mcpServers, 'dev-foundry-governance'));
 });

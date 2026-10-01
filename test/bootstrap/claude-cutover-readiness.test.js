@@ -39,7 +39,7 @@ function section(document, heading) {
 
 async function assertAbsent(path) {
   await assert.rejects(lstat(resolve(root, path)), { code: 'ENOENT' },
-    `${path} must remain absent before cutover`);
+    `${path} must remain absent in the Claude-native topology`);
 }
 
 test('cutover prerequisites TSK-002, TSK-003, and TSK-004 are COMPLETE', async () => {
@@ -92,7 +92,7 @@ for (const [path, id, role, identity] of [
   [claudePath, 'DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V2', 'implementation_executor', 'dev-foundry-executor'],
   [auditorPath, 'DFC-GOVERNANCE-AUDITOR-CLAUDE-CODE-V1', 'governance_auditor', 'dev-foundry-auditor'],
 ]) {
-  test(`prepared target ${id} requires governance MCP and an active POP binding`, async () => {
+  test(`active Claude target ${id} requires governance MCP and an active POP binding`, async () => {
     const profile = await readYaml(path);
     assert.equal(profile.id, id);
     assert.equal(profile.status, 'active');
@@ -113,38 +113,96 @@ for (const [path, id, role, identity] of [
   });
 }
 
-test('active POP still binds Implementation Executor to the ChatGPT runner capability', async () => {
+test('active POP has exactly the final Claude-native role bindings', async () => {
   const pop = await readYaml('.dev-foundry/profiles/project-operating-profile.yaml');
-  const runner = await readYaml(runnerPath);
   assert.equal(pop.status, 'active');
   assert.equal(pop.repository.name, 'dev-foundry-claude');
-  const executor = pop.actor_bindings['implementation-executor'];
-  assert.equal(executor.status, 'active');
-  assert.equal(executor.implementation.platform, 'chatgpt-project');
-  assert.equal(executor.implementation.identity, 'process-bound-runner-code-executor');
-  assert.deepEqual(executor.capability_profiles, [runnerPath]);
-  assert.equal(runner.id, 'DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V2');
-  assert.equal(runner.status, 'active');
-  for (const binding of Object.values(pop.actor_bindings)) {
-    for (const path of [historicalClaudePath, claudePath, auditorPath]) {
-      assert.ok(!binding.capability_profiles.includes(path), `Prepared Claude capability must remain unbound: ${path}`);
-    }
+  assert.equal(pop.policies.default_role, 'governance-author');
+  assert.deepEqual(pop.platform_bootstraps['primary-governance-agent'], {
+    path: '.dev-foundry/platform-bootstrap.yaml',
+    status: 'active',
+  });
+  const expected = [
+    ['governance-author', 'governance-author-v3', 'agent', 'claude-main-agent', []],
+    ['evidence-custodian', 'evidence-custodian-v1', 'agent', 'claude-main-agent', []],
+    ['implementation-executor', 'implementation-executor-v2', 'agent', 'dev-foundry-executor', [claudePath]],
+    ['governance-auditor', 'governance-auditor-v2', 'agent', 'dev-foundry-auditor', [auditorPath]],
+    ['mechanical-validator', 'mechanical-validator-v2', 'tool', 'claude-code-native-validation', []],
+  ];
+  assert.deepEqual(Object.keys(pop.actor_bindings).sort(), expected.map(([role]) => role).sort());
+  for (const [role, profile, kind, identity, capabilities] of expected) {
+    const binding = pop.actor_bindings[role];
+    assert.equal(binding.status, 'active', role);
+    assert.equal(binding.profile, `.dev-foundry/releases/2.1.0/actor-profiles/${profile}.yaml`, role);
+    assert.deepEqual(binding.implementation, { kind, identity, platform: 'claude-code' }, role);
+    assert.deepEqual(binding.capability_profiles, capabilities, role);
   }
 });
 
-test('current Platform Bootstrap still identifies chatgpt-project', async () => {
-  const bootstrap = await readYaml('.dev-foundry/platform-bootstrap.yaml');
-  assert.equal(bootstrap.repository.expected_name, 'dev-foundry-claude');
-  assert.equal(bootstrap.platform.id, 'chatgpt-project');
+test('Authority Index requires Claude targets and retains runner and Claude V1 as non-required history', async () => {
+  const index = await readYaml('.dev-foundry/authority-index.yaml');
+  for (const [path, required] of [
+    [runnerPath, false],
+    [claudePath, true],
+    [auditorPath, true],
+    [historicalClaudePath, false],
+  ]) {
+    const bindings = index.bindings.filter((binding) => binding.path === path);
+    assert.equal(bindings.length, 1, `Expected exactly one capability binding: ${path}`);
+    assert.equal(bindings[0].kind, 'capability-profile', path);
+    assert.equal(bindings[0].authority_class, 'configured', path);
+    assert.equal(bindings[0].required, required, path);
+  }
+  const runner = await readYaml(runnerPath);
+  assert.equal(runner.id, 'DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V2');
+  assert.equal(runner.status, 'active');
 });
 
-test('SPC-002 defines future Claude role mappings with active dedicated Executor and Auditor targets', async () => {
+test('active Claude Platform Bootstrap permits only Author and Custodian on the main agent', async () => {
+  const bootstrap = await readYaml('.dev-foundry/platform-bootstrap.yaml');
+  assert.equal(bootstrap.status, 'active');
+  assert.equal(bootstrap.repository.expected_name, 'dev-foundry-claude');
+  assert.equal(bootstrap.platform.id, 'claude-code');
+  assert.equal(bootstrap.sources.project_operating_profile, '.dev-foundry/profiles/project-operating-profile.yaml');
+  assert.equal(bootstrap.sources.authority_index, '.dev-foundry/authority-index.yaml');
+  assert.equal(bootstrap.actor_resolution.mode, 'governed-project-bindings');
+  assert.deepEqual(bootstrap.actor_resolution.eligible_profiles, [
+    '.dev-foundry/releases/2.1.0/actor-profiles/governance-author-v3.yaml',
+    '.dev-foundry/releases/2.1.0/actor-profiles/evidence-custodian-v1.yaml',
+  ]);
+  assert.equal(bootstrap.actor_resolution.fixed_profile, null);
+  assert.equal(bootstrap.actor_resolution.default_role, 'governance-author');
+
+  // Inspect operational rules as well as the structured eligibility list:
+  // main-agent audit eligibility must not survive in bootstrap prose.
+  const rules = [
+    bootstrap.actor_resolution.rule,
+    ...bootstrap.platform.startup_constraints,
+    ...bootstrap.constraints,
+  ].map((rule) => rule.replace(/\s+/g, ' ').trim());
+  const text = rules.join('\n');
+  const mainEligibility = /(?:main[- ]agent|claude-main-agent)[^.\n]*eligible only[^.\n]*Governance[- ]Author[^.\n]*Evidence[- ]Custodian/i;
+  assert.match(text, mainEligibility);
+  for (const role of ['Implementation[- ]Executor', 'Governance[- ]Auditor']) {
+    assert.ok(rules.some((rule) => new RegExp(role, 'i').test(rule)
+      && /explicit/i.test(rule) && /dispatch/i.test(rule) && /(?:dedicated|dev-foundry-)[^.]*subagent/i.test(rule)),
+    `${role} must be explicitly dispatched to a dedicated subagent`);
+  }
+  assert.match(text, /Mechanical[- ]Validator[^.\n]*(?:native Claude Code|Claude Code native|claude-code-native-validation)/i);
+  for (const clause of rules.flatMap((rule) => rule.split(/[.;]\s+/))) {
+    assert.doesNotMatch(clause, /(?:main[- ]agent|claude-main-agent)\s+(?:is|remains|may be)\s+eligible[^.]*Governance[- ]Auditor/i,
+      'Bootstrap must not grant Governance Auditor to the main agent');
+    assert.doesNotMatch(clause, /Governance[- ]Auditor\s+(?:is|remains|may be)\s+(?:eligible|bound|resolved)[^.]*(?:main[- ]agent|claude-main-agent)/i,
+      'Bootstrap must not map Governance Auditor to the main agent');
+  }
+});
+
+test('SPC-002 defines the Claude-native role mappings and telemetry readiness boundary', async () => {
   const contract = await readProjectFile(contractPath);
   const metadata = frontmatter(contract);
   assert.equal(metadata.artifact.id, 'SPC-002');
   assert.equal(metadata.artifact.status, 'ACTIVE');
   const target = section(contract, '3. Cutover target state');
-  assert.match(target, /A future cutover TSK SHALL atomically reconcile/);
   const mappings = target.split(/^- /m).slice(1).map((mapping) => mapping.split(/\r?\n\s*\r?\n/)[0].replace(/\s+/g, ' ').trim());
   const expected = [
     ['Governance Author', 'governance-author-v3', 'claude-main-agent'],
@@ -156,7 +214,7 @@ test('SPC-002 defines future Claude role mappings with active dedicated Executor
   assert.equal(mappings.length, expected.length);
   for (const [role, profile, implementation, capability] of expected) {
     const matches = mappings.filter((mapping) => mapping.startsWith(`${role} -> `));
-    assert.equal(matches.length, 1, `${role} must have one future mapping`);
+    assert.equal(matches.length, 1, `${role} must have one Claude-native mapping`);
     assert.ok(matches[0].includes(`canonical \`${profile}\``), role);
     assert.ok(matches[0].includes(`concrete implementation \`${implementation}\``), role);
     assert.ok(matches[0].includes('platform `claude-code`'), role);

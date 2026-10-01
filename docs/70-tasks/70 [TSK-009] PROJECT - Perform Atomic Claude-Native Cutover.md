@@ -4,8 +4,8 @@ artifact:
   id: TSK-009
   type: TSK
   title: Perform Atomic Claude-Native Cutover
-  status: IN_PROGRESS
-artifactVersion: "1"
+  status: COMPLETE
+artifactVersion: "3"
 authorityScope: tsk-009-atomic-claude-native-cutover
 ownerRole: governance-author
 canonical: true
@@ -41,7 +41,7 @@ traceability:
     - TSK-007
     - TSK-008
 lifecycle:
-  phase: in-progress
+  phase: complete
   dependsOn:
     - TSK-007
     - TSK-008
@@ -151,6 +151,13 @@ Phase A hard exclusions:
 - no commit, push, PR, or merge by the Executor.
 
 Phase A ends completely before Phase B begins.
+
+Phase A completed PASS in
+`execution_1d5696967d369ec01bc6be225f06d8cead9d50b4948071bb448ba778225e433b`
+with exactly the two authorized test paths changed, zero path-policy
+violations, both `node --check` commands PASS, and `git diff --check` PASS.
+The runner-bound Implementation Executor operation ended before any configured
+binding mutation.
 
 ## 6. Phase B — atomic configured-state cutover
 
@@ -309,8 +316,12 @@ After merge/reconciliation:
 - the runner is no longer the active Implementation Executor or Mechanical
   Validator binding;
 - future governed work MUST resolve against the Claude-native POP;
-- any further runner use requires separate authority compatible with the new
-  POP.
+- the process-bound runner transaction service may complete only the already
+  authorized TSK-009 promotion transaction boundaries of reconciliation and
+  cleanup as an Operator-side repository mechanism under OPS-008; this does not
+  select or re-bind it as Implementation Executor or Mechanical Validator;
+- any later runner use outside that already-authorized promotion transaction
+  requires separate authority compatible with the Claude-native POP.
 
 ## 14. Completion
 
@@ -326,3 +337,54 @@ TSK-009 is complete only when:
 
 First-session workspace trust/MCP approval and actual telemetry arrival remain
 explicit post-cutover Operator/runtime verification facts.
+
+
+## 15. Completion result
+
+Phase A completed PASS under the pre-cutover runner-bound Implementation
+Executor in
+`execution_1d5696967d369ec01bc6be225f06d8cead9d50b4948071bb448ba778225e433b`
+with exactly two changed test paths, zero path-policy violations, both syntax
+checks PASS, and `git diff --check` PASS.
+
+Phase B reconciled exactly the eight configured/SoT paths authorized by this
+task. Together with the two Phase A tests, the complete cutover candidate has
+exactly ten visible changed paths and zero hidden changes.
+
+The first full candidate validation identified one SPC-002 descriptive mismatch:
+the product topology term `subagent` had been simplified to the DAT-016 POP
+serialization kind `agent`. SPC-002 was corrected inside its authorized Phase B
+surface to preserve both truths explicitly.
+
+Governed mechanical validation
+`tsk009-final-mechanical-r2-20261001` then completed PASS with complete
+evidence and `executorInvoked:false`:
+
+- `npm ci` PASS;
+- `npm test` PASS with 49/49 tests;
+- `git diff --check` PASS.
+
+Governance Author semantic self-assessment is PASS:
+
+- POP bindings exactly match the SPC-002 Claude-native target;
+- Platform Bootstrap is active for `claude-code` and satisfies DAT-016
+  eligible-profile identity invariants;
+- main-agent eligibility is limited to Governance Author and Evidence Custodian
+  through operation-scoped role selection;
+- dedicated Executor and Auditor subagents are active through their target
+  Capability Profiles;
+- Mechanical Validator is `claude-code-native-validation`;
+- runner Capability Profiles remain only non-required historical configuration;
+- the ChatGPT project-system-prompt derivative is retired;
+- root `CLAUDE.md`, project `.mcp.json`, telemetry implementation, framework
+  release, dependencies, subagent definitions, and provider/model settings are
+  unchanged by the cutover;
+- Hooks, Skills, agent teams, model selection, additional subagents, synthetic
+  benchmarking, and remote telemetry remain outside authority;
+- no independent Governance Audit is required because the active POP contains no
+  audit trigger and no framework-required trigger applies.
+
+Promotion of this exact candidate is the Claude-native cutover boundary.
+Workspace trust/project MCP approval and actual telemetry arrival remain
+first-session runtime facts to verify after promotion; they are not fabricated as
+pre-cutover evidence.
