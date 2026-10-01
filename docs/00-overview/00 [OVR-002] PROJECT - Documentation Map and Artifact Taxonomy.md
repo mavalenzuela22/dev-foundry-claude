@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.4"
+artifactVersion: "2.1.0-local.5"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -104,9 +104,9 @@ The current project authority is:
 - DAT-001 for the exact resolver tool contract;
 - TSK-001 for the completed architecture-baseline task;
 - TSK-002 for the completed minimal resolver implementation task;
-- TSK-003 for the active minimal Claude-native project bootstrap task.
+- TSK-003 for the completed minimal Claude-native project bootstrap task.
 
-No MTP is active because TSK-003 is atomic.
+No MTP or follow-on product TSK is active.
 Hooks, Skills, subagents, agent teams, Claude settings/permissions, and direct
 Claude Code execution/cutover remain unauthorized follow-on work.
 
