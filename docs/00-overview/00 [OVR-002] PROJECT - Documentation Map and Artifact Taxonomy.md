@@ -98,8 +98,8 @@ The current project authority is:
 - ARC-001 for the active Claude Code adapter architecture baseline;
 - TSK-001 for the completed architecture-baseline task.
 
-No SPC, product DAT, or MTP is active.
-No product runtime implementation is authorized.
+No SPC, product DAT, MTP, or follow-on product TSK is active.
+No product runtime implementation is currently authorized.
 
 The project Authority Index routes every current authoritative home. Missing
 lower-level implementation authority does not authorize inventing requirements.
