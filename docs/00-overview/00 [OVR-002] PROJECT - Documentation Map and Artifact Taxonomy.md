@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.11"
+artifactVersion: "2.1.0-local.12"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -87,9 +87,11 @@ The active POP binds:
   ChatGPT, that profile selects `codex-cli` and explicitly excludes Claude Code
   execution before cutover.
 
-The prepared `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V1` Capability Profile
-is routed as configured readiness authority but remains unbound; it is not
-eligible for Implementation Executor selection before the later cutover task.
+The historical prepared `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V1`
+Capability Profile remains unbound. The target prepared cutover profiles are
+`DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V2` and
+`DFC-GOVERNANCE-AUDITOR-CLAUDE-CODE-V1`; both are configured but unbound and
+are not eligible for selection before the later cutover task.
 
 Capability does not grant authority, and the runner is product/runtime machinery,
 not reusable methodology. The governance-agent bootstrap is not an executor
@@ -114,13 +116,14 @@ The current project authority is:
 - TSK-004 for the completed Claude project MCP launch-compatibility task;
 - TSK-005 for the completed Claude-native cutover-readiness task;
 - TSK-006 for the completed role-isolation and token-economics architecture
-  task.
+  task;
+- TSK-007 for the active minimal Executor/Auditor subagent implementation task.
 
-No MTP or follow-on product TSK is active.
-The next separately governed product boundary is the minimal implementation of
-exactly `dev-foundry-executor` and `dev-foundry-auditor` under SPC-003.
-The atomic Claude-native cutover remains deferred until runtime/tokenomics
-qualification is accepted. Hooks, Skills, agent teams, and Claude
+No MTP is active because TSK-007 is one atomic two-role isolation capability
+under SPC-003.
+Runtime/tokenomics qualification remains a separate follow-on boundary, and the
+atomic Claude-native cutover remains deferred until that qualification is
+accepted. Hooks, Skills, agent teams, model selection, and Claude
 settings/permissions remain unauthorized unless separately governed.
 
 The project Authority Index routes every current authoritative home. Missing

@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: System Overview
   status: ACTIVE
-artifactVersion: "2.1.0-local.11"
+artifactVersion: "2.1.0-local.12"
 authorityScope: dev-foundry-claude-project
 ownerRole: governance-author
 canonical: false
@@ -76,16 +76,17 @@ The approved direction is to:
 The completed TSK-002 boundary delivers the minimal Claude governance MCP
 resolver, TSK-003 delivers the minimal Claude-native project bootstrap, and
 TSK-004 establishes direct Claude project MCP launch compatibility, TSK-005
-completes repository-side cutover readiness, and TSK-006 completes the
-role-isolation/token-economics architecture before any subagent implementation
-or cutover.
+completes repository-side cutover readiness, TSK-006 completes the
+role-isolation/token-economics architecture, and TSK-007 is the active bounded
+implementation task for exactly the Executor and Auditor project subagents.
 
-TSK-006 did not authorize:
+TSK-007 does not authorize:
 
 - activating Claude-native POP role bindings or switching the active Platform
   Bootstrap away from ChatGPT;
-- creating Claude subagent files, Hooks, Skills, agent teams, or Claude
-  settings/permissions;
+- any Claude subagent beyond `dev-foundry-executor` and
+  `dev-foundry-auditor`;
+- Hooks, Skills, agent teams, Claude settings/permissions, or model selection;
 - another MCP tool or generic repository-control MCP surface;
 - remote MCP transport, authentication, cloud deployment, or telemetry;
 - automatic provider routing or secret handling;
@@ -99,9 +100,9 @@ The initial Claude-native adapter architecture baseline, TSK-002 minimal
 governance MCP resolver, TSK-003 minimal root Claude project bootstrap, and
 TSK-004 project-scoped MCP launch compatibility, TSK-005 Claude-native cutover
 readiness, and TSK-006 role-isolation/token-economics architecture are complete.
-The next product boundary is the minimal implementation of exactly two dedicated
-subagents: Executor and Auditor. Runtime qualification and Claude-native cutover
-remain deferred.
+TSK-007 is active to implement exactly two dedicated project subagents: Executor
+and Auditor, plus focused static proof. Runtime qualification and Claude-native
+cutover remain deferred.
 
 Canonical DEV FOUNDRY 2.1.0 remains the selected reusable methodology.
 The local Project Operating Profile and Authority Index bind that release to
