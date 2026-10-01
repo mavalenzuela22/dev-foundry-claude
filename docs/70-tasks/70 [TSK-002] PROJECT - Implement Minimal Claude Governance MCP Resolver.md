@@ -5,7 +5,7 @@ artifact:
   type: TSK
   title: Implement Minimal Claude Governance MCP Resolver
   status: IN_PROGRESS
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: tsk-002-minimal-claude-governance-mcp-resolver
 ownerRole: governance-author
 canonical: true
@@ -115,7 +115,8 @@ The task authorizes only the dependencies and versions accepted by ADR-002:
 Runtime:
 
 - `@modelcontextprotocol/server@2.2.0`;
-- `zod@4.6.5`.
+- `zod@4.6.5`;
+- `yaml@2.9.1`.
 
 Development-only:
 

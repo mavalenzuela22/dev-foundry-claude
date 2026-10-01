@@ -29,6 +29,7 @@ limits:
     runtime:
       - "@modelcontextprotocol/server@2.2.0"
       - "zod@4.6.5"
+      - "yaml@2.9.1"
     development:
       - "@modelcontextprotocol/client@2.2.0"
   mutation_surface_projection:
