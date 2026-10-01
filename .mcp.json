@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "dev-foundry-governance": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${CLAUDE_PROJECT_DIR}/src/governance-mcp/server.js"]
+    }
+  }
+}

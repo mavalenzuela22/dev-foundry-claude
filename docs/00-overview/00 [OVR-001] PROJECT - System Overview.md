@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: System Overview
   status: ACTIVE
-artifactVersion: "2.1.0-local.2"
+artifactVersion: "2.1.0-local.3"
 authorityScope: dev-foundry-claude-project
 ownerRole: governance-author
 canonical: false
@@ -73,10 +73,10 @@ The approved direction is to:
 
 ## 4. Current Non-Goals
 
-The active TSK-002 boundary authorizes only the minimal Claude governance MCP
-resolver.
+The completed TSK-002 boundary delivers only the minimal Claude governance MCP
+resolver. No follow-on implementation TSK is active yet.
 
-It does not authorize:
+TSK-002 did not authorize:
 
 - Hooks, Skills, subagents, agent teams, or product `CLAUDE.md` behavior;
 - another MCP tool or generic repository-control MCP surface;
@@ -88,8 +88,9 @@ Those require separate follow-on governed tasks.
 
 ## 5. Current State
 
-The initial Claude-native adapter architecture baseline is complete and TSK-002
-is the active bounded implementation task.
+The initial Claude-native adapter architecture baseline and TSK-002 minimal
+governance MCP resolver implementation are complete. No follow-on product task is
+currently active.
 
 Canonical DEV FOUNDRY 2.1.0 remains the selected reusable methodology.
 The local Project Operating Profile and Authority Index bind that release to
@@ -99,6 +100,7 @@ ADR-001 owns the Claude-native repository versus governance-MCP boundary.
 ADR-002 owns the initial local stdio runtime stack. ARC-001 defines the adapter
 architecture. SPC-001 and DAT-001 close the resolver behavior and tool contract.
 
-The Implementation Executor is separately bound to the runner under the active
-TSK-002 Capability Profile. The governance-agent implementation remains the
-Governance Author and does not self-select the executor role.
+The Implementation Executor remains separately bound to the runner through the
+TSK-002-scoped Capability Profile; TSK-002 completion does not broaden that
+binding to future implementation work. The governance-agent implementation
+remains the Governance Author and does not self-select the executor role.
