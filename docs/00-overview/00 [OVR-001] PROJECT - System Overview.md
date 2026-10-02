@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: System Overview
   status: ACTIVE
-artifactVersion: "2.1.0-local.18"
+artifactVersion: "2.1.0-local.21"
 authorityScope: dev-foundry-claude-project
 ownerRole: governance-author
 canonical: false
@@ -55,6 +55,12 @@ The project SHALL NOT embed or recreate the runner merely to read or mutate the
 same repository from Claude Code. The runner and this adapter are distinct
 runtime integrations.
 
+When separately governed (TSK-012, ADR-003), the project MAY distribute its reusable runtime
+as a versioned package that an existing governed repository installs, receiving only
+project-specific generated configuration. A consumer SHALL NOT receive this project's
+authority, history, or runtime code copies, and adopting the package SHALL NOT change that
+repository's authority or its runner bindings.
+
 The project SHALL NOT duplicate the adopted DEV FOUNDRY release into project
 prompts, Skills, summaries, or local OPS/DAT copies as a parallel methodology
 source.
@@ -86,7 +92,9 @@ follow-on governed tasks:
 - automatic provider routing, provider authentication, or secret handling;
 - copying runtime implementation or task history from another project;
 - modifying, wrapping, or replacing the mature ChatGPT-side runner, or creating
-  an intermediate synchronization layer or cross-surface protocol.
+  an intermediate synchronization layer or cross-surface protocol;
+- dual binding of any role, package-registry publication, and modification of any
+  consumer repository without separate Operator authorization.
 
 ## 5. Current State
 
@@ -99,6 +107,11 @@ the atomic cutover (TSK-009), and multi-harness launcher support (TSK-010:
 `scripts/telemetry/claude.mjs`, with a dynamically selected collector port).
 TSK-011 reconciles post-cutover defects and bounds a Claude-versus-runner
 compatibility investigation.
+
+TSK-012 is complete: the reusable `@dev-foundry/claude-adapter` package and brownfield adoption
+under ADR-003 exist as a private, tarball-distributed build with a plan/apply CLI, a runtime pin,
+and a default-off consumer-mode activation guard. No real consumer repository has adopted it and
+no package has been published. The active self-hosted state below is unchanged.
 
 Claude Code is the active configured project platform. Canonical DEV FOUNDRY
 2.1.0 remains the selected reusable methodology; the local Project Operating

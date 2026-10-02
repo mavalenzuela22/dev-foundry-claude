@@ -1,0 +1,54 @@
+schema_version: dev-foundry.platform-bootstrap.v2
+id: {{PREFIX}}-PLATFORM-BOOTSTRAP-CLAUDE-CODE
+title: {{PROJECT}} Claude Code Platform Bootstrap
+kind: platform-bootstrap
+status: active
+artifact_version: "claude-adapter-1"
+canonical: false
+methodology_authority: false
+
+repository:
+  expected_name: {{PROJECT}}
+  workspace_binding: repository-root
+
+sources:
+  project_operating_profile: .dev-foundry/profiles/project-operating-profile.yaml
+  authority_index: .dev-foundry/authority-index.yaml
+
+actor_resolution:
+  mode: governed-project-bindings
+  eligible_profiles:
+    - {{AUTHOR_PROFILE}}
+    - {{CUSTODIAN_PROFILE}}
+  fixed_profile: null
+  default_role: governance-author
+  rule: >
+    Resolve exactly one eligible role/profile before each role-dependent bounded
+    operation. The claude-main-agent is eligible only for Governance Author or
+    Evidence Custodian through active POP bindings and operation-scoped role
+    selection. Implementation Executor and Governance Auditor are dispatched
+    explicitly to their dedicated project subagents after resolution. Mechanical
+    Validator is separately bound to native Claude Code validation.
+
+platform:
+  id: claude-code
+  startup_constraints:
+    - start governed work from the {{PROJECT}} repository root
+    - load project instruction files only as startup guidance, never as authority
+    - retrieve the active POP and Authority Index before role-dependent work
+    - require the project-scoped dev-foundry-governance MCP and resolve_governed_operation for governed role resolution
+    - workspace trust and project MCP approval remain explicit Operator-side provider security mechanics
+    - repository identity authority state and required capability mismatches fail closed
+
+constraints:
+  - active reusable methodology is sourced only from the POP-selected immutable canonical framework release
+  - concrete implementation bindings are owned by the Project Operating Profile
+  - capability does not grant authority
+  - role selection is operation-scoped
+  - conversational continuity does not transfer authority or satisfy independence
+  - claude-main-agent is not the Implementation Executor or Governance Auditor implementation
+  - implementation-executor dispatches explicitly to dev-foundry-executor only after applicable role resolution
+  - governance-auditor dispatches explicitly to dev-foundry-auditor only when the bounded operation requires that role and its independence preconditions are satisfied
+  - mechanical-validator is separately bound to claude-code-native-validation
+  - project instruction files and the project governance MCP are startup mechanisms and not repository authority
+  - repository configuration must not bypass workspace trust or silently pre-approve the project MCP

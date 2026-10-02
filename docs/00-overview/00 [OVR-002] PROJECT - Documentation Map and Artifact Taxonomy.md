@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.18"
+artifactVersion: "2.1.0-local.21"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -104,6 +104,7 @@ The current project authority is:
 - ADR-001 for the accepted Claude-native repository versus governance-MCP
   decision;
 - ADR-002 for the local stdio MCP runtime stack and dependency boundary;
+- ADR-003 for the reusable adapter package and consumer boundary;
 - ARC-001 for the active Claude Code adapter architecture baseline;
 - SPC-001 for governed-operation resolver behavior;
 - SPC-002 for the active Claude-native cutover binding contract;
@@ -123,7 +124,8 @@ The current project authority is:
 - TSK-009 for the completed atomic Claude-native cutover task;
 - TSK-010 for the completed multi-harness Claude runtime activation task;
 - TSK-011 for the post-cutover reconciliation and runner-compatibility
-  investigation task.
+  investigation task;
+- TSK-012 for the completed reusable package and brownfield adoption task.
 
 No MTP is active.
 Exactly `dev-foundry-executor` and `dev-foundry-auditor` are the active

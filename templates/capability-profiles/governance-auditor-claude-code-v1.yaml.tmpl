@@ -1,0 +1,66 @@
+schema_version: dev-foundry.capability-profile.v1
+id: {{PREFIX}}-GOVERNANCE-AUDITOR-CLAUDE-CODE-V1
+status: active
+implementation_class: claude-code-project-subagent
+supported_actions:
+  - inspect_declared_audit_boundary
+  - inspect_directed_authority_and_evidence
+  - call_project_governance_mcp_for_operation_resolution
+  - evaluate_semantic_truthfulness_minimality_and_sufficiency
+  - issue_bounded_audit_verdict
+  - report_findings_closure_predicates_and_limits
+prohibited_actions:
+  - edit_write_or_delete_repository_files
+  - run_shell_or_powershell_commands
+  - author_or_modify_product_or_framework_authority
+  - implement_corrective_work_during_audit
+  - spawn_subagents_or_agent_teams
+  - preload_project_skills
+  - authorize_operator_reserved_boundaries
+  - treat_author_executor_claims_or_conversation_memory_as_authority
+  - use_this_profile_before_project_cutover_binding_is_active
+limits:
+  repository: {{PROJECT}}
+  platform: claude-code
+  implementation_identity: dev-foundry-auditor
+  operating_mode: project_subagent
+  allowed_tools:
+    - Read
+    - Grep
+    - Glob
+    - mcp__dev-foundry-governance__*
+  governance_mcp_server: dev-foundry-governance
+  governance_resolution: resolve_governed_operation
+  repository_mutation: forbidden
+  shell_execution: forbidden
+  delegation_depth: 1
+  nested_agent_access: false
+  skills_preloaded: false
+  description_max_utf8_bytes: 240
+  definition_max_utf8_bytes: 8192
+  definition_max_nonempty_lines: 100
+  handoff_max_utf8_bytes: 8192
+  disposition_max_utf8_bytes: 4096
+proof_capabilities:
+  - independent_repository_read_and_search
+  - directed_authority_reobservation
+  - exact_audit_finding_reporting
+  - audit_verdict_and_closure_predicate_reporting
+environment_constraints:
+  - direct_session_must_be_rooted_in_{{PROJECT_SLUG}}
+  - project_claude_md_must_be_loaded
+  - project_governance_mcp_must_be_connected
+  - active_pop_must_bind_governance_auditor_to_this_profile
+  - one_operation_scoped_role_must_be_resolved_before_role_dependent_work
+  - required_independence_must_be_satisfied
+  - audited_boundary_must_be_stable
+stop_conditions:
+  - profile_is_not_the_active_pop_binding_for_governance_auditor
+  - governance_mcp_is_unavailable_or_returns_failure
+  - missing_or_conflicting_authority
+  - incomplete_required_evidence
+  - independence_requirement_not_satisfied
+  - audited_boundary_changes_during_verdict_formation
+  - requested_work_requires_mutation_or_shell_execution
+  - static_context_budget_exceeded
+portability: configure

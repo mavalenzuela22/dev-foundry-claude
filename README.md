@@ -12,3 +12,10 @@ This README is orientation only and is not authority.
   whether it runs inside or outside the launcher.
 - Start a session through the canonical launcher:
   `scripts/telemetry/run-claude.sh <direct|dial|codemie> -- <claude args>`.
+
+Reusable package: this repository can also be built as the `@dev-foundry/claude-adapter`
+tarball (`npm pack`, private, no registry) whose `dev-foundry-claude` command provides
+`adopt plan|apply|status`, `mcp`, and `run` for a consumer repository that already
+governs itself with DEV FOUNDRY. Adoption writes only adapter-owned files; the
+consumer's own cutover under its own authority activates Claude roles. Self-hosted
+use above is unchanged.

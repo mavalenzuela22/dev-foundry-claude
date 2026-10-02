@@ -5,6 +5,11 @@ import { resolveGovernedOperation } from './resolver.js';
 import { writeOperationMarker } from '../telemetry/telemetry.js';
 
 const projectRoot = process.env.CLAUDE_PROJECT_DIR;
+// Opt-in consumer-mode activation guard (SPC-001 section 13). Only the packaged `mcp` entry sets this
+// in-process switch; source-run launch leaves it off and behaves exactly as before.
+const consumerGuard = globalThis[Symbol.for('dev-foundry-claude.consumer-mode-guard')] === true
+  ? (await import('../adopt/activation.js')).evaluateActivation
+  : null;
 const server = new McpServer({
   name: 'dev-foundry-governance',
   version: '1.0.0',
@@ -23,6 +28,10 @@ server.registerTool('resolve_governed_operation', {
     expectedContextFingerprint: z.unknown().optional().describe('Optional lowercase SHA-256 fingerprint from a prior resolution.'),
   }).passthrough(),
 }, async (input) => {
+  if (consumerGuard && (await consumerGuard(projectRoot)).overall !== 'active') {
+    const denied = { ok: false, errorCode: 'BINDING_INACTIVE', message: 'Claude role activation is not complete for this project.' };
+    return { content: [{ type: 'text', text: JSON.stringify(denied) }] };
+  }
   const result = await resolveGovernedOperation(input, { projectRoot });
   if (result.ok === true && process.env.DEV_FOUNDRY_TELEMETRY_RUN_ID && process.env.DEV_FOUNDRY_TELEMETRY_DIR) {
     const { resolution } = result;

@@ -1,20 +1,35 @@
 {
-  "name": "dev-foundry-claude-governance-mcp",
-  "version": "1.0.0",
+  "name": "@dev-foundry/claude-adapter",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=20"
   },
+  "bin": {
+    "dev-foundry-claude": "bin/dev-foundry-claude.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "templates",
+    "payload-manifest.json"
+  ],
   "scripts": {
     "start": "node src/governance-mcp/server.js",
-    "test": "node --test test/governance-mcp/*.test.js test/bootstrap/*.test.js"
+    "prepack": "node scripts/package/payload-manifest.mjs",
+    "test": "node --test test/governance-mcp/*.test.js test/bootstrap/*.test.js test/adopt/*.test.js"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.2.0",
     "yaml": "2.9.1",
     "zod": "4.6.5"
   },
+  "bundleDependencies": [
+    "@modelcontextprotocol/server",
+    "yaml",
+    "zod"
+  ],
   "devDependencies": {
     "@modelcontextprotocol/client": "2.2.0"
   }

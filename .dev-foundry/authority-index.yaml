@@ -3,7 +3,7 @@ id: DFC-AUTHORITY-INDEX
 title: dev-foundry-claude Repository Authority Index
 kind: authority-index
 status: active
-artifact_version: "2.1.0-local.12"
+artifact_version: "2.1.0-local.13"
 canonical: false
 
 subject:
@@ -65,6 +65,15 @@ routes:
       - governance-mcp-runtime-stack
       - governance-mcp-dependency-boundary
     section_id: null
+  - id: claude-adapter-package-consumer-boundary
+    path: docs/10-decisions/10 [ADR-003] PROJECT - Reusable Claude Adapter Package and Consumer Boundary.md
+    authority_class: decision
+    governs:
+      - claude-adapter-package-form
+      - claude-consumer-mcp-launch-and-runtime-pin
+      - claude-adapter-write-boundary
+      - claude-prepared-versus-active-model
+    section_id: null
   - id: governed-operation-resolver-behavior
     path: docs/40-specifications/40 [SPC-001] PROJECT - Governed Operation Resolver Behavior.md
     authority_class: product
@@ -73,6 +82,7 @@ routes:
       - resolver-authority-selection
       - resolver-role-selection
       - resolver-staleness-detection
+      - consumer-mode-activation-guard
     section_id: null
   - id: governed-operation-resolver-contract
     path: docs/60-data-contracts/60 [DAT-001] PROJECT - Governed Operation Resolver Contract.md
@@ -168,6 +178,15 @@ routes:
     authority_class: task
     governs:
       - claude-post-cutover-reconciliation
+    section_id: null
+  - id: TSK-012
+    path: docs/70-tasks/70 [TSK-012] PROJECT - Establish Reusable Claude Adapter Package and Brownfield Adoption.md
+    authority_class: task
+    governs:
+      - claude-adapter-package-distribution
+      - claude-brownfield-adoption-plan-apply
+      - claude-adapter-runtime-integrity-pin
+      - claude-consumer-mode-activation-guard
     section_id: null
 
 bindings:
