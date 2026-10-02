@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: System Overview
   status: ACTIVE
-artifactVersion: "2.1.0-local.17"
+artifactVersion: "2.1.0-local.18"
 authorityScope: dev-foundry-claude-project
 ownerRole: governance-author
 canonical: false
@@ -73,45 +73,36 @@ The approved direction is to:
 
 ## 4. Current Non-Goals
 
-The completed TSK-002 boundary delivers the minimal Claude governance MCP
-resolver, TSK-003 delivers the minimal Claude-native project bootstrap, and
-TSK-004 establishes direct Claude project MCP launch compatibility, TSK-005
-completes repository-side cutover readiness, TSK-006 completes the
-role-isolation/token-economics architecture, TSK-007 completes the bounded
-implementation of exactly the Executor and Auditor project subagents, and
-TSK-008 completes the local operational-telemetry instrumentation boundary.
+The following remain outside the delivered boundary and require separate
+follow-on governed tasks:
 
-TSK-008 did not authorize:
-
-- activating Claude-native POP role bindings or switching the active Platform
-  Bootstrap away from ChatGPT;
-- any Claude subagent beyond `dev-foundry-executor` and
-  `dev-foundry-auditor`;
-- Hooks, Skills, agent teams, Claude settings/permissions, or model selection;
-- another MCP tool or generic repository-control MCP surface;
+- any Claude subagent beyond `dev-foundry-executor` and `dev-foundry-auditor`;
+- Hooks, Skills, agent teams, committed Claude settings/permissions, or model
+  selection (Operator-local, Git-ignored `.claude/settings.local.json` is
+  provider mechanics, not project configuration);
+- another MCP tool or a generic repository-control MCP surface;
 - synthetic Claude benchmarks, public/LAN telemetry listeners, remote telemetry
   backends, or cloud telemetry deployment;
-- automatic provider routing or secret handling;
-- copying runtime implementation or task history from another project.
-
-Those require separate follow-on governed tasks.
+- automatic provider routing, provider authentication, or secret handling;
+- copying runtime implementation or task history from another project;
+- modifying, wrapping, or replacing the mature ChatGPT-side runner, or creating
+  an intermediate synchronization layer or cross-surface protocol.
 
 ## 5. Current State
 
-The initial Claude-native adapter architecture baseline, TSK-002 minimal
-governance MCP resolver, TSK-003 minimal root Claude project bootstrap, and
-TSK-004 project-scoped MCP launch compatibility, TSK-005 Claude-native cutover
-readiness, TSK-006 role-isolation/token-economics architecture, and TSK-007
-minimal Executor/Auditor subagent implementation and TSK-008 local operational
-telemetry instrumentation are complete. Exactly two project subagents now exist
-and are statically qualified under SPC-003, and the SPC-004 telemetry path is
-mechanically ready without synthetic Claude spend.
-TSK-009 completes the atomic configured-state cutover to Claude Code.
-Claude Code is now the active configured project platform after promotion.
+TSK-001 through TSK-010 are complete: the adapter architecture baseline, the
+minimal governance MCP resolver, the minimal root Claude bootstrap, project MCP
+launch compatibility, cutover readiness, role-isolation/token-economics
+architecture, the Executor and Auditor subagents, local operational telemetry,
+the atomic cutover (TSK-009), and multi-harness launcher support (TSK-010:
+`direct`, `dial`, `codemie` through the one canonical launcher
+`scripts/telemetry/claude.mjs`, with a dynamically selected collector port).
+TSK-011 reconciles post-cutover defects and bounds a Claude-versus-runner
+compatibility investigation.
 
-Canonical DEV FOUNDRY 2.1.0 remains the selected reusable methodology.
-The local Project Operating Profile and Authority Index bind that release to
-`dev-foundry-claude`.
+Claude Code is the active configured project platform. Canonical DEV FOUNDRY
+2.1.0 remains the selected reusable methodology; the local Project Operating
+Profile and Authority Index bind that release to `dev-foundry-claude`.
 
 ADR-001 owns the Claude-native repository versus governance-MCP boundary.
 ADR-002 owns the initial local stdio runtime stack. ARC-001 defines the adapter
@@ -120,14 +111,15 @@ SPC-002 owns the active Claude-native binding contract. SPC-003 owns the
 role-isolation and token-economics contract. SPC-004 owns the operational
 telemetry and empirical tokenomics evidence contract.
 
-The active POP now binds Governance Author and Evidence Custodian to the
+The active POP binds Governance Author and Evidence Custodian to the
 `claude-main-agent` through operation-scoped role selection, Implementation
 Executor to `dev-foundry-executor`, Governance Auditor to
 `dev-foundry-auditor`, and Mechanical Validator to
-`claude-code-native-validation`. The runner is no longer an active Executor or
-Validator binding.
+`claude-code-native-validation`. The runner is not an active Executor or
+Validator binding. A read-only runner inspection is not an active-role action
+and is not evidence of a stale binding.
 
-Exactly two project subagents remain authorized. Hooks, Skills, agent teams,
-model selection, additional subagents, and remote telemetry remain outside the
-completed cutover boundary. Actual telemetry arrival and any provider trust/MCP
-approval are first-session runtime facts.
+Exactly two project subagents are authorized. Actual telemetry arrival and any
+provider trust/MCP approval are first-session runtime facts; whether `dial` and
+`codemie` forward the launcher's telemetry environment remains to be observed in
+a real session.

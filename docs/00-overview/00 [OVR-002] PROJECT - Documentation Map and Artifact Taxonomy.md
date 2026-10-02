@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.17"
+artifactVersion: "2.1.0-local.18"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -76,8 +76,6 @@ Use the project Authority Index first for repository-dependent authority routing
 
 The active POP binds:
 
-- Governance Author -> canonical `governance-author-v3`;
-- Governance Auditor -> canonical `governance-auditor-v2`;
 - Mechanical Validator -> canonical `mechanical-validator-v2`, implemented by
   `claude-code-native-validation` on `claude-code`;
 - Evidence Custodian -> canonical `evidence-custodian-v1`, implemented by
@@ -108,7 +106,7 @@ The current project authority is:
 - ADR-002 for the local stdio MCP runtime stack and dependency boundary;
 - ARC-001 for the active Claude Code adapter architecture baseline;
 - SPC-001 for governed-operation resolver behavior;
-- SPC-002 for the prepared Claude-native cutover binding contract;
+- SPC-002 for the active Claude-native cutover binding contract;
 - SPC-003 for Claude role isolation and token-economics constraints;
 - SPC-004 for local operational telemetry and empirical tokenomics evidence;
 - DAT-001 for the exact resolver tool contract;
@@ -122,15 +120,18 @@ The current project authority is:
 - TSK-007 for the completed minimal Executor/Auditor subagent implementation
   task;
 - TSK-008 for the completed operational-telemetry instrumentation task;
-- TSK-009 for the completed atomic Claude-native cutover task.
+- TSK-009 for the completed atomic Claude-native cutover task;
+- TSK-010 for the completed multi-harness Claude runtime activation task;
+- TSK-011 for the post-cutover reconciliation and runner-compatibility
+  investigation task.
 
-No MTP or follow-on product TSK is active.
+No MTP is active.
 Exactly `dev-foundry-executor` and `dev-foundry-auditor` are the active
 dedicated project subagents under SPC-003, with their target Capability Profiles
 bound in the active POP.
 TSK-008 established the local telemetry path for empirical review using real
-Claude-native work; actual telemetry arrival is verified in the first real
-Claude-native session.
+Claude-native work and TSK-010 added the `direct`, `dial` and `codemie` launch
+modes; actual telemetry arrival is verified in real launcher-started sessions.
 Claude Code is the active platform. Hooks, Skills, agent teams, model selection,
 and additional subagents remain unauthorized unless separately governed.
 

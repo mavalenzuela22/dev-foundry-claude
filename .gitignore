@@ -431,3 +431,4 @@ FodyWeavers.xsd
 .dev-foundry/telemetry/local/
 
 docs/codemie/analytics/
+.claude/settings.local.json

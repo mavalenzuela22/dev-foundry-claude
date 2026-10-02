@@ -3,7 +3,7 @@ id: DFC-AUTHORITY-INDEX
 title: dev-foundry-claude Repository Authority Index
 kind: authority-index
 status: active
-artifact_version: "2.1.0-local.11"
+artifact_version: "2.1.0-local.12"
 canonical: false
 
 subject:
@@ -162,6 +162,12 @@ routes:
     authority_class: task
     governs:
       - claude-multi-harness-runtime-activation
+    section_id: null
+  - id: TSK-011
+    path: docs/70-tasks/70 [TSK-011] PROJECT - Reconcile Post-Cutover Defects and Investigate Runner Compatibility.md
+    authority_class: task
+    governs:
+      - claude-post-cutover-reconciliation
     section_id: null
 
 bindings:

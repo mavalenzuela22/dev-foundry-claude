@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { lstat, readFile, readdir } from 'node:fs/promises';
 import { relative, resolve, sep } from 'node:path';
 import test from 'node:test';
@@ -236,11 +236,15 @@ test('project has exactly the two authorized subagents and no Claude settings, H
   // An exact tree excludes settings variants, Hooks, Skills, teams, extra
   // agents, nested definitions, and dangling configuration links.
   assert.ok((await lstat(resolve(root, '.claude'))).isDirectory());
-  // Operator-local settings.local.json is tolerated only when Git ignores it.
+  // Operator-local settings.local.json is tolerated only when the repository's
+  // own .gitignore ignores it, independent of global or user-level ignores.
   const claudeEntries = (await readdir(resolve(root, '.claude'))).sort();
-  if (claudeEntries.includes('settings.local.json')) {
-    execFileSync('git', ['check-ignore', '-q', '.claude/settings.local.json'], { cwd: root });
-  }
+  const checkIgnore = (path) => spawnSync('git', ['-c', 'core.excludesFile=/dev/null', 'check-ignore', '-v', path], { cwd: root, encoding: 'utf8' });
+  const localSettings = checkIgnore('.claude/settings.local.json');
+  assert.equal(localSettings.status, 0);
+  assert.match(localSettings.stdout, /^\.gitignore:\d+:\.claude\/settings\.local\.json\t/);
+  assert.equal(checkIgnore('.claude/settings.json').status, 1);
+  assert.equal(checkIgnore('.claude/agents/dev-foundry-executor.md').status, 1);
   assert.deepEqual(claudeEntries.filter((name) => name !== 'settings.local.json'), ['agents']);
   assert.ok((await lstat(resolve(root, '.claude/agents'))).isDirectory());
   const definitions = ['dev-foundry-auditor.md', 'dev-foundry-executor.md'];

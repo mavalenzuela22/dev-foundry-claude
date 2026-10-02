@@ -219,9 +219,13 @@ test('marker writer is a no-op unless both telemetry variables are present', asy
 // Speak the newline-delimited stdio protocol directly; no model or Claude
 // process participates in these smoke checks.
 async function startMcp(t, projectRoot, telemetryEnv = {}) {
+  // Launcher-owned variables are removed so results do not depend on whether
+  // the suite runs inside or outside the launcher.
   const env = { ...process.env, CLAUDE_PROJECT_DIR: projectRoot };
-  delete env.DEV_FOUNDRY_TELEMETRY_RUN_ID;
-  delete env.DEV_FOUNDRY_TELEMETRY_DIR;
+  for (const key of Object.keys(env)) {
+    if (key === 'DEV_FOUNDRY_CLAUDE_LAUNCH_MODE' || key.startsWith('DEV_FOUNDRY_TELEMETRY_') || key.startsWith('OTEL_')
+      || ['CLAUDE_CODE_ENABLE_TELEMETRY', 'CLAUDE_CODE_ENHANCED_TELEMETRY_BETA', 'ENABLE_ENHANCED_TELEMETRY_BETA', 'ENABLE_BETA_TRACING_DETAILED', 'BETA_TRACING_ENDPOINT'].includes(key)) delete env[key];
+  }
   Object.assign(env, telemetryEnv);
   const child = spawn(process.execPath, [serverPath], { cwd: os.tmpdir(), env, stdio: ['pipe', 'pipe', 'pipe'] });
   let stderr = '';
