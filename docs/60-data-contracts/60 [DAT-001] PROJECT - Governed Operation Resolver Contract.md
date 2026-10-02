@@ -5,7 +5,7 @@ artifact:
   type: DAT
   title: Governed Operation Resolver Contract
   status: ACTIVE
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: dev-foundry-claude-governed-operation-resolver-contract
 ownerRole: governance-author
 canonical: true
@@ -20,6 +20,7 @@ scope:
       - claude-governance-mcp
     tasks:
       - TSK-002
+      - TSK-012
   excludes:
     - generic-mcp-runtime-contracts
     - execution-contract-schema
@@ -28,6 +29,7 @@ authority:
   governedBy:
     - SPC-001
     - ADR-002
+    - ADR-003
   supersedes: []
 lifecycle:
   phase: active
@@ -129,7 +131,12 @@ Allowed `errorCode` values:
 - `AUTHORITY_INVALID`;
 - `ROLE_INELIGIBLE`;
 - `STALE_CONTEXT`;
-- `READ_FAILED`.
+- `READ_FAILED`;
+- `BINDING_INACTIVE`.
+
+`BINDING_INACTIVE` is emitted only by the consumer-mode activation guard of SPC-001 section 13,
+never by the resolver, and only when the server was launched through the packaged adapter entry.
+Its `message` is concise and carries no repository content. Source-run launch never emits it.
 
 A failure MUST NOT include a partial success resolution.
 
@@ -205,3 +212,7 @@ The initial contract version is `1`.
 
 A backward-incompatible input, output, error, or fingerprint change requires a
 new DAT artifact version or explicit successor contract before implementation.
+
+Version `2` adds `BINDING_INACTIVE` as an opt-in error code (TSK-012). It changes no input, no
+success payload, no fingerprint, and no existing error condition, and callers that do not enable
+the guard never observe it, so it is backward-compatible.

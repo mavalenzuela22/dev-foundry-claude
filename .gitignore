@@ -432,3 +432,5 @@ FodyWeavers.xsd
 
 docs/codemie/analytics/
 .claude/settings.local.json
+
+/payload-manifest.json

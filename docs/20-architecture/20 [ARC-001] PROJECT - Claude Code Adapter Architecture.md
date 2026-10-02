@@ -5,7 +5,7 @@ artifact:
   type: ARC
   title: Claude Code Adapter Architecture
   status: ACTIVE
-artifactVersion: "3"
+artifactVersion: "4"
 authorityScope: dev-foundry-claude-adapter-architecture
 ownerRole: governance-author
 canonical: true
@@ -14,6 +14,7 @@ scope:
     - claude-code-adapter-components
     - claude-code-primitive-responsibility-map
     - claude-code-context-loading-boundary
+    - claude-adapter-distribution-components
   appliesTo:
     components:
       - dev-foundry-claude
@@ -102,6 +103,17 @@ A later task may justify operations such as governance-context validation or
 promotion-readiness evaluation only when their deterministic value is
 demonstrated and their responsibility is not already satisfied by Claude Code
 native capabilities, hooks, or ordinary repository validation.
+
+### 4.3 Distribution and consumer activation
+
+The reusable runtime is also a versioned package with one CLI (ADR-003). The CLI adds exactly
+three responsibilities around the existing MCP and launcher: brownfield adoption planning and
+apply for adapter-owned files only, a read-only activation status, and thin `mcp` and `run`
+entry points that verify a runtime pin first.
+
+A consumer receives configuration, not code. Until the consumer's own atomic cutover the adapter
+is prepared and not active, and the packaged MCP fails closed with `BINDING_INACTIVE` for role
+work. No component exists to coexist with, bridge, or modify the mature runner.
 
 ## 5. Hooks and permissions
 

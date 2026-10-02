@@ -5,7 +5,7 @@ artifact:
   type: SPC
   title: Governed Operation Resolver Behavior
   status: ACTIVE
-artifactVersion: "2"
+artifactVersion: "3"
 authorityScope: dev-foundry-claude-governed-operation-resolution
 ownerRole: governance-author
 canonical: true
@@ -15,11 +15,13 @@ scope:
     - resolver-authority-selection
     - resolver-role-selection
     - resolver-staleness-detection
+    - consumer-mode-activation-guard
   appliesTo:
     capabilities:
       - claude-governance-mcp
     tasks:
       - TSK-002
+      - TSK-012
   excludes:
     - repository-mutation
     - implementation-execution
@@ -29,6 +31,7 @@ authority:
   governedBy:
     - ADR-001
     - ADR-002
+    - ADR-003
     - ARC-001
   supersedes: []
 lifecycle:
@@ -256,3 +259,28 @@ decision.
 
 Reading local repository authority under `CLAUDE_PROJECT_DIR` is the complete
 runtime side-effect boundary for TSK-002 resolution.
+
+## 13. Consumer-mode activation guard (TSK-012)
+
+The guard is MCP-boundary behavior and is not resolver behavior. The resolver, its
+authority selection, role selection, fingerprint, and every failure above are unchanged.
+
+When the governance MCP is launched through the packaged adapter entry (ADR-003), the server
+SHALL, on every `resolve_governed_operation` call and before invoking the resolver, determine
+whether Claude activation is complete for the consumer project. Activation is derived only from
+the consumer's POP, Platform Bootstrap files, Authority Index, and the profiles they reference;
+adapter-owned files and capability grant none.
+
+Activation is complete only when all five governed roles (Governance Author, Implementation
+Executor, Governance Auditor, Mechanical Validator, Evidence Custodian) are actively bound to
+their Claude implementations, their required Capability Profiles are routed, active and bound to
+the project, and exactly one active Platform Bootstrap exists and is the Claude bootstrap for the
+project. Absent, partial, or mixed state is not complete.
+
+When activation is not complete the server SHALL return the DAT-001 `BINDING_INACTIVE` failure,
+SHALL NOT invoke the resolver, and SHALL NOT return a role binding owned by another
+implementation. The tool remains listed. The guard performs only the read-only local reads that
+resolution already performs.
+
+The guard is enabled only by the packaged entry. Source-run launch, including the self-hosted
+`.mcp.json` path, SHALL leave it off and behave as before.
