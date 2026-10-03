@@ -5,7 +5,7 @@ artifact:
   type: SPC
   title: Claude-Native Cutover Binding Contract
   status: ACTIVE
-artifactVersion: "5"
+artifactVersion: "6"
 authorityScope: claude-native-cutover-binding-contract
 ownerRole: governance-author
 canonical: true
@@ -44,34 +44,39 @@ portability: project-specific
 
 ## 1. Purpose
 
-Define and record the configured Claude-native operating state of
-`dev-foundry-claude` after the TSK-009 cutover without changing reusable DEV
-FOUNDRY role semantics.
+Define the Claude-native role binding model that `dev-foundry-claude` operated
+under after the TSK-009 cutover, and that remains the target binding model for a
+consumer repository that cuts over to Claude Code under its own authority
+(ADR-003), without changing reusable DEV FOUNDRY role semantics.
 
-TSK-009 promotes the transition originally prepared by this contract.
+TSK-013 (ADR-004) moved this repository's own producer operation to
+ChatGPT-project producer maintenance. This contract therefore no longer
+describes the active producer binding of `dev-foundry-claude`; the active
+producer bindings are in its POP.
 
-## 2. Historical pre-cutover state
+## 2. Historical Claude-native producer state
 
-Before TSK-009 promotion:
+From TSK-009 promotion until TSK-013 promotion, the producer repository itself
+was bound to the Claude-native model in section 3. That is history and MUST NOT
+be used for new producer governed operations after TSK-013 promotion.
 
-- Governance Author, Governance Auditor, and Evidence Custodian were bound to the
-  ChatGPT project governance implementation;
-- Implementation Executor was bound to the runner through
-  `DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V2`;
-- Mechanical Validator was bound to the runner;
-- the Platform Bootstrap identified `chatgpt-project`;
-- the target Claude Executor and Auditor Capability Profiles existed but were
-  unbound.
-
-That state is historical after TSK-009 promotion and MUST NOT be used for new
-governed operations.
+Before TSK-009, the producer was bound to the ChatGPT project governance
+implementation and the process-bound runner. TSK-013 reuses those concrete
+identities, not the historical pre-cutover runner Capability Profile V2.
 
 `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V1` remains historical prepared
-configuration and is not an active target binding.
+configuration and is not a target binding.
 
-## 3. Cutover target state
+Sections 3 through 8 describe the Claude-native target/consumer model and the
+historical TSK-009 acceptance of this repository. `dev-foundry-executor`,
+`dev-foundry-auditor`, `claude-code-native-validation`, workspace trust and
+Claude MCP activation are properties of that model. They are not the active
+`dev-foundry-claude` producer bindings after TSK-013 promotion; those are owned
+by the current POP.
 
-The configured project state is:
+## 3. Claude-native binding target state
+
+The Claude-native binding model is:
 
 - Governance Author -> canonical `governance-author-v3`, concrete implementation
   `claude-main-agent`, platform `claude-code`, active;
@@ -96,12 +101,11 @@ Custodian only through operation-scoped role selection under OPS-003/OPS-009.
 It is not the Implementation Executor or Governance Auditor implementation.
 Role continuity across operations does not transfer authority.
 
-The runner Capability Profiles remain historical configured records where
-retained by the Authority Index, but they are not required active bindings.
+In the Claude-native model the runner Capability Profiles are not bound.
 
-## 4. Active Platform Bootstrap
+## 4. Claude-native Platform Bootstrap model
 
-The primary project Platform Bootstrap is active for:
+A Claude-native Platform Bootstrap is active for:
 
 - platform id `claude-code`;
 - repository identity `dev-foundry-claude`;
@@ -115,10 +119,12 @@ The primary project Platform Bootstrap is active for:
 - root `CLAUDE.md` and project governance MCP as startup mechanisms, not
   authority.
 
-The prior ChatGPT project-system-prompt derivative is retired historical
-material and is not active startup guidance.
+A ChatGPT project-system-prompt derivative is not part of the Claude-native
+model.
 
 ## 5. Operator-side activation facts
+
+This section describes the Claude-native model.
 
 The first direct interactive Claude Code session may require human workspace
 trust and approval of the project-scoped MCP server. These are provider security
@@ -137,6 +143,8 @@ project MCP.
 
 ## 6. Native operation boundary
 
+This section describes the Claude-native model.
+
 Claude Code uses native repository capabilities for file/search, shell,
 build/test, Git, and provider work subject to the selected role, task authority,
 Capability Profile where applicable, and Operator side-effect authorization.
@@ -145,6 +153,9 @@ The governance MCP remains read-oriented and resolves authority. It is not a
 repository remote-control surface.
 
 ## 7. Isolation and audit boundary
+
+This section describes the Claude-native model, not the active producer after
+TSK-013.
 
 The cutover SHALL NOT occur until the dedicated Executor and Auditor subagents
 are implemented and statically qualified under SPC-003 and the local
@@ -163,6 +174,9 @@ to `dev-foundry-executor`. The main agent does not silently implement product
 work instead of the selected Executor role.
 
 ## 8. Post-cutover acceptance state
+
+This section records the historical TSK-009 acceptance of the Claude-native
+model.
 
 TSK-009 acceptance requires repository-configured bindings, active Platform
 Bootstrap, active Capability Profile routing, SPC-003 subagent topology, SPC-004

@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: System Overview
   status: ACTIVE
-artifactVersion: "2.1.0-local.21"
+artifactVersion: "2.1.0-local.22"
 authorityScope: dev-foundry-claude-project
 ownerRole: governance-author
 canonical: false
@@ -65,6 +65,13 @@ The project SHALL NOT duplicate the adopted DEV FOUNDRY release into project
 prompts, Skills, summaries, or local OPS/DAT copies as a parallel methodology
 source.
 
+Under ADR-004 the project is the **producer** of the Claude adapter and is
+operated independently of the **consumers** that run it. The runtime that
+develops this repository need not be Claude Code, even though the adapter it
+produces targets Claude Code. A consumer adopts an explicit immutable adapter
+release and never follows this repository's `main`; adopting or replacing a
+package changes no consumer authority.
+
 ## 3. Current Goals
 
 The approved direction is to:
@@ -113,26 +120,35 @@ under ADR-003 exist as a private, tarball-distributed build with a plan/apply CL
 and a default-off consumer-mode activation guard. No real consumer repository has adopted it and
 no package has been published. The active self-hosted state below is unchanged.
 
-Claude Code is the active configured project platform. Canonical DEV FOUNDRY
-2.1.0 remains the selected reusable methodology; the local Project Operating
-Profile and Authority Index bind that release to `dev-foundry-claude`.
+TSK-013 is the producer-maintenance cutover under ADR-004. After its promotion
+the active configured producer platform is `chatgpt-project`, not Claude Code.
+Claude Code remains the target runtime of the adapter and of any consumer that
+explicitly adopts a release. Root `CLAUDE.md`, `.mcp.json`, `.claude/**`, the
+Claude Capability Profiles and package templates remain as product,
+distribution and test surface and bind no producer role. Adapter version 1.1.0
+(TSK-012) is the initial consumer baseline; SPC-005 (PLANNED) records the future
+release and upgrade contract, whose implementation is not yet authorized.
+Canonical DEV FOUNDRY 2.1.0 remains the selected reusable methodology; the local
+Project Operating Profile and Authority Index bind that release to
+`dev-foundry-claude`.
 
 ADR-001 owns the Claude-native repository versus governance-MCP boundary.
 ADR-002 owns the initial local stdio runtime stack. ARC-001 defines the adapter
 architecture. SPC-001 and DAT-001 close the resolver behavior and tool contract.
-SPC-002 owns the active Claude-native binding contract. SPC-003 owns the
+SPC-002 owns the Claude-native binding target and consumer-cutover model, not
+the active producer bindings, which the POP owns. SPC-003 owns the
 role-isolation and token-economics contract. SPC-004 owns the operational
 telemetry and empirical tokenomics evidence contract.
 
-The active POP binds Governance Author and Evidence Custodian to the
-`claude-main-agent` through operation-scoped role selection, Implementation
-Executor to `dev-foundry-executor`, Governance Auditor to
-`dev-foundry-auditor`, and Mechanical Validator to
-`claude-code-native-validation`. The runner is not an active Executor or
-Validator binding. A read-only runner inspection is not an active-role action
-and is not evidence of a stale binding.
+The active POP binds Governance Author, Governance Auditor and Evidence
+Custodian to `operator-assisted-dev-foundry-copilot` on `chatgpt-project` through
+operation-scoped role selection, Implementation Executor to
+`process-bound-runner-code-executor` through
+`DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V3`, and Mechanical Validator to
+`process-bound-runner`. The Claude subagents and native validation are not
+active producer bindings; the runner V2 profile is historical.
 
-Exactly two project subagents are authorized. Actual telemetry arrival and any
+Exactly two Claude project subagents exist as adapter product surface. Actual telemetry arrival and any
 provider trust/MCP approval are first-session runtime facts; whether `dial` and
 `codemie` forward the launcher's telemetry environment remains to be observed in
 a real session.

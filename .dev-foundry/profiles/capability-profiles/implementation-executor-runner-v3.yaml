@@ -1,0 +1,57 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V3
+status: active
+implementation_class: process-bound-runner-code-executor
+supported_actions:
+  - inspect_task_directed_repository_context
+  - create_update_delete_task_authorized_product_files
+  - install_explicitly_authorized_dependencies
+  - run_task_authorized_build_and_test_commands
+  - run_focused_self_verification
+  - report_changed_surface_and_projection_variances
+  - produce_focused_implementation_proof
+prohibited_actions:
+  - author_or_modify_product_authority
+  - modify_canonical_framework_release
+  - modify_project_operating_profile_platform_bootstrap_or_authority_index
+  - create_or_modify_governance_audit_verdict
+  - commit_push_create_pull_request_or_merge
+  - mutate_outside_process_bound_repository
+  - mutate_any_consumer_repository
+  - add_undeclared_dependencies
+  - read_or_store_secrets
+  - expose_unapproved_network_listener_or_remote_service
+  - perform_adjacent_cleanup
+  - invoke_claude_code_as_executor_for_producer_maintenance
+  - use_this_profile_before_project_producer_maintenance_binding_is_active
+limits:
+  repository: dev-foundry-claude
+  hosting_purpose: chatgpt-governed-producer-maintenance
+  execution_provider: codex-cli
+  task_binding: exact_governed_execution_contract
+  mutation_surface: task_authorized_contract_paths_only
+  promotion: prohibited
+  governance_mutation: prohibited
+proof_capabilities:
+  - package_dependency_restore
+  - task_authorized_command_execution
+  - focused_test_execution
+  - repository_status_and_diff_reporting
+  - execution_handoff_evidence
+environment_constraints:
+  - process_bound_repository_must_be_dev_foundry_claude
+  - runner_must_be_available
+  - codex_cli_executor_must_be_available
+  - active_pop_must_bind_implementation_executor_to_this_profile
+  - task_authority_must_be_closed_before_execution
+  - exact_execution_contract_must_bind_branch_prompt_paths_and_validation
+stop_conditions:
+  - missing_or_conflicting_task_authority
+  - profile_is_not_the_active_pop_binding_for_implementation_executor
+  - execution_contract_requests_claude_code_for_producer_maintenance
+  - task_requires_governance_mutation_by_executor
+  - task_requires_consumer_repository_mutation
+  - task_requires_unapproved_dependency_or_external_service
+  - observed_repository_state_conflicts_with_directed_authority
+  - material_scope_expansion
+portability: configure

@@ -3,13 +3,13 @@ id: DFC-PLATFORM-BOOTSTRAP
 title: dev-foundry-claude Platform Bootstrap
 kind: platform-bootstrap
 status: active
-artifact_version: "2.1.0-local.3"
+artifact_version: "2.1.0-local.4"
 canonical: false
 methodology_authority: false
 
 repository:
   expected_name: dev-foundry-claude
-  workspace_binding: repository-root
+  workspace_binding: process-bound-repository
 
 sources:
   project_operating_profile: .dev-foundry/profiles/project-operating-profile.yaml
@@ -19,36 +19,38 @@ actor_resolution:
   mode: governed-project-bindings
   eligible_profiles:
     - .dev-foundry/releases/2.1.0/actor-profiles/governance-author-v3.yaml
+    - .dev-foundry/releases/2.1.0/actor-profiles/governance-auditor-v2.yaml
     - .dev-foundry/releases/2.1.0/actor-profiles/evidence-custodian-v1.yaml
   fixed_profile: null
   default_role: governance-author
   rule: >
     Resolve exactly one eligible role/profile before each role-dependent bounded
-    operation. The claude-main-agent is eligible only for Governance Author or
-    Evidence Custodian through active POP bindings and operation-scoped role
-    selection. Implementation Executor and Governance Auditor are dispatched
-    explicitly to their dedicated project subagents after resolution. Mechanical
-    Validator is separately bound to native Claude Code validation.
+    operation. Explicit Operator role intent wins only when the POP binding is
+    active and applicable separation-of-duty and independence rules are
+    satisfied. The Implementation Executor is separately bound to the
+    process-bound-runner-code-executor and is not self-selected by this
+    governance implementation. The Mechanical Validator is separately bound to
+    the process-bound-runner.
 
 platform:
-  id: claude-code
+  id: chatgpt-project
   startup_constraints:
-    - start governed work from the dev-foundry-claude repository root
-    - load root CLAUDE.md only as project instructions, never as authority
-    - retrieve the active POP and Authority Index before role-dependent work
-    - require the project-scoped dev-foundry-governance MCP and resolve_governed_operation for governed role resolution
-    - workspace trust and project MCP approval remain explicit Operator-side provider security mechanics
+    - repository-dependent work uses the process-bound runner connected to dev-foundry-claude
+    - repository authority is retrieved before role-dependent work
+    - conversation memory generated summaries and other repositories are not repository authority
     - repository identity authority state and required capability mismatches fail closed
 
 constraints:
+  - this bootstrap establishes ChatGPT-project producer maintenance for dev-foundry-claude under ADR-004
   - active reusable methodology is sourced only from the POP-selected immutable canonical framework release
   - concrete implementation bindings are owned by the Project Operating Profile
   - capability does not grant authority
   - role selection is operation-scoped
-  - conversational continuity does not transfer authority or satisfy independence
-  - claude-main-agent is not the Implementation Executor or Governance Auditor implementation
-  - implementation-executor dispatches explicitly to dev-foundry-executor only after applicable role resolution
-  - governance-auditor dispatches explicitly to dev-foundry-auditor only when the bounded operation requires that role and its independence preconditions are satisfied
-  - mechanical-validator is separately bound to claude-code-native-validation
-  - CLAUDE.md and the project governance MCP are startup mechanisms and not repository authority
-  - repository configuration must not bypass workspace trust or silently pre-approve the project MCP
+  - independent audit eligibility is established from actual prior participation and active separation-of-duty rules
+  - runner runtime state and product mechanics are not reusable methodology
+  - the Implementation Executor is separately bound in the POP to the process-bound-runner-code-executor through DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V3 and is not self-selected by this governance implementation
+  - the Mechanical Validator is separately bound in the POP to the process-bound-runner
+  - Claude Code is the adapter target runtime and is not the active producer platform
+  - root CLAUDE.md, .mcp.json, .claude and Claude Capability Profiles are product and distribution surface and do not bind any producer role
+  - consumer repositories are never read or modified by producer governance and consume only explicit adapter releases
+  - the deployed project system prompt is a non-authoritative derivative and must remain semantically aligned with this bootstrap
