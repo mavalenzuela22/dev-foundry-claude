@@ -115,18 +115,25 @@ for (const { role, name, profile, id, tools } of roles) {
   });
 }
 
-test('active POP binds Executor and Auditor to their dedicated Claude subagents and exact capabilities', async () => {
+test('Claude subagent definitions and profiles are consistent and are not active producer POP bindings', async () => {
   const pop = await readYaml('.dev-foundry/profiles/project-operating-profile.yaml');
   assert.equal(pop.repository.name, 'dev-foundry-claude');
   assert.equal(pop.status, 'active');
-  for (const { role, actorProfile, name, profile } of roles) {
+  const definitions = await agentFiles();
+  for (const { role, name, profile, id, tools } of roles) {
+    assert.ok(definitions.includes(`.claude/agents/${name}.md`), name);
+    const document = await readProjectFile(`.claude/agents/${name}.md`);
+    const metadata = parse(document.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/)[1]);
+    const capability = await readYaml(`${profileDirectory}${profile}`);
+    assert.equal(metadata.name, capability.limits.implementation_identity);
+    assert.deepEqual(metadata.tools, capability.limits.allowed_tools);
+    assert.deepEqual(metadata.tools, tools);
+    assert.equal(capability.id, id);
+    assert.ok(capability.environment_constraints.includes(`active_pop_must_bind_${role.replaceAll('-', '_')}_to_this_profile`));
     const binding = pop.actor_bindings[role];
-    assert.equal(binding.status, 'active', role);
-    assert.equal(binding.profile, `.dev-foundry/releases/2.1.0/actor-profiles/${actorProfile}.yaml`, role);
-    assert.deepEqual(binding.implementation, {
-      kind: 'agent', identity: name, platform: 'claude-code',
-    }, role);
-    assert.deepEqual(binding.capability_profiles, [`${profileDirectory}${profile}`], role);
+    assert.equal(binding.implementation.platform, 'chatgpt-project', role);
+    assert.notEqual(binding.implementation.identity, name, role);
+    assert.ok(!binding.capability_profiles.includes(`${profileDirectory}${profile}`), role);
   }
   const config = JSON.parse(await readProjectFile('.mcp.json'));
   assert.ok(Object.hasOwn(config.mcpServers, 'dev-foundry-governance'));

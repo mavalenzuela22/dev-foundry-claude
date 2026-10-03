@@ -7,7 +7,9 @@ import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
+const runnerV1Path = '.dev-foundry/profiles/capability-profiles/implementation-executor-runner-v1.yaml';
 const runnerPath = '.dev-foundry/profiles/capability-profiles/implementation-executor-runner-v2.yaml';
+const runnerV3Path = '.dev-foundry/profiles/capability-profiles/implementation-executor-runner-v3.yaml';
 const historicalClaudePath = '.dev-foundry/profiles/capability-profiles/implementation-executor-claude-code-v1.yaml';
 const claudePath = '.dev-foundry/profiles/capability-profiles/implementation-executor-claude-code-v2.yaml';
 const auditorPath = '.dev-foundry/profiles/capability-profiles/governance-auditor-claude-code-v1.yaml';
@@ -114,7 +116,7 @@ for (const [path, id, role, identity] of [
   });
 }
 
-test('active POP has exactly the final Claude-native role bindings', async () => {
+test('active POP has exactly the ChatGPT-project producer-maintenance role bindings', async () => {
   const pop = await readYaml('.dev-foundry/profiles/project-operating-profile.yaml');
   assert.equal(pop.status, 'active');
   assert.equal(pop.repository.name, 'dev-foundry-claude');
@@ -124,29 +126,34 @@ test('active POP has exactly the final Claude-native role bindings', async () =>
     status: 'active',
   });
   const expected = [
-    ['governance-author', 'governance-author-v3', 'agent', 'claude-main-agent', []],
-    ['evidence-custodian', 'evidence-custodian-v1', 'agent', 'claude-main-agent', []],
-    ['implementation-executor', 'implementation-executor-v2', 'agent', 'dev-foundry-executor', [claudePath]],
-    ['governance-auditor', 'governance-auditor-v2', 'agent', 'dev-foundry-auditor', [auditorPath]],
-    ['mechanical-validator', 'mechanical-validator-v2', 'tool', 'claude-code-native-validation', []],
+    ['governance-author', 'governance-author-v3', 'agent', 'operator-assisted-dev-foundry-copilot', []],
+    ['governance-auditor', 'governance-auditor-v2', 'agent', 'operator-assisted-dev-foundry-copilot', []],
+    ['evidence-custodian', 'evidence-custodian-v1', 'agent', 'operator-assisted-dev-foundry-copilot', []],
+    ['implementation-executor', 'implementation-executor-v2', 'tool', 'process-bound-runner-code-executor', [runnerV3Path]],
+    ['mechanical-validator', 'mechanical-validator-v2', 'tool', 'process-bound-runner', []],
   ];
   assert.deepEqual(Object.keys(pop.actor_bindings).sort(), expected.map(([role]) => role).sort());
   for (const [role, profile, kind, identity, capabilities] of expected) {
     const binding = pop.actor_bindings[role];
     assert.equal(binding.status, 'active', role);
     assert.equal(binding.profile, `.dev-foundry/releases/2.1.0/actor-profiles/${profile}.yaml`, role);
-    assert.deepEqual(binding.implementation, { kind, identity, platform: 'claude-code' }, role);
+    assert.deepEqual(binding.implementation, { kind, identity, platform: 'chatgpt-project' }, role);
     assert.deepEqual(binding.capability_profiles, capabilities, role);
+  }
+  for (const binding of Object.values(pop.actor_bindings)) {
+    assert.equal(binding.implementation.platform, 'chatgpt-project');
   }
 });
 
-test('Authority Index requires Claude targets and retains runner and Claude V1 as non-required history', async () => {
+test('Authority Index requires only runner V3 and retains runner V1/V2 and Claude profiles as non-required', async () => {
   const index = await readYaml('.dev-foundry/authority-index.yaml');
   for (const [path, required] of [
+    [runnerV1Path, false],
     [runnerPath, false],
-    [claudePath, true],
-    [auditorPath, true],
+    [runnerV3Path, true],
     [historicalClaudePath, false],
+    [claudePath, false],
+    [auditorPath, false],
   ]) {
     const bindings = index.bindings.filter((binding) => binding.path === path);
     assert.equal(bindings.length, 1, `Expected exactly one capability binding: ${path}`);
@@ -154,56 +161,89 @@ test('Authority Index requires Claude targets and retains runner and Claude V1 a
     assert.equal(bindings[0].authority_class, 'configured', path);
     assert.equal(bindings[0].required, required, path);
   }
-  const runner = await readYaml(runnerPath);
-  assert.equal(runner.id, 'DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V2');
-  assert.equal(runner.status, 'active');
 });
 
-test('active Claude Platform Bootstrap permits only Author and Custodian on the main agent', async () => {
+test('runner V2 remains unmodified pre-cutover history', async () => {
+  const text = await readProjectFile(runnerPath);
+  assert.match(text, /^status: active$/m);
+  const runner = parse(text);
+  assert.equal(runner.id, 'DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V2');
+  assert.equal(runner.status, 'active');
+  assert.equal(runner.limits.hosting_phase, 'chatgpt-governed-pre-cutover');
+});
+
+test('runner V3 binds the producer Executor to the ChatGPT-governed process-bound runner', async () => {
+  const profile = await readYaml(runnerV3Path);
+  assert.equal(profile.id, 'DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V3');
+  assert.equal(profile.implementation_class, 'process-bound-runner-code-executor');
+  assert.equal(profile.limits.hosting_purpose, 'chatgpt-governed-producer-maintenance');
+  assert.equal(profile.limits.execution_provider, 'codex-cli');
+  assert.ok(!Object.hasOwn(profile.limits, 'hosting_phase'));
+  assert.ok(profile.environment_constraints.includes('active_pop_must_bind_implementation_executor_to_this_profile'));
+  assert.ok(profile.stop_conditions.includes('profile_is_not_the_active_pop_binding_for_implementation_executor'));
+  for (const action of [
+    'invoke_claude_code_as_executor_for_producer_maintenance',
+    'mutate_any_consumer_repository',
+  ]) assert.ok(profile.prohibited_actions.includes(action), action);
+});
+
+test('ADR-004 is routed and ACCEPTED, SPC-005 is routed and PLANNED, and package version is unchanged', async () => {
+  const index = await readYaml('.dev-foundry/authority-index.yaml');
+  for (const [prefix, id, status] of [
+    ['docs/10-decisions/10 [ADR-004] ', 'ADR-004', 'ACCEPTED'],
+    ['docs/40-specifications/40 [SPC-005] ', 'SPC-005', 'PLANNED'],
+  ]) {
+    const routes = index.routes.filter((route) => route.path.startsWith(prefix));
+    assert.equal(routes.length, 1, `${id} must have exactly one authority route`);
+    const metadata = frontmatter(await readProjectFile(routes[0].path));
+    assert.equal(metadata.artifact.id, id);
+    assert.equal(metadata.artifact.status, status, id);
+  }
+  assert.equal(JSON.parse(await readProjectFile('package.json')).version, '1.1.0');
+});
+
+test('active ChatGPT-project Platform Bootstrap permits Author, Auditor, and Custodian and separately binds the runner', async () => {
   const bootstrap = await readYaml('.dev-foundry/platform-bootstrap.yaml');
   assert.equal(bootstrap.status, 'active');
   assert.equal(bootstrap.repository.expected_name, 'dev-foundry-claude');
-  assert.equal(bootstrap.platform.id, 'claude-code');
+  assert.equal(bootstrap.platform.id, 'chatgpt-project');
   assert.equal(bootstrap.sources.project_operating_profile, '.dev-foundry/profiles/project-operating-profile.yaml');
   assert.equal(bootstrap.sources.authority_index, '.dev-foundry/authority-index.yaml');
   assert.equal(bootstrap.actor_resolution.mode, 'governed-project-bindings');
   assert.deepEqual(bootstrap.actor_resolution.eligible_profiles, [
     '.dev-foundry/releases/2.1.0/actor-profiles/governance-author-v3.yaml',
+    '.dev-foundry/releases/2.1.0/actor-profiles/governance-auditor-v2.yaml',
     '.dev-foundry/releases/2.1.0/actor-profiles/evidence-custodian-v1.yaml',
   ]);
   assert.equal(bootstrap.actor_resolution.fixed_profile, null);
   assert.equal(bootstrap.actor_resolution.default_role, 'governance-author');
 
-  // Inspect operational rules as well as the structured eligibility list:
-  // main-agent audit eligibility must not survive in bootstrap prose.
   const rules = [
     bootstrap.actor_resolution.rule,
     ...bootstrap.platform.startup_constraints,
     ...bootstrap.constraints,
   ].map((rule) => rule.replace(/\s+/g, ' ').trim());
   const text = rules.join('\n');
-  const mainEligibility = /(?:main[- ]agent|claude-main-agent)[^.\n]*eligible only[^.\n]*Governance[- ]Author[^.\n]*Evidence[- ]Custodian/i;
-  assert.match(text, mainEligibility);
-  for (const role of ['Implementation[- ]Executor', 'Governance[- ]Auditor']) {
-    assert.ok(rules.some((rule) => new RegExp(role, 'i').test(rule)
-      && /explicit/i.test(rule) && /dispatch/i.test(rule) && /(?:dedicated|dev-foundry-)[^.]*subagent/i.test(rule)),
-    `${role} must be explicitly dispatched to a dedicated subagent`);
-  }
-  assert.match(text, /Mechanical[- ]Validator[^.\n]*(?:native Claude Code|Claude Code native|claude-code-native-validation)/i);
+  assert.match(text, /Implementation[- ]Executor[^.\n]*(?:separately )?bound[^.\n]*process-bound[- ]runner[- ]code[- ]executor/i);
+  assert.match(text, /DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V3/);
+  assert.match(text, /Implementation[- ]Executor[^.\n]*not (?:be )?self-selected|not self-selected[^.\n]*Implementation[- ]Executor/i);
+  assert.match(text, /Mechanical[- ]Validator[^.\n]*(?:separately )?bound[^.\n]*process-bound[- ]runner/i);
+  assert.match(text, /Claude Code[^.\n]*target runtime[^.\n]*not[^.\n]*active producer platform/i);
+  assert.match(text, /capability (?:does not|never) grants? authority|capabilit[^.\n]*not grant authority|does not grant authority/i);
   for (const clause of rules.flatMap((rule) => rule.split(/[.;]\s+/))) {
-    assert.doesNotMatch(clause, /(?:main[- ]agent|claude-main-agent)\s+(?:is|remains|may be)\s+eligible[^.]*Governance[- ]Auditor/i,
-      'Bootstrap must not grant Governance Auditor to the main agent');
-    assert.doesNotMatch(clause, /Governance[- ]Auditor\s+(?:is|remains|may be)\s+(?:eligible|bound|resolved)[^.]*(?:main[- ]agent|claude-main-agent)/i,
-      'Bootstrap must not map Governance Auditor to the main agent');
+    assert.doesNotMatch(clause, /Implementation[- ]Executor\s+(?:is|remains|may be)\s+(?:bound|resolved)[^.]*(?:claude-main-agent|dev-foundry-executor)/i,
+      'Bootstrap must not map the producer Executor to Claude');
   }
 });
 
-test('SPC-002 defines the Claude-native role mappings and telemetry readiness boundary', async () => {
+test('SPC-002 defines the Claude-native binding model and telemetry readiness boundary', async () => {
   const contract = await readProjectFile(contractPath);
   const metadata = frontmatter(contract);
   assert.equal(metadata.artifact.id, 'SPC-002');
   assert.equal(metadata.artifact.status, 'ACTIVE');
-  const target = section(contract, '3. Cutover target state');
+  section(contract, '2. Historical Claude-native producer state');
+  assert.doesNotMatch(contract, /^## 2\. Historical pre-cutover state$/m);
+  const target = section(contract, '3. Claude-native binding target state');
   const mappings = target.split(/^- /m).slice(1).map((mapping) => mapping.split(/\r?\n\s*\r?\n/)[0].replace(/\s+/g, ' ').trim());
   const expected = [
     ['Governance Author', 'governance-author-v3', 'claude-main-agent'],

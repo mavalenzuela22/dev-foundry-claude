@@ -3,7 +3,7 @@ id: DFC-AUTHORITY-INDEX
 title: dev-foundry-claude Repository Authority Index
 kind: authority-index
 status: active
-artifact_version: "2.1.0-local.13"
+artifact_version: "2.1.0-local.14"
 canonical: false
 
 subject:
@@ -188,6 +188,30 @@ routes:
       - claude-adapter-runtime-integrity-pin
       - claude-consumer-mode-activation-guard
     section_id: null
+  - id: producer-consumer-operational-separation
+    path: docs/10-decisions/10 [ADR-004] PROJECT - Producer-Consumer Operational Separation and Adapter Release Lifecycle.md
+    authority_class: decision
+    governs:
+      - producer-consumer-operational-separation
+      - producer-maintenance-runtime-independence
+      - adapter-release-and-consumer-pin-lifecycle
+    section_id: null
+  - id: claude-adapter-release-consumer-upgrade-contract
+    path: docs/40-specifications/40 [SPC-005] PROJECT - Claude Adapter Release and Consumer Upgrade Contract.md
+    authority_class: product
+    governs:
+      - claude-adapter-release-identity
+      - claude-consumer-release-pin-lifecycle
+      - claude-consumer-upgrade-contract
+    section_id: null
+  - id: TSK-013
+    path: docs/70-tasks/70 [TSK-013] PROJECT - Establish Producer Maintenance Mode and Adapter Release Lifecycle.md
+    authority_class: task
+    governs:
+      - producer-maintenance-cutover
+      - producer-runner-capability-profile-v3
+      - adapter-release-lifecycle-baseline
+    section_id: null
 
 bindings:
   - id: project-operating-profile
@@ -210,21 +234,26 @@ bindings:
     kind: capability-profile
     authority_class: configured
     required: false
-  - id: implementation-executor-capability-claude-cutover-prepared-v1-history
+  - id: implementation-executor-capability-producer-maintenance
+    path: .dev-foundry/profiles/capability-profiles/implementation-executor-runner-v3.yaml
+    kind: capability-profile
+    authority_class: configured
+    required: true
+  - id: implementation-executor-capability-claude-consumer-target-v1-history
     path: .dev-foundry/profiles/capability-profiles/implementation-executor-claude-code-v1.yaml
     kind: capability-profile
     authority_class: configured
     required: false
-  - id: implementation-executor-capability-claude-cutover-prepared
+  - id: implementation-executor-capability-claude-consumer-target
     path: .dev-foundry/profiles/capability-profiles/implementation-executor-claude-code-v2.yaml
     kind: capability-profile
     authority_class: configured
-    required: true
-  - id: governance-auditor-capability-claude-cutover-prepared
+    required: false
+  - id: governance-auditor-capability-claude-consumer-target
     path: .dev-foundry/profiles/capability-profiles/governance-auditor-claude-code-v1.yaml
     kind: capability-profile
     authority_class: configured
-    required: true
+    required: false
 
 rules:
   single_authoritative_home_required: true

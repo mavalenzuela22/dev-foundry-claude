@@ -74,24 +74,25 @@ Use the project Authority Index first for repository-dependent authority routing
 
 ## 4. Role Bindings
 
-The active POP binds:
+The active POP binds, on platform `chatgpt-project` (ADR-004, TSK-013):
 
-- Mechanical Validator -> canonical `mechanical-validator-v2`, implemented by
-  `claude-code-native-validation` on `claude-code`;
-- Evidence Custodian -> canonical `evidence-custodian-v1`, implemented by
-  `claude-main-agent` on `claude-code`;
-- Implementation Executor -> canonical `implementation-executor-v2`,
-  implemented by dedicated subagent `dev-foundry-executor` through
-  `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V2`;
-- Governance Auditor -> canonical `governance-auditor-v2`, implemented by
-  read-only dedicated subagent `dev-foundry-auditor` through
-  `DFC-GOVERNANCE-AUDITOR-CLAUDE-CODE-V1`;
 - Governance Author -> canonical `governance-author-v3`, implemented by
-  `claude-main-agent` on `claude-code`.
+  `operator-assisted-dev-foundry-copilot`;
+- Governance Auditor -> canonical `governance-auditor-v2`, implemented by
+  `operator-assisted-dev-foundry-copilot`, subject to operation-scoped
+  independence;
+- Evidence Custodian -> canonical `evidence-custodian-v1`, implemented by
+  `operator-assisted-dev-foundry-copilot`;
+- Implementation Executor -> canonical `implementation-executor-v2`,
+  implemented by `process-bound-runner-code-executor` through
+  `DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V3` (Codex via the process-bound runner);
+- Mechanical Validator -> canonical `mechanical-validator-v2`, implemented by
+  `process-bound-runner`.
 
-The historical `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V1` and runner
-Capability Profiles remain configured history where indexed but are not active
-required Executor bindings.
+The Claude Capability Profiles, `DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V1` and
+`-V2`, and `DFC-IMPLEMENTATION-EXECUTOR-CLAUDE-CODE-V1` remain configured
+history or consumer-target product surface where indexed and are not active
+producer bindings.
 
 Capability does not grant authority. Role selection remains operation-scoped,
 and the main agent is not the Executor or Auditor implementation.
@@ -107,7 +108,7 @@ The current project authority is:
 - ADR-003 for the reusable adapter package and consumer boundary;
 - ARC-001 for the active Claude Code adapter architecture baseline;
 - SPC-001 for governed-operation resolver behavior;
-- SPC-002 for the active Claude-native cutover binding contract;
+- SPC-002 for the Claude-native binding model (historical producer state and consumer target);
 - SPC-003 for Claude role isolation and token-economics constraints;
 - SPC-004 for local operational telemetry and empirical tokenomics evidence;
 - DAT-001 for the exact resolver tool contract;
@@ -125,16 +126,19 @@ The current project authority is:
 - TSK-010 for the completed multi-harness Claude runtime activation task;
 - TSK-011 for the post-cutover reconciliation and runner-compatibility
   investigation task;
-- TSK-012 for the completed reusable package and brownfield adoption task.
+- TSK-012 for the completed reusable package and brownfield adoption task;
+- ADR-004 for producer/consumer operational separation and the adapter release
+  lifecycle;
+- SPC-005 for the PLANNED adapter release and consumer upgrade contract;
+- TSK-013 for the producer-maintenance cutover task.
 
 No MTP is active.
-Exactly `dev-foundry-executor` and `dev-foundry-auditor` are the active
-dedicated project subagents under SPC-003, with their target Capability Profiles
-bound in the active POP.
+`dev-foundry-executor` and `dev-foundry-auditor` remain Claude adapter product
+surface under SPC-003 and are not bound in the producer POP.
 TSK-008 established the local telemetry path for empirical review using real
 Claude-native work and TSK-010 added the `direct`, `dial` and `codemie` launch
 modes; actual telemetry arrival is verified in real launcher-started sessions.
-Claude Code is the active platform. Hooks, Skills, agent teams, model selection,
+The active producer platform is `chatgpt-project`; Claude Code is the adapter's target runtime. Hooks, Skills, agent teams, model selection,
 and additional subagents remain unauthorized unless separately governed.
 
 The project Authority Index routes every current authoritative home. Missing
