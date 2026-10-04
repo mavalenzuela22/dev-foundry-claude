@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.21"
+artifactVersion: "2.1.0-local.22"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -130,7 +130,9 @@ The current project authority is:
 - ADR-004 for producer/consumer operational separation and the adapter release
   lifecycle;
 - SPC-005 for the PLANNED adapter release and consumer upgrade contract;
-- TSK-013 for the producer-maintenance cutover task.
+- TSK-013 for the producer-maintenance cutover task;
+- SPC-006 for the local producer operations dashboard parity contract;
+- TSK-014 for the Foundry Runner dashboard parity baseline task.
 
 No MTP is active.
 `dev-foundry-executor` and `dev-foundry-auditor` remain Claude adapter product

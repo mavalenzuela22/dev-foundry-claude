@@ -1,0 +1,29 @@
+{
+  "name": "dev-foundry-claude-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "vite build",
+    "test": "node --test test/*.test.mjs",
+    "dashboard": "node server/start.mjs"
+  },
+  "dependencies": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "@epam/assets": "6.5.1",
+    "@epam/loveship": "6.5.1",
+    "@epam/uui": "6.5.1",
+    "@epam/uui-components": "6.5.1",
+    "@epam/uui-core": "6.5.1",
+    "history": "4.10.1"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "7.0.4",
+    "@vitejs/plugin-react": "4.6.0",
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6"
+  }
+}
