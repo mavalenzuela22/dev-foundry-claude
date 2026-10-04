@@ -1,0 +1,60 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, Arial, sans-serif; }
+.dashboard { min-height: 100vh; background: var(--uui-color-50); color: var(--uui-color-80); }
+main { width: 100%; min-width: 0; }
+/* MainMenuLogo owns its slot. No margin or padding may move navigation. */
+.product-logo { margin: 0; padding: 0; }
+.product-logo img { width: 112px; height: 40px; object-fit: contain; }
+.status-strip { padding: 12px 16px 0; }
+.connection-row { flex-wrap: nowrap; min-height: 36px; }
+.page-heading { margin: 0; font-size: 28px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+.section-heading { margin: 0; font-size: 20px; font-weight: 600; line-height: 1.35; }
+.overview { padding: 16px; display: grid; gap: 16px; min-width: 0; }
+.snapshot-cockpit { padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.snapshot-intro { padding-bottom: 4px; }
+.snapshot-latest { min-width: 0; padding: 12px; border: 1px solid var(--uui-divider); border-left-width: 3px; border-left-color: var(--uui-primary-50); background: var(--uui-surface-higher); display: flex; flex-direction: column; gap: 8px; }
+.category-heading { margin: 0; color: var(--uui-primary-60); font-size: 20px; font-weight: 700; line-height: 1.35; padding-bottom: 8px; border-bottom: 1px solid var(--uui-divider); }
+.primary-record, .history-record { justify-content: space-between; align-items: center; min-width: 0; }
+.primary-record > *, .history-record > * { min-width: 0; overflow-wrap: anywhere; }
+.overview-facts { display: grid; gap: 4px; }
+.record-link { color: var(--uui-primary-60); font-weight: 600; min-width: 0; }
+.record-link:hover { text-decoration: underline; }
+.snapshot-history { margin-top: 4px; padding: 12px; border-top: 2px solid var(--uui-divider); display: grid; gap: 8px; background: var(--uui-surface-higher); min-width: 0; }
+.history-executions { border-left: 3px solid var(--cyan-60); }
+.history-validations { border-left: 3px solid var(--purple-50); }
+.history-record { padding-block: 6px; border-bottom: 1px solid var(--uui-divider); }
+.durable-list, .telemetry { margin: 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.durable-list { height: calc(100vh - 128px); min-height: 320px; }
+.durable-table { min-height: 0; min-width: 0; overflow: auto; flex: 1; }
+.durable-table > div { height: 100%; }
+.compact-table-row [role="cell"] { align-items: center; }
+.list-footer { flex-wrap: wrap; flex-shrink: 0; }
+.empty-panel { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 12px; text-align: center; }
+.live-surface { height: calc(100vh - 108px); min-width: 0; }
+.record-detail { margin: 16px; padding: 12px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.record-detail > a { align-self: flex-start; }
+.detail-header { display: grid; gap: 8px; }
+.detail-title { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; min-width: 0; }
+.detail-section { padding: 12px; border: 1px solid var(--uui-divider); display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.fact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px 16px; }
+.fact-grid > div { min-width: 0; overflow-wrap: anywhere; }
+.execution-timing { padding-bottom: 12px; border-bottom: 1px solid var(--uui-divider); }
+.detail-tabs { flex-wrap: wrap; height: auto; min-width: 0; }
+.detail-tabs > * { flex-shrink: 0; }
+.technical-facts { margin: 0; display: grid; gap: 8px; }
+.technical-facts > div { display: grid; grid-template-columns: minmax(100px, 35%) minmax(0, 1fr); gap: 12px; padding-block: 8px; border-bottom: 1px solid var(--uui-divider); }
+.technical-facts dt { font-size: 13px; color: var(--uui-text-secondary); overflow-wrap: anywhere; }
+.technical-facts dd { margin: 0; font-size: 14px; line-height: 20px; overflow-wrap: anywhere; }
+pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 18px; margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; }
+.record-detail summary { cursor: pointer; font-size: 16px; line-height: 22px; font-weight: 600; }
+.transaction-next, .phase-row { justify-content: space-between; align-items: center; min-width: 0; flex-wrap: wrap; }
+.lifecycle { margin: 0; padding-left: 24px; }
+.lifecycle li, .finding { padding-block: 8px; border-bottom: 1px solid var(--uui-divider); }
+@media (max-width: 800px) {
+  .status-strip, .overview { padding-inline: 8px; }
+  .durable-list, .record-detail, .telemetry { margin: 8px; }
+}
+@media (max-width: 480px) {
+  .primary-record { flex-direction: column; align-items: flex-start; }
+  .technical-facts > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
