@@ -4,8 +4,8 @@ artifact:
   id: TSK-014
   type: TSK
   title: Establish Foundry Runner Dashboard Parity Baseline
-  status: IN_PROGRESS
-artifactVersion: "1"
+  status: CLOSED
+artifactVersion: "2"
 authorityScope: tsk-014-foundry-runner-dashboard-parity
 ownerRole: governance-author
 canonical: true
@@ -37,9 +37,11 @@ authority:
   supersedes: []
 traceability:
   dependsOn: []
+  closureArtifact: TSK-014-CLOSURE
 lifecycle:
-  phase: in-progress
+  phase: closed
   dependsOn: []
+  closureArtifact: TSK-014-CLOSURE
   promotionRequired: true
 portability: project-specific
 ---
@@ -427,6 +429,7 @@ Promotion requires:
 - confirmation that the adapter 1.1.0 release surface is unchanged;
 - explicit Operator visual acceptance and promotion authorization.
 
-Completion means the parity baseline is promoted on clean `main`.
+Completion was achieved when the parity baseline was promoted and reconciled on clean
+`main`. Terminal disposition is recorded by `TSK-014-CLOSURE`.
 
 OTEL integration remains a separately governed follow-on task.
