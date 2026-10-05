@@ -4,8 +4,8 @@ artifact:
   id: TSK-015
   type: TSK
   title: Integrate Claude OTEL Telemetry into Local Operations Dashboard
-  status: IN_PROGRESS
-artifactVersion: "1"
+  status: CLOSED
+artifactVersion: "2"
 authorityScope: tsk-015-claude-otel-dashboard-integration
 ownerRole: governance-author
 canonical: true
@@ -44,12 +44,14 @@ traceability:
   dependsOn:
     - TSK-008
     - TSK-014-CLOSURE
+  closureArtifact: TSK-015-CLOSURE
 lifecycle:
-  phase: in-progress
+  phase: closed
   dependsOn:
     - TSK-008
     - TSK-014-CLOSURE
   blockedBy: []
+  closureArtifact: TSK-015-CLOSURE
   promotionRequired: true
 portability: project-specific
 ---
@@ -493,3 +495,10 @@ task/measurement correlation.
 The Operator authorizes TSK-015 final validation, promotion and formal closure with the
 current accepted baseline. Future dashboard refinements discovered after additional
 telemetry runs are separate follow-on work and do not block this closure.
+
+## 17. Formal closure
+
+TSK-015 is formally CLOSED through `TSK-015-CLOSURE` after terminal mechanical
+validation PASS, independent Governance Audit PASS, promotion through PR #30,
+integration, reconciliation, source-branch cleanup, and explicit Operator
+authorization for end-to-end closure.

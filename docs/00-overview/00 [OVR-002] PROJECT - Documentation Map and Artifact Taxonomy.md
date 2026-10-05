@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.25"
+artifactVersion: "2.1.0-local.26"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -136,9 +136,12 @@ The current project authority is:
   baseline task;
 - TSK-014-CLOSURE for TSK-014 terminal disposition, delivered evidence, accepted
   visual limit, and explicit OTEL deferral;
-- TSK-015 for the active Claude OTEL read-model and local dashboard integration task;
+- TSK-015 for the completed and formally closed Claude OTEL read-model and local
+  dashboard integration task;
 - TSK-015-AUDIT for the completed independent Governance Audit and corrective-review
-  lineage supporting TSK-015 promotion.
+  lineage supporting TSK-015 promotion;
+- TSK-015-CLOSURE for TSK-015 terminal disposition, delivered evidence, known limit,
+  explicit deferrals, and formal closure.
 
 No MTP is active.
 `dev-foundry-executor` and `dev-foundry-auditor` remain Claude adapter product
