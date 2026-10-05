@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.26"
+artifactVersion: "2.1.0-local.27"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -142,6 +142,8 @@ The current project authority is:
   lineage supporting TSK-015 promotion;
 - TSK-015-CLOSURE for TSK-015 terminal disposition, delivered evidence, known limit,
   explicit deferrals, and formal closure.
+- TSK-016 for the active reusable-package dashboard distribution, package CLI,
+  consumer installation documentation, and isolated package-consumer smoke task.
 
 No MTP is active.
 `dev-foundry-executor` and `dev-foundry-auditor` remain Claude adapter product
