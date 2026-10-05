@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { readClaudeOtel } from './claude-otel.mjs';
 import { readRecords, safeFile, summary } from './evidence.mjs';
 
 export const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
@@ -45,6 +46,7 @@ export function dashboardHandler({ root = repositoryRoot, uiRoot = defaultUiRoot
           }
           return send(200, { product: 'dev-foundry-claude', dashboard: { api: 'available', ui: uiAvailability }, mode: 'read-only durable evidence', liveActivity: 'unavailable', throughput: 'unavailable', data });
         }
+        if (kind === 'claude-otel' && !ids.length) return send(200, await readClaudeOtel(root));
         if (!['executions', 'validations', 'transactions'].includes(kind)) return send(404, { error: 'Unknown endpoint' });
         if (ids.length !== 0 && ids.length !== (kind === 'executions' ? 2 : 1)) return send(404, { error: 'Unknown detail route' });
         if (ids.some((id) => !/^[A-Za-z0-9_-]{1,400}$/.test(id))) return send(400, { error: 'Invalid record identifier' });

@@ -19,6 +19,7 @@ before(async () => {
     import { HistoryAdaptedRouter, UuiContext, useUuiServices } from '@epam/uui-core';
     export { App } from './main';
     export { OverviewContent, DurableListContent, DurableTable, pageRecords, Telemetry } from './pages';
+    export { ClaudeOtelContent, ClaudeOtelBreakdown } from './claude-otel';
     export { DetailContent } from './details';
     const router = new HistoryAdaptedRouter(createMemoryHistory());
     export function Provider({ children }) { const { services } = useUuiServices({ router }); return <UuiContext.Provider value={services}>{children}</UuiContext.Provider>; }
@@ -202,12 +203,14 @@ test('current-page search never pulls matching records from another page or chan
 });
 
 test('Telemetry has the diagnostics surface, ordered tabs and labelled tabpanel; transactions also stand alone', () => {
-  for (const [path, selected] of [['/telemetry', 'throughput'], ['/telemetry?tab=transactions', 'transactions']]) {
+  for (const [path, selected] of [['/telemetry', 'throughput'], ['/telemetry?tab=claude-otel', 'claude-otel'], ['/telemetry?tab=transactions', 'transactions']]) {
     const html = render(ui.App, { initialPath: path });
     assert.ok(html.includes('Telemetry / Diagnostics'));
     const panel = html.indexOf('class="telemetry');
     assert.ok(html.indexOf('Telemetry / Diagnostics', panel) < html.indexOf('role="tablist"', panel));
-    assert.ok(html.indexOf('telemetry-tab-throughput') < html.indexOf('telemetry-tab-transactions'));
+    assert.ok(html.indexOf('telemetry-tab-throughput') < html.indexOf('telemetry-tab-claude-otel'));
+    assert.ok(html.indexOf('telemetry-tab-claude-otel') < html.indexOf('telemetry-tab-transactions'));
+    if (selected === 'claude-otel') assert.ok(html.includes('Loading Claude OTEL'));
     assert.match(html, new RegExp(`role="tabpanel"[^>]*id="telemetry-panel"[^>]*aria-labelledby="telemetry-tab-${selected}"`));
   }
   const standalone = render(ui.App, { initialPath: '/transactions' });
@@ -305,4 +308,141 @@ test('execution table renders unknown when the projection has no trustworthy exe
   const html = textOnly(render(ui.DurableTable, { kind: 'executions', records: [record] }));
   assert.ok(html.includes('unknown'));
   assert.ok(!html.includes('codex-cli'));
+});
+
+test('Claude OTEL renders measured values, unavailable dimensions, correlation and bounded issues natively', () => {
+  const measures = { inputTokens: 10, outputTokens: 0, cacheReadInputTokens: null, cacheCreationInputTokens: null, totalMeasuredTokens: 10, reportedCostUsd: 0.25, requestDurationMs: 50, activeDurationMs: null, apiRequests: 1 };
+  const model = { availability: 'available', summary: { ...measures, runs: 1, sessions: 1, cacheReadRatio: null }, breakdowns: { model: [{ ...measures, value: 'claude-fixture', runs: 1 }], effort: [], querySource: [], task: [], role: [], launchMode: [] }, recentRuns: [{ displayId: 'abc123', startTime: '2026-10-02T12:00:00Z', endTime: '2026-10-02T12:01:00Z', models: ['claude-fixture'], sessions: 1, measures, correlation: { task: ['TSK-015'], role: ['implementation-executor'], launchMode: ['direct'] } }], recentRunsTruncated: false, truncated: true, issues: [{ code: 'Malformed NDJSON or OTLP record excluded', count: 2 }], scan: { filesRead: 1, candidateLines: 3, records: 1 } };
+  model.latestObservedAt = '2026-10-02T12:01:00Z'; model.recentSessions = []; model.tasksObserved = ['TSK-015'];
+  const html = render(ui.ClaudeOtelContent, { state: { loading: false, data: model } });
+  for (const value of ['Direct measurements', 'Exact run-id correlation', 'Total measured tokens', '$0.25', '50 ms', 'unavailable', 'Recent runs', 'TSK-015', 'implementation-executor', 'direct', 'Parse / scan issues (2)', 'Scan or display limit reached']) assert.ok(html.includes(value), value);
+  assert.ok(html.includes('otel-summary')); assert.ok(html.includes('uui-panel')); assert.match(html, /<details class="otel-issues">/); assert.doesNotMatch(html, /<details[^>]*\bopen\b/);
+  assert.ok(html.includes('<dt>Observed range</dt>')); assert.ok(html.includes('otel-run-card')); assert.ok(!html.includes('Throughput unavailable'));
+  const empty = render(ui.ClaudeOtelContent, { state: { loading: false, data: { ...model, availability: 'unavailable', recentRuns: [] } } });
+  assert.ok(empty.includes('No supported telemetry runs')); assert.ok(!empty.includes('otel-kpis'));
+  const error = render(ui.ClaudeOtelContent, { state: { loading: false, error: 'Local source unavailable' } });
+  assert.ok(error.includes('Claude OTEL unavailable')); assert.ok(error.includes('Local source unavailable'));
+});
+
+const otelDensityFixture = () => {
+  const measures = { inputTokens: 270120, outputTokens: 408964, cacheReadInputTokens: 44827985, cacheCreationInputTokens: 1510300, totalMeasuredTokens: 47017369, reportedCostUsd: 18.4428395, requestDurationMs: 3857711, activeDurationMs: 3422777, apiRequests: 329 };
+  const breakdowns = Object.fromEntries(['model', 'effort', 'querySource', 'task', 'role', 'launchMode'].map((key) => [key, [{ ...measures, value: `${key}-only-row`, runs: 1 }]]));
+  return { availability: 'available', latestObservedAt: '2026-10-02T12:57:02.777Z', recentSessions: [{ displayId: 'session-latest', runDisplayId: 'run-abc123', startTime: '2026-10-02T12:00:00.123Z', endTime: '2026-10-02T12:57:02.777Z', models: ['claude-fixture-a'], measures: { ...measures }, cacheReadRatio: 44827985 / (270120 + 44827985 + 1510300) }, { displayId: 'session-previous', runDisplayId: 'run-abc123', startTime: '2026-10-01T12:00:00Z', endTime: '2026-10-01T12:01:00Z', models: ['claude-fixture-b'], measures: { ...measures, totalMeasuredTokens: 1234, reportedCostUsd: 0.125, apiRequests: null }, cacheReadRatio: null }], recentSessionsTruncated: true, tasksObserved: ['TSK-010', 'TSK-011', 'TSK-012', 'TSK-013'], tasksObservedTruncated: false, summary: { ...measures, runs: 1, sessions: 6, cacheReadRatio: 44827985 / (270120 + 44827985 + 1510300) }, breakdowns, recentRuns: [{ displayId: 'run-abc123', startTime: '2026-10-02T12:00:00.123Z', endTime: '2026-10-02T12:57:02.777Z', models: ['claude-fixture-a', 'claude-fixture-b'], sessions: 6, measures, correlation: { task: ['TSK-014', 'TSK-015'], role: ['implementation-executor', 'mechanical-validator'], launchMode: ['direct', 'governed'] } }], recentRunsTruncated: true, truncated: false, issues: [], scan: { filesRead: 4, candidateLines: 494, records: 3815 } };
+};
+
+test('OTEL session hierarchy compacts consumption and preserves all global exact measurements', () => {
+  const model = otelDensityFixture();
+  const html = render(ui.ClaudeOtelContent, { state: { loading: false, data: model } });
+  const primary = html.slice(html.indexOf('class="otel-kpis"'), html.indexOf('<details'));
+  assert.equal((primary.match(/class="otel-kpi-value"/g) || []).length, 5);
+  for (const label of ['Reported USD cost', 'Total measured tokens', 'API requests observed', 'Cache-read ratio', 'Active duration']) assert.ok(primary.includes(label), label);
+  for (const display of ['$18.44', '47.0M', '≈57m', '329']) assert.ok(textOnly(primary).includes(display), display);
+  for (const exact of ['47017369', '18.4428395 USD', '3422777 ms', `${model.summary.cacheReadRatio} ratio`]) assert.ok(primary.includes(exact), exact);
+  const details = html.match(/<summary>All observed telemetry · exact values<\/summary>([\s\S]*?)<\/details>/)[1];
+  for (const label of ['Telemetry runs', 'Input tokens', 'Output tokens', 'Cache-read input tokens', 'Cache-creation input tokens', 'Request duration', 'Reported USD cost', 'Total measured tokens', 'API requests observed', 'Cache-read ratio', 'Sessions observed', 'Active duration']) assert.ok(details.includes(`<dt>${label}</dt>`), label);
+  for (const exact of ['47,017,369', '$18.4428395', '3,422,777 ms', '270,120', '408,964', '44,827,985', '1,510,300', '3,857,711 ms', `${model.summary.cacheReadRatio}`]) assert.ok(details.includes(exact), exact);
+  assert.doesNotMatch(html, /<details[^>]*\bopen\b/);
+  assert.match(html, /<details[^>]*otel-methodology/);
+  assert.ok(html.indexOf('Metrics are preferred') > html.indexOf('otel-methodology'));
+});
+
+test('all six UUI breakdown dimensions are selectable with only active rows rendered', () => {
+  const model = otelDensityFixture();
+  for (const [dimension, caption] of [['model', 'Model'], ['effort', 'Effort'], ['querySource', 'Query source'], ['task', 'Task'], ['role', 'Selected role'], ['launchMode', 'Launch mode']]) {
+    const html = render(ui.ClaudeOtelBreakdown, { breakdowns: model.breakdowns, dimension, onDimensionChange: () => {} });
+    assert.equal((html.match(/<table /g) || []).length, 1);
+    assert.equal((html.match(/role="tab"/g) || []).length, 6);
+    assert.match(html, new RegExp(`id="otel-dimension-${dimension}"[^>]*aria-selected="true"`));
+    assert.ok(html.includes(`<th scope="col">${caption}</th>`));
+    assert.ok(html.includes(`${dimension}-only-row`));
+    for (const other of Object.keys(model.breakdowns).filter((key) => key !== dimension)) assert.ok(!html.includes(`${other}-only-row`), other);
+    const missing = render(ui.ClaudeOtelBreakdown, { breakdowns: { ...model.breakdowns, [dimension]: [] }, dimension, onDimensionChange: () => {} });
+    assert.ok(missing.includes('unavailable')); assert.ok(!missing.includes('<table'));
+  }
+  const html = render(ui.ClaudeOtelContent, { state: { loading: false, data: model } });
+  assert.equal((html.match(/<table /g) || []).length, 1, 'Recent runs uses cards; only the default Model table is mounted');
+  assert.ok(html.includes('model-only-row'));
+});
+
+test('recent OTEL run cards retain identity, exact observed range, models, measures and all correlation sets', () => {
+  const model = otelDensityFixture();
+  const html = render(ui.ClaudeOtelContent, { state: { loading: false, data: model } });
+  const recent = html.slice(html.indexOf('class="otel-run-list"'), html.indexOf('otel-methodology'));
+  for (const value of ['run-abc123', 'Observed range', '2026-10-02T12:00:00.123Z', '2026-10-02T12:57:02.777Z', 'Models', 'claude-fixture-a', 'claude-fixture-b', 'Total measured tokens', '47017369', 'Reported USD cost', '18.4428395 USD', 'Tasks observed', 'TSK-014', 'TSK-015', 'Selected-role set', 'implementation-executor', 'mechanical-validator', 'Launch mode', 'direct', 'governed', 'Exact run-id correlation', 'Run history limit reached; showing 1 newest observed runs.']) assert.ok(recent.includes(value), value);
+  assert.ok(!recent.includes('<table'));
+  model.recentRuns[0] = { ...model.recentRuns[0], startTime: null, endTime: null, models: [], measures: { ...model.recentRuns[0].measures, totalMeasuredTokens: null, reportedCostUsd: null }, correlation: { task: [], role: [], launchMode: [] } };
+  const missing = render(ui.ClaudeOtelContent, { state: { loading: false, data: model } });
+  assert.ok((missing.slice(missing.indexOf('class="otel-run-list"')).match(/unavailable/g) || []).length >= 8);
+});
+
+test('OTEL retains loading, error retry, absent-response and unavailable states with direct zero measurements', () => {
+  const loading = render(ui.ClaudeOtelContent, { state: { loading: true } });
+  assert.ok(loading.includes('Loading Claude OTEL')); assert.ok(!loading.includes('otel-kpis'));
+  const error = render(ui.ClaudeOtelContent, { state: { loading: false, error: 'Local source unavailable' }, retry: () => {} });
+  assert.ok(error.includes('Local source unavailable')); assert.ok(error.includes('Retry'));
+  const absent = render(ui.ClaudeOtelContent, { state: { loading: false } });
+  assert.ok(absent.includes('No local telemetry response is available.'));
+  const model = otelDensityFixture();
+  model.summary = Object.fromEntries(Object.keys(model.summary).map((key) => [key, 0]));
+  model.recentSessions[0].measures = Object.fromEntries(Object.keys(model.recentSessions[0].measures).map((key) => [key, 0]));
+  model.recentSessions[0].cacheReadRatio = 0;
+  const zero = render(ui.ClaudeOtelContent, { state: { loading: false, data: model } });
+  const primary = textOnly(zero.slice(zero.indexOf('class="otel-kpis"'), zero.indexOf('<details')));
+  assert.ok(primary.includes('$0.00')); assert.ok(primary.includes('0 ms')); assert.ok(primary.includes('0%')); assert.ok(!primary.includes('unavailable'));
+  const empty = render(ui.ClaudeOtelContent, { state: { loading: false, data: { ...model, availability: 'unavailable', truncated: true, issues: [{ code: 'Malformed record', count: 1 }] } } });
+  assert.ok(empty.includes('No supported telemetry runs')); assert.ok(empty.includes('Parse / scan issues (1)')); assert.ok(empty.includes('Limit reached'));
+  assert.ok(!empty.includes('otel-kpis')); assert.ok(!empty.includes('otel-breakdown')); assert.ok(!empty.includes('otel-run-list'));
+});
+
+
+test('latest session/history precede global totals, direct breakdowns and run/task context', () => {
+  const model = otelDensityFixture();
+  model.summary.totalMeasuredTokens = 999999999;
+  model.summary.reportedCostUsd = 99.99;
+  const html = render(ui.ClaudeOtelContent, { state: { loading: false, data: model } });
+  const order = ['Latest observed telemetry:', 'Latest observed session', 'Previous sessions', 'All observed telemetry', 'Breakdown', 'Tasks observed', 'Recent runs'];
+  for (let i = 1; i < order.length; i++) assert.ok(html.indexOf(order[i]) > html.indexOf(order[i - 1]), order[i]);
+  assert.ok(html.includes(`dateTime="${model.latestObservedAt}"`));
+  const latest = html.slice(html.indexOf('otel-latest-session'), html.indexOf('otel-session-history'));
+  assert.ok(latest.includes('session-latest')); assert.ok(latest.includes('47017369')); assert.ok(!latest.includes('999999999'));
+  assert.ok(!html.includes('Current session'));
+  const history = html.slice(html.indexOf('otel-session-history'), html.indexOf('otel-global-totals'));
+  for (const value of ['session-previous', '2026-10-01T12:00:00Z', '2026-10-01T12:01:00Z', 'claude-fixture-b', '1.2K', '$0.13', '0.125 USD', 'API requests observed: unavailable', 'Session history limit reached']) assert.ok(history.includes(value), value);
+  const global = html.slice(html.indexOf('otel-global-totals'), html.indexOf('otel-breakdown'));
+  assert.ok(global.includes('999,999,999')); assert.ok(global.includes('$99.99'));
+  const tasks = html.slice(html.indexOf('otel-tasks-observed'), html.indexOf('otel-recent'));
+  for (const task of model.tasksObserved) assert.ok(tasks.includes(task));
+  assert.ok(tasks.includes('per-task consumption is unavailable with the current markers'));
+  assert.ok(!tasks.includes('USD')); assert.ok(!tasks.includes('tokens'));
+});
+
+test('correlated selectors never display run tokens or USD beside tasks, roles or launch modes', () => {
+  const model = otelDensityFixture();
+  for (const dimension of ['task', 'role', 'launchMode']) {
+    const html = render(ui.ClaudeOtelBreakdown, { breakdowns: model.breakdowns, dimension, onDimensionChange: () => {} });
+    assert.ok(html.includes(`${dimension}-only-row`)); assert.ok(html.includes('context only; consumption unavailable'));
+    assert.ok(html.includes('<th scope="col">Runs</th>'));
+    for (const value of ['<th scope="col">Tokens</th>', '<th scope="col">USD</th>', '47,017,369', '$18.4428395']) assert.ok(!html.includes(value));
+  }
+});
+
+test('sessions absent/partial remain truthful while complete card layout hooks and responsive rules exist', async () => {
+  const model = otelDensityFixture();
+  model.recentSessions = [];
+  let html = render(ui.ClaudeOtelContent, { state: { loading: false, data: model } });
+  assert.ok(html.includes('No valid session identifiers')); assert.ok(html.includes('No previous sessions observed.'));
+  assert.ok(html.includes('All observed telemetry')); assert.ok(!html.includes('otel-kpis'));
+  const partial = otelDensityFixture();
+  partial.recentSessions[0].measures.activeDurationMs = null;
+  partial.recentSessions[0].measures.totalMeasuredTokens = null;
+  partial.recentSessions[0].cacheReadRatio = null;
+  html = render(ui.ClaudeOtelContent, { state: { loading: false, data: partial } });
+  const kpis = html.slice(html.indexOf('class="otel-kpis"'), html.indexOf('<details'));
+  assert.ok(!kpis.includes('Active duration')); assert.ok(kpis.includes('Total measured tokens: unavailable')); assert.ok(kpis.includes('Cache-read ratio: unavailable'));
+  const css = await readFile(new URL('../ui/style.css', import.meta.url), 'utf8');
+  assert.match(css, /\.otel-run-card, \.otel-session-card\s*\{[^}]*border:\s*1px solid[^}]*padding:\s*16px;/);
+  assert.match(css, /\.claude-otel-view\s*\{[^}]*padding-bottom:\s*24px;/);
+  assert.match(css, /\.otel-recent\s*\{[^}]*padding-bottom:\s*24px;/);
+  assert.match(css, /\.otel-value-set\s*\{[^}]*flex-wrap:\s*wrap;/);
+  assert.match(css, /@media \(max-width: 480px\)\s*\{\s*\.otel-session-totals, \.otel-run-totals\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/);
 });

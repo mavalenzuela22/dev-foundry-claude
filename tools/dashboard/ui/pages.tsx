@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useArrayDataSource, type DataColumnProps } from '@epam/uui-core';
 import { Anchor, Button, DataTable, DataTableRow, FlexRow, FlexSpacer, LinkButton, Panel, Paginator, SearchInput, Spinner, StatusIndicator, Tabs, Text } from '@epam/uui';
-import { recordPath } from './routes.mjs';
+import { ClaudeOtel } from './claude-otel';
+import { recordPath, telemetryTabPath } from './routes.mjs';
 import { label, shortTime, statusColor, titles, useRead, type Kind, type ListModel, type ReadState, type RecordModel } from './model';
 
 export function State({ title, message, retry, loading = false }: { title: string; message: string; retry?: () => void; loading?: boolean }) {
@@ -95,16 +96,16 @@ export function DurableList({ kind, revision, retry }: { kind: Kind; revision: n
   return <DurableListContent kind={kind} state={useRead<ListModel>(kind, revision)} retry={retry} />;
 }
 
-export function Telemetry({ transactions, revision, retry }: { transactions: boolean; revision: number; retry: () => void }) {
-  const active = transactions ? 'transactions' : 'throughput';
-  const tabs = ['Throughput', 'Transactions'].map((caption) => {
-    const id = caption.toLowerCase();
+export function Telemetry({ tab = 'throughput', revision, retry }: { tab?: string; revision: number; retry: () => void }) {
+  const active = tab;
+  const tabs = ['Throughput', 'Claude OTEL', 'Transactions'].map((caption) => {
+    const id = caption.toLowerCase().replace(' ', '-');
     return { id, caption, isActive: id === active, rawProps: { role: 'tab', id: `telemetry-tab-${id}`, 'aria-controls': 'telemetry-panel', 'aria-selected': id === active } };
   });
   return <Panel background="surface-main" cx="telemetry"><Text size="30" fontWeight="600">Telemetry / Diagnostics</Text>
-    <Tabs items={tabs} value={active} onValueChange={(value) => { window.history.pushState(null, '', value === 'transactions' ? '/telemetry?tab=transactions' : '/telemetry'); window.dispatchEvent(new PopStateEvent('popstate')); }} />
+    <Tabs items={tabs} value={active} onValueChange={(value) => { window.history.pushState(null, '', telemetryTabPath(value)); window.dispatchEvent(new PopStateEvent('popstate')); }} />
     <section role="tabpanel" id="telemetry-panel" aria-labelledby={`telemetry-tab-${active}`} tabIndex={0}>
-      {transactions ? <DurableList kind="transactions" revision={revision} retry={retry} /> : <Panel background="surface-main"><Text size="24" fontWeight="600">Throughput</Text><Text color="secondary">No live call throughput source is configured for this local dashboard.</Text><Text>Throughput unavailable.</Text></Panel>}
+      {active === 'claude-otel' ? <ClaudeOtel revision={revision} retry={retry} /> : active === 'transactions' ? <DurableList kind="transactions" revision={revision} retry={retry} /> : <Panel background="surface-main"><Text size="24" fontWeight="600">Throughput</Text><Text color="secondary">No live call throughput source is configured for this local dashboard.</Text><Text>Throughput unavailable.</Text></Panel>}
     </section>
   </Panel>;
 }

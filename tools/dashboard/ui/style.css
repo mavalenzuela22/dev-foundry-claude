@@ -58,3 +58,62 @@ pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12
   .primary-record { flex-direction: column; align-items: flex-start; }
   .technical-facts > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 }
+/* Claude OTEL is scoped beneath the existing diagnostics tabpanel. */
+.claude-otel-view { display: grid; gap: 12px; min-width: 0; padding-bottom: 24px; }
+.otel-summary, .otel-latest-session, .otel-session-history, .otel-global-totals, .otel-tasks-observed, .otel-breakdown, .otel-recent { padding: 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; border: 1px solid var(--uui-divider); }
+.otel-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; padding-block: 12px; }
+.otel-kpis > div { border-left: 3px solid var(--uui-primary-50); padding-left: 12px; min-width: 0; }
+.otel-kpi-value { font-size: 28px; line-height: 36px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.otel-dimension-tabs { flex-wrap: wrap; height: auto; }
+.otel-dimension-tabs > * { flex-shrink: 0; }
+.otel-table-scroll { min-width: 0; overflow-x: auto; }
+.otel-table { width: 100%; min-width: 600px; border-collapse: collapse; font-size: 14px; line-height: 20px; font-variant-numeric: tabular-nums; }
+.otel-table th, .otel-table td { padding: 8px 16px; text-align: right; border-bottom: 1px solid var(--uui-divider); white-space: nowrap; }
+.otel-table th:first-child { width: 50%; text-align: left; white-space: normal; overflow-wrap: break-word; }
+.otel-table thead { background: var(--uui-surface-higher); }
+.otel-table th { font-weight: 600; }
+.otel-run-list, .otel-session-list, .otel-value-set { list-style: none; padding: 0; margin: 0; }
+.otel-run-list, .otel-session-list { display: grid; gap: 12px; }
+.otel-run-card, .otel-session-card { border: 1px solid var(--uui-divider); border-radius: 4px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.otel-run-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 24px; }
+.otel-run-totals, .otel-run-context, .otel-measurements { margin: 0; display: grid; gap: 12px 24px; }
+.otel-run-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.otel-run-totals dd { font-size: 20px; line-height: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.otel-run-context { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+.otel-run-correlation { grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--uui-divider); padding-top: 12px; }
+.otel-run-card dt, .otel-session-card dt, .otel-latest-session dt, .otel-measurements dt { font-size: 13px; line-height: 20px; color: var(--uui-text-secondary); }
+.otel-run-card dd, .otel-session-card dd, .otel-latest-session dd, .otel-measurements dd { margin: 4px 0 0; font-size: 14px; line-height: 20px; overflow-wrap: anywhere; }
+.otel-run-context > div, .otel-measurements > div { min-width: 0; }
+.otel-value-set { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.otel-value-set li { max-width: 100%; }
+.otel-details, .otel-issues { padding: 12px 0; border-top: 1px solid var(--uui-divider); }
+.otel-methodology, .otel-issues { padding: 12px 16px; }
+.claude-otel-view summary { cursor: pointer; font-size: 14px; line-height: 20px; color: var(--uui-text-secondary); }
+.otel-measurements { grid-template-columns: repeat(3, minmax(0, 1fr)); padding-top: 12px; }
+.otel-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+@media (max-width: 900px) {
+  .otel-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .otel-run-context, .otel-run-correlation { grid-template-columns: minmax(0, 1fr); }
+  .otel-measurements { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .otel-summary, .otel-latest-session, .otel-session-history, .otel-global-totals, .otel-tasks-observed, .otel-breakdown, .otel-recent { padding: 12px; }
+  .otel-kpis { grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 12px; }
+  .otel-kpi-value { font-size: 24px; line-height: 32px; }
+  .otel-measurements { grid-template-columns: minmax(0, 1fr); }
+}
+
+.otel-latest-session { border-left: 3px solid var(--uui-primary-50); }
+.otel-latest-observed { font-size: 14px; color: var(--uui-text-secondary); overflow-wrap: anywhere; }
+.otel-session-identity { font-size: 18px; line-height: 26px; overflow-wrap: anywhere; }
+.otel-session-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 24px; margin: 0; }
+.otel-global-totals .otel-details { border: 0; padding: 0; }
+.otel-recent { padding-bottom: 24px; }
+.otel-run-list { padding-bottom: 8px; }
+@media (max-width: 900px) {
+  .otel-session-totals { width: 100%; }
+}
+@media (max-width: 480px) {
+  .otel-session-totals, .otel-run-totals { grid-template-columns: minmax(0, 1fr); }
+  .otel-run-card, .otel-session-card { padding: 12px; }
+}

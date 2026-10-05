@@ -48,7 +48,7 @@ function handler(fixture) {
 
 test('contract menu, tabs and every list/detail route parse without fabricated sections', () => {
   assert.deepEqual(menu.map((m) => m.caption), ['Overview', 'Live Activity', 'Executions', 'Validations', 'Telemetry']);
-  assert.deepEqual(telemetryTabs.map((m) => m.caption), ['Throughput', 'Transactions']);
+  assert.deepEqual(telemetryTabs.map((m) => m.caption), ['Throughput', 'Claude OTEL', 'Transactions']);
   for (const url of ['/', '/calls', '/calls/call-1', '/executions', '/executions/TSK-014/run-1', '/validations', '/validations/check-1', '/telemetry', '/transactions', '/transactions/tx-1']) assert.notEqual(parseRoute(url).section, 'unknown', url);
   for (const url of ['/unknown', '/executions/one', '/validations/two/three', '/calls/%2e%2e', '/calls/%00', '/calls/%']) assert.equal(parseRoute(url).section, 'unknown', url);
 });
@@ -352,4 +352,24 @@ test('request identity is stable until execution ID exists; output location alon
   assert.equal(rows[0].recordId, 'execution_later');
   await f.put(requestFile('executions', 2), request('executions', 2, { taskId: 'TSK-015', outputPath: directory }));
   assert.equal((await readRecords(f.root, 'executions')).records.length, 2, 'Task identity prevents cross-task merging');
+});
+
+
+test('Claude OTEL API returns session-first allowlisted evidence and global totals read-only', async (t) => {
+  const f = await fixture(t);
+  const rawRun = 'api-private-run'; const rawSession = 'api-private-session'; const rawRequest = 'api-private-request';
+  const stamp = '2026-10-02T12:00:00.000Z';
+  const telemetry = { schema: 'dev-foundry.claude-otel-envelope.v1', telemetryRunId: rawRun, signal: 'logs', receivedAt: stamp, payload: { resourceLogs: [{ scopeLogs: [{ logRecords: [{ attributes: Object.entries({ 'event.name': 'api_request', 'session.id': rawSession, 'request.id': rawRequest, input_tokens: 0, output_tokens: 7, cost_usd: 0, model: 'claude-fixture' }).map(([key, v]) => ({ key, value: typeof v === 'number' ? { doubleValue: v } : { stringValue: v } })) }] }] }] } };
+  const file = '.dev-foundry/telemetry/local/otel-2026-10-02.ndjson';
+  const original = JSON.stringify(telemetry) + '\n'; await f.put(file, original);
+  const response = await handler(f).call('/api/dashboard/v1/claude-otel');
+  assert.equal(response.status, 200); const data = JSON.parse(response.body);
+  assert.equal(data.latestObservedAt, stamp); assert.equal(data.recentSessions.length, 1);
+  const session = data.recentSessions[0];
+  assert.equal(session.displayId, createHash('sha256').update(rawSession).digest('hex').slice(0, 12));
+  assert.equal(session.runDisplayId, createHash('sha256').update(rawRun).digest('hex').slice(0, 12));
+  assert.equal(session.measures.totalMeasuredTokens, 7); assert.equal(session.measures.inputTokens, 0); assert.equal(session.measures.reportedCostUsd, 0);
+  assert.equal(data.summary.totalMeasuredTokens, 7); assert.equal(data.recentSessionsTruncated, false);
+  for (const value of [rawRun, rawSession, rawRequest, 'payload', 'attributes']) assert.ok(!response.body.includes(value));
+  assert.equal(await readFile(path.join(f.root, file), 'utf8'), original);
 });

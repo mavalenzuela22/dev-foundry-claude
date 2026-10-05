@@ -8,7 +8,7 @@ import { DropdownMenuBody, DropdownMenuButton, FlexRow, MainMenuButton, MainMenu
 import '@epam/uui-components/styles.css';
 import '@epam/uui/styles.css';
 import '@epam/loveship/styles.css';
-import { menu, parseRoute } from './routes.mjs';
+import { menu, parseRoute, telemetryTab } from './routes.mjs';
 import { useRead, type Health, type Kind } from './model';
 import { DurableList, LiveUnavailable, Overview, State, Telemetry } from './pages';
 import { Detail } from './details';
@@ -40,7 +40,7 @@ function Dashboard({ initialPath }: { initialPath?: string }) {
   let content: React.ReactNode;
   if (route.section === 'overview') content = <Overview revision={revision} retry={retry} />;
   else if (route.section === 'calls') content = <LiveUnavailable detail={!!route.ids.length} />;
-  else if (route.section === 'telemetry') content = <Telemetry transactions={new URLSearchParams(query).get('tab') === 'transactions'} revision={revision} retry={retry} />;
+  else if (route.section === 'telemetry') content = <Telemetry tab={telemetryTab(query)} revision={revision} retry={retry} />;
   else if (['executions', 'validations', 'transactions'].includes(route.section)) {
     content = route.ids.length ? <Detail key={path} kind={route.section as Kind} ids={route.ids} revision={revision} retry={retry} returnTo={route.section === 'transactions' && typeof document !== 'undefined' && document.referrer.includes('/telemetry') ? '/telemetry?tab=transactions' : undefined} /> : <DurableList key={route.section} kind={route.section as Kind} revision={revision} retry={retry} />;
   } else content = <State title="Page unavailable" message="This route is not part of the local operations dashboard." />;
