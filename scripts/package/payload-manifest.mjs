@@ -38,6 +38,15 @@ function checkLock(files) {
 
 function generate() {
   const files = npmPackList();
+  for (const file of ['src/dashboard/command.js', ...['http', 'evidence', 'claude-otel', 'launch'].map((name) => `tools/dashboard/server/${name}.mjs`), 'tools/dashboard/dist/index.html', 'tools/dashboard/dist/logo.svg']) {
+    if (!files.includes(file)) fail(`required dashboard payload missing: ${file}`);
+  }
+  for (const extension of ['js', 'css']) {
+    if (!files.some((file) => file.startsWith('tools/dashboard/dist/assets/') && file.endsWith(`.${extension}`))) fail(`dashboard ${extension} assets missing.`);
+  }
+  for (const file of files.filter((entry) => entry.startsWith('tools/'))) {
+    if (!/^tools\/dashboard\/(?:server\/(?:http|evidence|claude-otel|launch)\.mjs|dist\/(?:index\.html|logo\.svg|assets\/[^/]+\.(?:js|css|svg|woff2?)))$/.test(file)) fail(`unexpected dashboard payload: ${file}`);
+  }
   checkLock(files);
   const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
   const entries = files.map((file) => {

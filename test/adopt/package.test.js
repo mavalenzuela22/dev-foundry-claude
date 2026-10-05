@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:net';
+import { request } from 'node:http';
 import { chmod, cp, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,7 +21,8 @@ const scratch = async (prefix) => {
 after(async () => { for (const dir of scratchDirs) await rm(dir, { recursive: true, force: true }); });
 
 const cleanEnv = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(?:npm_|DEV_FOUNDRY_|OTEL_|CLAUDE)/i.test(key)));
-const npm = (args, cwd, env = {}) => execFileSync('npm', args, { cwd, encoding: 'utf8', env: { ...cleanEnv(), ...env, npm_config_update_notifier: 'false' }, stdio: ['ignore', 'pipe', 'pipe'] });
+const npmCache = await scratch('package-npm-cache');
+const npm = (args, cwd, env = {}) => execFileSync('npm', args, { cwd, encoding: 'utf8', env: { ...cleanEnv(), ...env, npm_config_cache: npmCache, npm_config_update_notifier: 'false' }, stdio: ['ignore', 'pipe', 'pipe'] });
 
 // Builds a tarball from a copy of the tracked package inputs plus the prod node_modules.
 async function build(mutate) {
@@ -27,11 +30,23 @@ async function build(mutate) {
   for (const entry of ['package.json', 'package-lock.json', 'README.md', 'bin', 'src', 'templates', 'scripts/package']) {
     await cp(path.join(repoRoot, entry), path.join(tree, entry), { recursive: true });
   }
+  await cp(path.join(repoRoot, 'tools/dashboard'), path.join(tree, 'tools/dashboard'), {
+    recursive: true,
+    filter: (source) => !['node_modules', 'dist'].includes(path.relative(path.join(repoRoot, 'tools/dashboard'), source).split(path.sep)[0]),
+  });
+  // Producer build dependencies only. npm's explicit payload allowlist excludes
+  // this symlink; consumers receive the fresh Vite output, never build tooling.
+  await symlink(path.join(repoRoot, 'tools/dashboard/node_modules'), path.join(tree, 'tools/dashboard/node_modules'), 'dir');
   await cp(path.join(repoRoot, 'node_modules'), path.join(tree, 'node_modules'), {
     recursive: true,
     filter: (source) => !source.includes(`${path.sep}node_modules${path.sep}@modelcontextprotocol${path.sep}client`),
   });
   await writeFile(path.join(tree, 'LICENSE'), 'Test license text.\n');
+  // Forbidden producer inputs exist in the build tree but must never ship.
+  for (const relative of ['.env', 'docs/task-history.md', '.dev-foundry/telemetry/local/otel-2026-10-05.ndjson', '.claude/settings.json', 'tools/dashboard/producer-state.json']) {
+    await mkdir(path.dirname(path.join(tree, relative)), { recursive: true });
+    await writeFile(path.join(tree, relative), 'producer-only-sentinel');
+  }
   if (mutate) await mutate(tree);
   const destination = await scratch('tarball');
   const output = npm(['pack', '--pack-destination', destination, '--json'], tree);
@@ -71,9 +86,9 @@ function baseline() {
     const manifest = JSON.parse(manifestBytes.toString('utf8'));
     const pin = formatExpect(manifest.version, rootOf(manifestBytes));
     const prefix = await scratch('install-prefix');
-    await writeFile(path.join(prefix, 'package.json'), '{"name":"consumer-host","version":"1.0.0","private":true}\n');
     npm(['install', '--prefix', prefix, '--offline', '--no-audit', '--no-fund', '--ignore-scripts', built.tarball], prefix, { npm_config_registry: 'http://127.0.0.1:9/' });
     const installed = path.join(prefix, 'node_modules/@dev-foundry/claude-adapter');
+    await rm(built.tree, { recursive: true, force: true });
     return { ...built, manifest, manifestBytes, pin, prefix, installed };
   })();
   return baselinePromise;
@@ -103,6 +118,7 @@ test('16 the manifest is complete and exact for the tarball and the offline inst
   const again = await build();
   assert.ok(manifestOf(again.tarball).equals(base.manifestBytes));
   assert.equal(rootOf(manifestOf(again.tarball)), rootOf(base.manifestBytes));
+  assert.equal(again.info.integrity, base.info.integrity, 'tarball bytes are reproducible');
 });
 
 test('16 the build fails when a bundled dependency does not match the lock', async () => {
@@ -144,6 +160,9 @@ function tampers(base) {
     'changed template': (dir) => bump(path.join(dir, 'templates/agents/dev-foundry-executor.md.tmpl')),
     'changed package.json': async (dir) => { const file = path.join(dir, 'package.json'); await writeFile(file, `${await readFile(file, 'utf8')}\n`); },
     'changed README': (dir) => bump(path.join(dir, 'README.md')),
+    'changed dashboard server': (dir) => bump(path.join(dir, 'tools/dashboard/server/http.mjs')),
+    'changed dashboard UI': (dir) => bump(path.join(dir, 'tools/dashboard/dist/index.html')),
+    'changed dashboard compiled asset': (dir) => bump(path.join(dir, base.manifest.files.find((entry) => /^tools\/dashboard\/dist\/assets\/.*\.js$/.test(entry.path)).path)),
     'changed LICENSE': (dir) => bump(path.join(dir, 'LICENSE')),
     'one byte in a bundled dependency': (dir) => bump(path.join(dir, bundled)),
     'deleted payload file': (dir) => rm(path.join(dir, 'templates/mcp-entry.json.tmpl')),
@@ -280,6 +299,12 @@ test('14 20 run rejects every tamper before any collector or child starts and la
   await assert.rejects(readFile(marker), /ENOENT/);
   await consumer.put('.mcp.json', consumerPin);
 
+  // Observe the host restriction independently; never turn a product error into
+  // a skip based on the launcher's intentionally generic failure message.
+  if (await freeDashboardPort() === null) {
+    t.skip('Host prohibits collector loopback sockets; tamper/pin rejection passed, live run remains unverified');
+    return;
+  }
   const run = cli(base.installed, ['run', 'direct', '--', '--probe', 'a b', '--', '--help'], { cwd: consumer.root, env });
   assert.equal(run.status, 0, `${run.stderr}|${run.stdout}`);
   const recorded = Object.fromEntries((await readFile(marker, 'utf8')).trim().split('\n').map((line) => {
@@ -323,4 +348,201 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
   assert.equal(lock.version, pkg.version);
   const ignoreText = await readFile(path.join(repoRoot, '.gitignore'), 'utf8');
   assert.ok(ignoreText.split('\n').includes('/payload-manifest.json'));
+});
+
+// TSK-016 uses the same independently packed, offline-installed baseline as the
+// adoption/MCP/run regression tests. Its temporary producer tree is deleted.
+test('TSK-016 package ships only dashboard runtime/assets and pins every dashboard byte', async () => {
+  const base = await baseline();
+  assert.equal(base.manifest.version, '1.2.0', 'TSK-016 advances the 1.1.0 compatibility baseline');
+  await assert.rejects(lstat(base.tree), /ENOENT/);
+  const files = base.info.files.map((file) => file.path);
+  for (const name of ['http', 'evidence', 'claude-otel', 'launch']) assert.ok(files.includes(`tools/dashboard/server/${name}.mjs`));
+  assert.ok(files.includes('src/dashboard/command.js'));
+  assert.ok(files.includes('tools/dashboard/dist/index.html'));
+  assert.ok(files.includes('tools/dashboard/dist/logo.svg'));
+  assert.ok(files.some((file) => /^tools\/dashboard\/dist\/assets\/.*\.js$/.test(file)));
+  assert.ok(files.some((file) => /^tools\/dashboard\/dist\/assets\/.*\.css$/.test(file)));
+  for (const file of files) {
+    assert.ok(!/^(?:docs\/|\.dev-foundry\/|\.claude\/|\.env|secrets\/|scripts\/|test\/)/.test(file), file);
+    if (file.startsWith('tools/')) assert.match(file, /^tools\/dashboard\/(?:server\/(?:http|evidence|claude-otel|launch)\.mjs|dist\/(?:index\.html|logo\.svg|assets\/[^/]+\.(?:js|css|svg|woff2?)))$/);
+    assert.ok(!file.startsWith('tools/dashboard/node_modules/'), file);
+  }
+  assert.ok(!files.some((file) => file.startsWith('node_modules/vite/') || file.startsWith('node_modules/react/') || file.startsWith('node_modules/@modelcontextprotocol/client/')));
+  const dashboardFiles = files.filter((file) => /^(?:src\/dashboard\/|tools\/dashboard\/)/.test(file));
+  assert.ok(dashboardFiles.every((file) => base.manifest.files.some((entry) => entry.path === file)));
+  verifyPayload(base.installed, base.pin);
+});
+
+async function freeDashboardPort() {
+  const socket = createServer();
+  try {
+    await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen(0, '127.0.0.1', resolve); });
+  } catch (error) {
+    if (['EPERM', 'EACCES'].includes(error.code)) return null;
+    throw error;
+  }
+  const { port, address } = socket.address();
+  assert.equal(address, '127.0.0.1');
+  await new Promise((resolve) => socket.close(resolve));
+  return port;
+}
+
+const boundedDashboardPorts = new Map();
+async function startInstalledDashboard(t, base, cwd, args = []) {
+  const livePort = await freeDashboardPort();
+  const port = livePort ?? 43127;
+  const extra = {};
+  if (livePort === null) {
+    t.diagnostic('Host blocks loopback sockets: installed CLI/HTTP handler smoke uses IPC; live TCP remains unverified.');
+    const loader = path.join(await scratch('dashboard-server-smoke'), 'listen.mjs');
+    // Instrument only the socket boundary, outside the installed payload. The
+    // actual CLI, root/pin checks, server and asynchronous request handler run.
+    await writeFile(loader, `import assert from 'node:assert/strict';
+import { Server } from 'node:http';
+Server.prototype.listen = function(options, ready) {
+  assert.deepEqual(options, { host: '127.0.0.1', port: 43127, exclusive: true });
+  this.address = () => ({ address: '127.0.0.1', port: options.port, family: 'IPv4' });
+  this.close = (done) => done();
+  process.on('message', ({ id, url, method, host }) => {
+    const response = { status: 0, headers: {}, body: '' };
+    this.emit('request', { url, method, headers: { host } }, {
+      setHeader(key, value) { response.headers[key.toLowerCase()] = value; },
+      writeHead(status, headers) { response.status = status; for (const [key, value] of Object.entries(headers)) this.setHeader(key, value); },
+      end(body) { response.body = body?.toString() ?? ''; process.send({ id, response }); }
+    });
+  });
+  queueMicrotask(ready);
+  return this;
+};
+`);
+    extra.NODE_OPTIONS = `--import=${loader}`;
+  }
+  const child = spawn(process.execPath, [path.join(base.prefix, 'node_modules/.bin/dev-foundry-claude'), 'dashboard', '--port', String(port), ...args], {
+    cwd, env: cliEnv({ CLAUDE_PROJECT_DIR: base.tree, GIT_DIR: base.tree, GIT_WORK_TREE: base.tree, ...extra }), stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+  });
+  if (livePort === null) boundedDashboardPorts.set(port, child);
+  let output = ''; let errors = '';
+  child.stderr.on('data', (bytes) => { errors += bytes; });
+  const closed = new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', (code, signal) => resolve({ code, signal }));
+  });
+  t.after(async () => {
+    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    await closed;
+    boundedDashboardPorts.delete(port);
+  });
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Installed dashboard startup timed out: ${errors}`)), 10000);
+    child.stdout.on('data', (bytes) => {
+      output += bytes;
+      if (output.includes(`http://127.0.0.1:${port}`)) { clearTimeout(timer); resolve(); }
+    });
+    closed.then((result) => { clearTimeout(timer); reject(new Error(`Dashboard exited: ${JSON.stringify(result)} ${errors}`)); }, reject);
+  });
+  return { port, url: `http://127.0.0.1:${port}`, stop: async () => {
+    child.kill('SIGTERM');
+    const result = await closed;
+    boundedDashboardPorts.delete(port);
+    assert.deepEqual(result, { code: 0, signal: null });
+    assert.equal(errors, '');
+  } };
+}
+
+function dashboardRequest(port, url, { method = 'GET', host = `127.0.0.1:${port}` } = {}) {
+  const child = boundedDashboardPorts.get(port);
+  if (child) return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { child.removeListener('message', received); reject(new Error('Handler timed out')); }, 5000);
+    const received = ({ response }) => { clearTimeout(timer); resolve(response); };
+    child.once('message', received); child.send({ id: 1, url, method, host });
+  });
+  return new Promise((resolve, reject) => {
+    const req = request({ hostname: '127.0.0.1', port, path: url, method, headers: { Host: host }, timeout: 5000 }, (res) => {
+      let body = '';
+      res.setEncoding('utf8'); res.on('data', (bytes) => { body += bytes; });
+      res.on('end', () => resolve({ status: res.statusCode, body, headers: res.headers }));
+    });
+    req.once('error', reject); req.once('timeout', () => req.destroy(new Error('Request timed out'))); req.end();
+  });
+}
+
+test('TSK-016 installed CLI serves consumer evidence and packaged UI without producer checkout or build tooling', { timeout: 60000 }, async (t) => {
+  const base = await baseline();
+  const consumer = await makeConsumer(); t.after(() => consumer.cleanup());
+  await adoptThroughInstalledCli(base, consumer);
+  await consumer.put('.dev-foundry/executions/TSK-CONSUMER/consumer-run/status.json', JSON.stringify({ schemaVersion: 'foundry-runner.status.v2', taskId: 'TSK-CONSUMER', status: 'passed', finishedAt: '2026-10-05T12:00:00Z' }));
+  await consumer.put('.dev-foundry/repository-transactions/consumer-tx.json', JSON.stringify({ transactionId: 'consumer-tx', status: 'completed', completedAt: '2026-10-05T12:00:00Z', facts: [{ name: 'taskId', value: 'TSK-CONSUMER' }] }));
+  const attrs = (values) => Object.entries(values).map(([key, value]) => ({ key, value: typeof value === 'number' ? { doubleValue: value } : { stringValue: value } }));
+  const metric = { schema: 'dev-foundry.claude-otel-envelope.v1', telemetryRunId: 'consumer-private-run', receivedAt: '2026-10-05T12:00:00Z', signal: 'metrics', payload: {
+    resourceMetrics: [{ resource: { attributes: attrs({ 'session.id': 'consumer-private-session', 'user.email': 'secret@example.invalid', prompt: 'private-prompt-sentinel' }) }, scopeMetrics: [{ metrics: [{ name: 'claude_code.token.usage', sum: { aggregationTemporality: 1, dataPoints: [{ asDouble: 37, startTimeUnixNano: '1', timeUnixNano: '1791201600000000000', attributes: attrs({ type: 'input' }) }] } }] }] }],
+  } };
+  await consumer.put('.dev-foundry/telemetry/local/otel-2026-10-05.ndjson', `${JSON.stringify(metric)}\n`);
+  // Consumer static files must not substitute for the pinned package assets.
+  await consumer.put('tools/dashboard/dist/index.html', 'consumer-ui-sentinel');
+  const nested = path.join(consumer.root, 'nested/work'); await mkdir(nested, { recursive: true });
+  const before = await listTree(consumer.root);
+  const dashboard = await startInstalledDashboard(t, base, nested);
+  const health = JSON.parse((await dashboardRequest(dashboard.port, '/api/dashboard/v1/health')).body);
+  assert.deepEqual(health.dashboard, { api: 'available', ui: 'available' });
+  assert.equal(health.data.executions.records, 1);
+  assert.equal(health.data.transactions.records, 1);
+  assert.equal(health.throughput, 'unavailable');
+  const executions = JSON.parse((await dashboardRequest(dashboard.port, '/api/dashboard/v1/executions')).body);
+  assert.equal(executions.records[0].taskId, 'TSK-CONSUMER');
+  const transactions = JSON.parse((await dashboardRequest(dashboard.port, '/api/dashboard/v1/transactions')).body);
+  assert.equal(transactions.records[0].recordId, 'consumer-tx');
+  const otel = JSON.parse((await dashboardRequest(dashboard.port, '/api/dashboard/v1/claude-otel')).body);
+  assert.equal(otel.summary.inputTokens, 37);
+  assert.equal(otel.recentSessions[0].measures.inputTokens, 37);
+  assert.ok(!/consumer-private|secret@example|private-prompt-sentinel/.test(JSON.stringify(otel)));
+  const ui = await dashboardRequest(dashboard.port, '/telemetry?tab=claude-otel');
+  assert.equal(ui.status, 200);
+  assert.equal(ui.body, await readFile(path.join(base.installed, 'tools/dashboard/dist/index.html'), 'utf8'));
+  const script = ui.body.match(/src="([^"]+\.js)"/)[1];
+  const asset = await dashboardRequest(dashboard.port, script);
+  assert.equal(asset.status, 200); assert.match(asset.headers['content-type'], /javascript/);
+  assert.equal(asset.body, await readFile(path.join(base.installed, 'tools/dashboard/dist', script), 'utf8'));
+  assert.equal((await dashboardRequest(dashboard.port, '/api/dashboard/v1/health', { method: 'HEAD' })).body, '');
+  for (const method of ['POST', 'PUT', 'DELETE', 'OPTIONS']) assert.equal((await dashboardRequest(dashboard.port, '/api/dashboard/v1/health', { method })).status, 405);
+  for (const host of ['localhost:43127', '0.0.0.0:43127', '192.168.0.1:43127', 'evil.example', '127.0.0.1.evil.example:43127', '127.0.0.1']) assert.equal((await dashboardRequest(dashboard.port, '/api/dashboard/v1/health', { host })).status, 403);
+  assert.equal((await dashboardRequest(dashboard.port, '/assets/%2e%2e/.env')).status, 400);
+  assert.equal((await dashboardRequest(dashboard.port, '/.env')).status, 404);
+  await dashboard.stop();
+  const explicit = await startInstalledDashboard(t, base, os.tmpdir(), ['--root', consumer.root]);
+  assert.equal(JSON.parse((await dashboardRequest(explicit.port, '/api/dashboard/v1/executions')).body).records[0].taskId, 'TSK-CONSUMER');
+  await explicit.stop();
+  assert.deepEqual(diffTrees(before, await listTree(consumer.root)), [], 'dashboard is observational');
+});
+
+test('TSK-016 dashboard rejects invalid args, roots, unsafe structure, stale pins and modified assets before listening', async (t) => {
+  const base = await baseline();
+  const consumer = await makeConsumer(); t.after(() => consumer.cleanup());
+  await adoptThroughInstalledCli(base, consumer);
+  for (const args of [[], ['--port'], ['--port', 'abc'], ['--port', '0'], ['--port', '1023'], ['--port', '65536'], ['--port', '4.5'], ['--port', '1e4'], ['--port', '3000', '--port', '4000'], ['--port', '3000', '--root'], ['--port', '3000', '--root', '--port'], ['--port', '3000', '--host', '0.0.0.0'], ['--port', '3000', 'extra']]) {
+    const result = cli(base.installed, ['dashboard', ...args], { cwd: consumer.root });
+    assert.equal(result.status, 2, JSON.stringify(args)); assert.equal(result.stdout, ''); assert.match(result.stderr, /Usage:/);
+  }
+  const noRoot = cli(base.installed, ['dashboard', '--port', '3000']);
+  assert.equal(noRoot.status, 1); assert.match(noRoot.stderr, /consumer git repository/);
+  const profile = await consumer.read('.dev-foundry/profiles/project-operating-profile.yaml');
+  await consumer.put('.dev-foundry/profiles/project-operating-profile.yaml', 'invalid: true');
+  assert.match(cli(base.installed, ['dashboard', '--port', '3000'], { cwd: consumer.root }).stderr, /project operating profile/);
+  await consumer.put('.dev-foundry/profiles/project-operating-profile.yaml', profile);
+  const mcp = await consumer.read('.mcp.json');
+  await consumer.put('.mcp.json', mcp.replace(base.pin, '1.1.0:sha256:' + '0'.repeat(64)));
+  const stale = cli(base.installed, ['dashboard', '--port', '3000'], { cwd: consumer.root });
+  assert.equal(stale.status, 1); assert.equal(stale.stdout, ''); assert.match(stale.stderr, /verification failed/);
+  await consumer.put('.mcp.json', mcp);
+  const unsafe = path.join(consumer.root, '.dev-foundry'); const moved = path.join(consumer.root, 'unsafe-evidence');
+  // A symlinked evidence authority root is rejected rather than followed.
+  await cp(unsafe, moved, { recursive: true }); await rm(unsafe, { recursive: true }); await symlink(moved, unsafe, 'dir');
+  const linked = cli(base.installed, ['dashboard', '--port', '3000'], { cwd: consumer.root });
+  assert.equal(linked.status, 1); assert.match(linked.stderr, /project operating profile/);
+  await rm(unsafe); await cp(moved, unsafe, { recursive: true });
+  for (const [name, tamper] of Object.entries(tampers(base)).filter(([name]) => name.includes('dashboard'))) {
+    const dir = await copyInstalled(base); await tamper(dir);
+    const result = cli(dir, ['dashboard', '--port', '3000'], { cwd: consumer.root });
+    assert.equal(result.status, 1, name); assert.equal(result.stdout, ''); assert.match(result.stderr, /verification failed/);
+  }
 });

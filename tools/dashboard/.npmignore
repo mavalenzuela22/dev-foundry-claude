@@ -1,0 +1,3 @@
+# dist is Git-ignored build output, but it is the installed dashboard UI.
+# Do not let npm reuse this workspace's .gitignore to exclude that payload.
+node_modules/

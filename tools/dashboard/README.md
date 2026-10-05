@@ -1,7 +1,9 @@
 # dev-foundry-claude local operations dashboard
 
-Independent producer tool for SPC-006 / TSK-014, extended by SPC-004 / TSK-015. The adapter package and its 1.1.0
-release payload do not include this workspace. No runner application source was
+Shared dashboard source for SPC-006 / TSK-014, extended by SPC-004 / TSK-015.
+TSK-016 includes its server and prebuilt UI in adapter 1.2.0; build dependencies
+and producer state remain outside the package. See the root README for installed
+consumer operation and integrity requirements. No runner application source was
 copied; the UI uses the frozen published UUI packages. SPC-006 authorizes the exact
 frozen MainMenu SVG, whose SHA-256 is
 `71e8330fd12ab24d58d6a424e5094902352052a2c89dd0d5a798b1275be7549c`.
@@ -19,7 +21,9 @@ node scripts/dashboard.mjs --port 43127
 ```
 
 It delegates directly, preserving argument validation, loopback binding, occupied-port
-failure, signals and exit codes. No root package script or dependency is added.
+failure, signals and exit codes. The root package prepack script builds this UI; it adds
+no root runtime dependency. The installed CLI supplies an explicit consumer
+evidence root and uses the same server and static build.
 
 Open `http://127.0.0.1:43127`. A port is mandatory (1024–65535); an occupied port
 fails explicitly. There is no automatic fallback, LAN bind or development server.

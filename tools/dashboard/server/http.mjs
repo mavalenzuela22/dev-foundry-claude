@@ -62,7 +62,7 @@ export function dashboardHandler({ root = repositoryRoot, uiRoot = defaultUiRoot
       const body = await safeFile(uiRoot, file, { maxBytes: 8 * 1024 * 1024, binary: true });
       return send(200, body, mime[path.extname(file)] || 'application/octet-stream');
     } catch {
-      return send(503, { error: 'Dashboard UI or evidence unavailable; build the local workspace and retry' });
+      return send(503, { error: 'Dashboard UI or evidence unavailable; verify the installation and local evidence' });
     }
   };
 }
