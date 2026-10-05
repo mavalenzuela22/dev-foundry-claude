@@ -3,7 +3,7 @@ id: DFC-AUTHORITY-INDEX
 title: dev-foundry-claude Repository Authority Index
 kind: authority-index
 status: active
-artifact_version: "2.1.0-local.20"
+artifact_version: "2.1.0-local.21"
 canonical: false
 
 subject:
@@ -261,6 +261,13 @@ routes:
       - claude-adapter-dashboard-cli
       - claude-adapter-installation-documentation
       - claude-adapter-package-consumer-smoke
+    section_id: null
+  - id: TSK-016-CLOSURE
+    path: docs/70-tasks/70 [TSK-016-CLOSURE] PROJECT - Integrate Local Operations Dashboard into Reusable Claude Adapter Package Closure.md
+    authority_class: configured
+    governs:
+      - tsk-016-terminal-disposition
+      - claude-adapter-dashboard-distribution-closure
     section_id: null
 
 bindings:
