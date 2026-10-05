@@ -7,6 +7,7 @@ export const menu = Object.freeze([
 ]);
 export const telemetryTabs = Object.freeze([
   { caption: 'Throughput', path: '/telemetry' },
+  { caption: 'Claude OTEL', path: '/telemetry?tab=claude-otel' },
   { caption: 'Transactions', path: '/transactions' },
 ]);
 export function parseRoute(path) {
@@ -23,3 +24,6 @@ export function parseRoute(path) {
 export function recordPath(record) {
   return `/${record.kind}/${record.kind === 'executions' ? `${record.taskId || 'unavailable'}/` : ''}${record.id}`;
 }
+
+export function telemetryTab(query) { const tab = new URLSearchParams(query).get('tab'); return tab === 'claude-otel' || tab === 'transactions' ? tab : 'throughput'; }
+export const telemetryTabPath = (tab) => tab === 'throughput' ? '/telemetry' : `/telemetry?tab=${tab === 'claude-otel' ? 'claude-otel' : 'transactions'}`;
