@@ -187,7 +187,7 @@ test('runner V3 binds the producer Executor to the ChatGPT-governed process-boun
   ]) assert.ok(profile.prohibited_actions.includes(action), action);
 });
 
-test('ADR-004 is routed and ACCEPTED, SPC-005 is routed and PLANNED, and package version is unchanged', async () => {
+test('ADR-004 is routed and ACCEPTED, SPC-005 is routed and PLANNED', async () => {
   const index = await readYaml('.dev-foundry/authority-index.yaml');
   for (const [prefix, id, status] of [
     ['docs/10-decisions/10 [ADR-004] ', 'ADR-004', 'ACCEPTED'],
@@ -199,7 +199,6 @@ test('ADR-004 is routed and ACCEPTED, SPC-005 is routed and PLANNED, and package
     assert.equal(metadata.artifact.id, id);
     assert.equal(metadata.artifact.status, status, id);
   }
-  assert.equal(JSON.parse(await readProjectFile('package.json')).version, '1.1.0');
 });
 
 test('active ChatGPT-project Platform Bootstrap permits Author, Auditor, and Custodian and separately binds the runner', async () => {

@@ -30,6 +30,10 @@ if (command === '--version') {
   try { verifyPayload(packageRoot, rest[1]); } catch { verificationFailure(); }
   globalThis[Symbol.for('dev-foundry-claude.consumer-mode-guard')] = true;
   await import(pathToFileURL(path.join(packageRoot, 'src/governance-mcp/server.js')).href);
+} else if (command === 'dashboard') {
+  const { dashboardCommand } = await import('../src/dashboard/command.js');
+  try { await dashboardCommand({ argv: rest, packageRoot }); }
+  catch (error) { fail(error.message, error.exitCode ?? 1); }
 } else if (command === 'run') {
   const [runtime, separator, ...claudeArgs] = rest;
   if (!['direct', 'dial', 'codemie'].includes(runtime) || separator !== '--') fail('Usage: dev-foundry-claude run <direct|dial|codemie> -- <claude args>', 2);
@@ -80,5 +84,5 @@ if (command === '--version') {
     }
   } else fail('Usage: dev-foundry-claude adopt <plan|apply|status>', 2);
 } else {
-  fail('Usage: dev-foundry-claude <adopt|mcp|run|--version>', 2);
+  fail('Usage: dev-foundry-claude <adopt|mcp|run|dashboard|--version>', 2);
 }

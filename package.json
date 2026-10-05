@@ -1,6 +1,6 @@
 {
   "name": "@dev-foundry/claude-adapter",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -13,11 +13,16 @@
     "bin",
     "src",
     "templates",
+    "tools/dashboard/server/http.mjs",
+    "tools/dashboard/server/evidence.mjs",
+    "tools/dashboard/server/claude-otel.mjs",
+    "tools/dashboard/server/launch.mjs",
+    "tools/dashboard/dist",
     "payload-manifest.json"
   ],
   "scripts": {
     "start": "node src/governance-mcp/server.js",
-    "prepack": "node scripts/package/payload-manifest.mjs",
+    "prepack": "node scripts/package/prepack.mjs",
     "test": "node --test test/governance-mcp/*.test.js test/bootstrap/*.test.js test/adopt/*.test.js"
   },
   "dependencies": {

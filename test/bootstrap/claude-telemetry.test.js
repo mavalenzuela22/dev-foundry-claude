@@ -10,6 +10,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { buildTelemetryEnvironment, sanitizeTelemetry, startCollector, writeOperationMarker } from '../../src/telemetry/telemetry.js';
 import { makeProject } from '../governance-mcp/fixture.js';
+import { requireLoopback } from './loopback.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const serverPath = path.join(repoRoot, 'src/governance-mcp/server.js');
@@ -135,6 +136,7 @@ test('sanitizer removes forbidden scalar and OTLP keys recursively and preserves
 });
 
 test('loopback collector persists sanitized metrics/logs as UTC-dated NDJSON and closes its listener', async (t) => {
+  if (!await requireLoopback(t)) return;
   const telemetryDir = await temporaryDirectory(t);
   const telemetryRunId = randomUUID();
   const collector = await startCollector({ telemetryDir, telemetryRunId, port: 0 });
@@ -160,6 +162,7 @@ test('loopback collector persists sanitized metrics/logs as UTC-dated NDJSON and
 });
 
 test('collector rejects unsupported routes/methods, malformed/non-JSON and oversized bodies without persistence', async (t) => {
+  if (!await requireLoopback(t)) return;
   const telemetryDir = await temporaryDirectory(t);
   const collector = await startCollector({ telemetryDir, telemetryRunId: randomUUID(), port: 0, maxBodyBytes: 256 });
   t.after(() => collector.close());

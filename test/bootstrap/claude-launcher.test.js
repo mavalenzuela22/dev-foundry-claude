@@ -8,6 +8,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { RUNTIMES, buildLaunchPlan, parseLauncherArgs, runLauncher } from '../../src/telemetry/launch.js';
 import { LAUNCH_MODES, buildTelemetryEnvironment, startCollector, writeOperationMarker } from '../../src/telemetry/telemetry.js';
+import { requireLoopback } from './loopback.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const runUuid = '123e4567-e89b-42d3-a456-426614174000';
@@ -74,6 +75,7 @@ test('rejected arguments start no collector and no child, exit 2 with a generic 
 });
 
 test('default launch uses an OS-selected loopback port and passes it to the child endpoint', async (t) => {
+  if (!await requireLoopback(t)) return;
   const projectRoot = await temporaryDirectory(t);
   let collector;
   const { spawn, calls } = fakeSpawn();
@@ -149,6 +151,7 @@ test('launch mode is a closed set in the environment builder and marker writer',
 });
 
 test('collector is closed after child exit and the exit status is preserved', async (t) => {
+  if (!await requireLoopback(t)) return;
   const projectRoot = await temporaryDirectory(t);
   for (const [outcome, expected] of [[{ code: 0 }, 0], [{ code: 7 }, 7], [{ code: null, signal: 'SIGTERM' }, 143], [{ code: null, signal: 'SIGINT' }, 130]]) {
     const { spawn } = fakeSpawn(outcome);
