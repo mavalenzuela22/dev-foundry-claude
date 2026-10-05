@@ -1,131 +1,84 @@
 # dev-foundry-claude
 
-dev-foundry-claude connects Claude Code to your project's DEV FOUNDRY rules for
-planning, implementation, review and evidence. It prepares project instructions,
-two dedicated Claude subagents and a local governance connection. It also gives
-you a read-only dashboard of local work records and Claude telemetry, and
-launchers for your existing `direct`, `dial` or `codemie` setup.
+## What this gives you
 
-The current adapter package is **1.2.0** (`@dev-foundry/claude-adapter`). You can
-install a received package without cloning this repository or building the UI.
+dev-foundry-claude is an adapter that helps Claude Code follow your repository's
+DEV FOUNDRY rules. DEV FOUNDRY is a framework for organizing software work:
+planning changes, deciding who may carry them out, reviewing results and keeping
+records of what happened.
+
+The adapter sets up Claude project instructions, two specialized Claude agents
+for implementation and review, and a local tool connection to your project's
+rules. It also includes a read-only dashboard for work records and available
+Claude usage data, plus launch commands for your existing Claude provider setup.
+
+The current package is **1.2.0** (`@dev-foundry/claude-adapter`). You can install
+it from a supplied package file without cloning this source repository or building
+the dashboard.
 
 **This README is orientation, not authority.** Your project's approved rules and
-authorizations determine what work may run; installation alone grants none.
+permissions determine which tasks Claude may perform. Installing the adapter
+alone does not give Claude permission to work on a task.
 
-## Prerequisites
+## Quick start
+
+**Already using DEV FOUNDRY 2.1.0?**
+
+- **Yes:** install adapter → plan → apply → activate → dashboard / Claude.
+- **No:** complete DEV FOUNDRY 2.1.0 adoption or migration → return here.
+
+You need:
 
 - Node.js 20 or newer, npm and Git.
-- An immutable adapter tarball and its expected SHA-256 from an authorized
-  artifact handoff: someone authorized to deliver the package must provide both.
-- For the adapter steps, a repository with completed DEV FOUNDRY **2.1.0** adoption
-  and a clean Git working tree. Choose your starting point below if it is not ready.
-- Your project's governed runner/process for framework adoption and the later
-  switch to Claude. A runner is the tool or agent authorized to carry out that
-  project's governed work.
-- For Claude sessions: Claude Code and your existing authentication/provider
-  setup. `dial` needs the `dial` launcher; `codemie` needs `codemie-claude` on
-  `PATH`. The dashboard needs no Claude session or provider credentials.
+- The adapter package file `dev-foundry-claude-adapter-1.2.0.tgz` and its expected
+  SHA-256 checksum from the person authorized to supply it. A checksum lets you
+  check that you received the exact file they intended to send.
+- A Git repository with DEV FOUNDRY **2.1.0** setup complete and active, and a clean
+  working tree. Save or commit your existing changes through your normal workflow
+  before preparing the repository.
+- For starting Claude: Claude Code and your existing login/provider configuration.
+  DIAL users also need `dial`; CodeMie users need `codemie-claude` on `PATH`.
+  The dashboard needs no Claude session or provider credentials.
 
-## Which starting point are you?
+The adapter cannot set up DEV FOUNDRY itself or migrate its version. If your
+repository is not ready, complete DEV FOUNDRY 2.1.0 setup using the project's
+normal DEV FOUNDRY adoption process. Once the repository reports **2.1.0 active**,
+return to **Step 1** below. There is no adapter shell command for that prerequisite.
 
-| Your situation | First action | Then |
-| --- | --- | --- |
-| **Greenfield:** new repository, no DEV FOUNDRY yet | Ask your governed runner to establish the minimum DEV FOUNDRY 2.1.0 governance needed for your first capability. | Follow the adapter walkthrough below. |
-| **Brownfield:** existing repository/product, no DEV FOUNDRY yet | Ask your governed runner to inventory current behavior and adopt DEV FOUNDRY 2.1.0 while preserving the product and its history. | Follow the adapter walkthrough below. |
-| Existing repository already governed by **DEV FOUNDRY 2.1.0** | Confirm framework adoption is complete and current project configuration agrees. | Go directly to the adapter walkthrough. |
-| Existing repository governed by **1.x, 2.0 or another earlier version** | Use your governed runner to review compatibility and explicitly adopt/migrate to 2.1.0. | Follow the adapter walkthrough after reconciliation is complete. |
-| Repository **partway through framework adoption** | Finish the existing adoption under your project's process; resolve incomplete or contradictory configuration. | Follow the adapter walkthrough once 2.1.0 adoption is active. |
-| Existing consumer **pinned to an older adapter release** | Keep using that exact release. There is no supported automatic adapter upgrade command yet. | Arrange a separately governed adapter upgrade; see [reinstall and upgrades](#integrity-reinstall-and-upgrades). Installing 1.2.0 alone does not migrate the pin. |
+## Choose your situation
 
-DEV FOUNDRY 2.1.0 supports greenfield, brownfield and explicit version adoption
-under **OPS-005**, its project adoption and versioning rules. The journey has two
-stages: establish the framework in your repository, then prepare and activate the
-Claude adapter. **The adapter CLI does not bootstrap or migrate the framework.**
+| Your situation | Where to start |
+| --- | --- |
+| New repository, nothing installed yet | Complete DEV FOUNDRY 2.1.0 setup using your project's normal adoption process, then return to Step 1 when 2.1.0 is active. |
+| Existing repository that has never used DEV FOUNDRY | Complete DEV FOUNDRY 2.1.0 adoption using your project's normal process while preserving your product and history, then return to Step 1 when 2.1.0 is active. |
+| Repository already on DEV FOUNDRY 2.1.0 | If setup is complete and active, start at Step 1. |
+| Repository on an older DEV FOUNDRY release | Complete migration to DEV FOUNDRY 2.1.0 using your project's normal adoption process, then return to Step 1 when 2.1.0 is active. |
+| Repository halfway through a DEV FOUNDRY adoption | Finish that adoption using your project's normal process, then return to Step 1 when 2.1.0 is active. |
+| Existing dev-foundry-claude installation on an older adapter package | Start with [reinstall and upgrades](#package-integrity-reinstall-and-upgrades) and keep your current package available, because installing 1.2.0 does not upgrade an already configured repository. |
 
-An adapter **pin** records the exact package build a consumer is configured to
-use, including its version and payload hash. A framework version change and an
-adapter release change are separate journeys.
+## Install dev-foundry-claude
 
-### Stage 1: make the framework ready
+### Step 1: verify and install the supplied package
 
-The following are copy/paste **requests to your governed runner**, not shell
-commands. Replace the repository path and describe your first capability where
-needed. Your runner must use your project's own authorization and review process.
+Ask the package provider for both the `.tgz` file and its expected SHA-256.
+**No public registry or download channel has been selected by this project.**
+There is currently no public install URL.
 
-**Greenfield request:**
-
-```text
-For /absolute/path/to/my-new-repo, establish DEV FOUNDRY 2.1.0 under OPS-005
-as a greenfield adoption. Create only the minimum governance required for
-our first capability: [describe it]. Do not import another project's history
-or evidence. Complete required review/acceptance and report framework readiness
-before we use the Claude adapter CLI.
-```
-
-**Brownfield request:**
-
-```text
-For /absolute/path/to/my-existing-product, adopt DEV FOUNDRY 2.1.0 under
-OPS-005 as a brownfield project. Inventory verified behavior, architecture,
-interfaces, delivery process, governance and dependencies; separate facts
-from assumptions. Preserve current product behavior and historical evidence.
-Reconcile only the governance needed, select an appropriate metadata migration
-policy, and complete required review/acceptance before adapter adoption.
-```
-
-**Earlier framework version request:**
-
-```text
-For /absolute/path/to/my-governed-repo, review and explicitly adopt DEV FOUNDRY
-2.1.0 from the currently recorded version under OPS-005. Assess active authority
-and work, metadata/schema compatibility, role/capability profiles, project
-configuration and platform startup bindings. Preserve historical evidence under
-the version that produced it. Propose bounded reconciliation and any required
-migration/deviation records; apply only with project authorization and complete
-required review/acceptance before adapter adoption.
-```
-
-When ready, your project should have an active **Project Operating Profile**
-(POP), which records repository identity, framework version and role assignments;
-an **Authority Index**, which routes to the project's governing documents; and
-the selected immutable 2.1.0 framework release. Roles and platform startup
-configuration must be consistent. A partial adoption should finish this stage
-rather than start another adoption alongside it.
-
-## Stage 2: install, prepare and activate the adapter
-
-### Worked example: acme-billing
-
-This complete walkthrough uses a fictional existing product at
-`$HOME/Development/acme-billing`. Its team has completed brownfield framework
-adoption to DEV FOUNDRY 2.1.0 using the request above and still uses its current
-runner. Substitute your own repository and received artifact paths. Run the shell
-blocks in the same terminal; requests in `text` blocks go to your governed runner.
-
-### 1. Receive and verify the package
-
-Obtain `dev-foundry-claude-adapter-1.2.0.tgz` and the expected SHA-256 through an
-authorized artifact handoff. **No public registry or download channel has been
-selected by this project.** Someone must deliver the artifact today; there is no
-public install URL to use. You do not need to clone dev-foundry-claude once you
-have the immutable tarball.
-
-Set the received path and paste the handoff's actual 64-character hash:
+Run the following blocks in the same terminal. Replace the package path if needed
+and paste the actual 64-character checksum supplied with it:
 
 ```sh
 ADAPTER_TARBALL="$HOME/Downloads/dev-foundry-claude-adapter-1.2.0.tgz"
-EXPECTED_SHA256='paste-the-SHA-256-from-the-authorized-handoff-here'
+EXPECTED_SHA256='paste-the-SHA-256-from-the-package-provider-here'
 printf '%s  %s\n' "$EXPECTED_SHA256" "$ADAPTER_TARBALL" | shasum -a 256 -c -
 ```
 
-Continue only if verification reports `OK`. If it fails, resolve the discrepancy
-with the artifact provider before installing. A hash calculated only from the
-received file is not a comparison against the handoff.
+Continue only when verification reports `OK`. If it fails, contact the package
+provider to resolve the discrepancy. Calculating a hash from the file alone
+cannot tell you whether it matches the file the provider intended to send.
 
-### 2. Install outside the consumer repository
-
-Use a fresh dedicated prefix for this build. The received tarball includes the
-runtime dependencies and prebuilt dashboard; consumers need no UI build tools.
+Install into a dedicated directory outside your project. Use a fresh directory
+if a different build already occupies this location:
 
 ```sh
 ADAPTER_PREFIX="$HOME/.local/share/dev-foundry/claude-adapter-1.2.0"
@@ -135,177 +88,231 @@ export PATH="$ADAPTER_PREFIX/node_modules/.bin:$PATH"
 dev-foundry-claude --version
 ```
 
-Expected version: `1.2.0`. Persist the prefix and `PATH` settings in the shell or
-environment that launches Claude Code and its local tools. Use a separate fresh
-prefix if a different build already occupies this one. Installation does not
-change the consumer's configuration, authority or adapter pin.
+Expect `1.2.0`. The package includes its runtime dependencies and prebuilt dashboard;
+you need no source checkout or dashboard build tools. Save the `ADAPTER_PREFIX`
+and `PATH` settings in your shell configuration so new terminals and Claude's
+local tools can find the installed command.
 
-### 3. Plan the consumer changes
+## Prepare the repository
 
-From the consumer's Git top-level, create the plan **outside the repository**.
-This prevents the plan file itself from dirtying the repository being checked.
+### Step 2: create and review a plan
+
+Set `PROJECT_ROOT` to your repository's absolute top-level path. The example path
+below is fictional; replace it with yours. Check for uncommitted changes first:
 
 ```sh
-CONSUMER_ROOT="$HOME/Development/acme-billing"
-cd "$CONSUMER_ROOT"
+PROJECT_ROOT="$HOME/Development/acme-billing"
+cd "$PROJECT_ROOT"
 git status --short --untracked-files=all
+```
+
+If Git lists changes, preserve and resolve them through your normal workflow
+before continuing. Keep the plan outside the repository so creating it does not
+add an untracked file to the project:
+
+```sh
 ADOPTION_WORKDIR="$(mktemp -d /tmp/dev-foundry-claude-plan.XXXXXX)"
 ADOPTION_PLAN="$ADOPTION_WORKDIR/adoption-plan.json"
-dev-foundry-claude adopt plan --root "$PWD" --out "$ADOPTION_PLAN"
+dev-foundry-claude adopt plan --root "$PROJECT_ROOT" --out "$ADOPTION_PLAN"
 cat "$ADOPTION_PLAN"
 ```
 
-Before planning, resolve uncommitted work through your normal workflow. The plan
-checks repository identity, active framework selection and authority routing,
-role/startup configuration, existing adapter files and pins, file collisions and
-uncommitted changes on affected paths. It inspects consumer files without changing
-them; `--out` writes only the external plan. It is not a full framework acceptance
-audit and does not complete framework adoption for you.
+This inspects the repository and writes the external plan without changing project
+files. Review the proposed file changes. The printed summary includes `planSha256`,
+the checksum of this exact plan; keep it for Step 3.
 
-The printed result contains `planSha256`, a hash of the exact plan bytes:
-
-| Plan result | Meaning and next action |
+| Plan result | What to do next |
 | --- | --- |
-| `ready` | Adapter changes can be prepared. Review the proposed files/diffs and obtain authorization under your project's process before applying. |
-| `not-governed` | The CLI could not recognize a complete active framework setup. Finish or reconcile Stage 1, then plan again. |
-| `blocked` | A version, identity, configuration or file conflict prevents preparation. Read `blockers` in the plan, resolve them, then create a fresh plan. |
-| `noop` | No adapter-owned file changes are needed. Check activation with `adopt status`; this does not itself mean Claude roles are active. |
+| `ready` | The adapter can prepare the proposed files; have the changes reviewed and approved through your project's normal process, then continue to Step 3. |
+| `not-governed` | The repository's DEV FOUNDRY setup is missing or incomplete; complete DEV FOUNDRY 2.1.0 adoption, then repeat Step 2. |
+| `blocked` | A version, configuration or file conflict prevents preparation; read the plan's `blockers`, resolve each issue, then create and review a fresh plan. |
+| `noop` | No adapter file changes are needed; skip apply, run `dev-foundry-claude adopt status --root "$PROJECT_ROOT"` and check whether activation in Step 4 is still needed. |
 
-The plan also contains a separate `cutover_proposal`: a proposed switch of your
-project's role assignments and platform startup configuration to Claude.
-Review it now, but its application is a later consumer-governed step.
+A successful plan checks adapter prerequisites; it does not replace your project's
+DEV FOUNDRY setup review.
 
-### 4. Apply the reviewed adapter plan
+### Step 3: apply the approved plan
 
-Proceed only with a `ready` plan authorized by your project's process. Paste the
-`planSha256` printed in step 3; do not edit the reviewed plan file.
+Continue with an approved `ready` plan. Paste the `planSha256` printed in Step 2
+and leave the reviewed plan file unchanged:
 
 ```sh
 PLAN_SHA256='paste-the-printed-planSha256-here'
-dev-foundry-claude adopt apply --root "$PWD" --plan "$ADOPTION_PLAN" --plan-sha256 "$PLAN_SHA256"
-dev-foundry-claude adopt status --root "$PWD"
+dev-foundry-claude adopt apply --root "$PROJECT_ROOT" --plan "$ADOPTION_PLAN" --plan-sha256 "$PLAN_SHA256"
+dev-foundry-claude adopt status --root "$PROJECT_ROOT"
 ```
 
-`apply` verifies the plan hash, installed package identity and current repository
-preconditions. If they changed, create and review a new plan. It writes the two
-subagent definitions, an adapter-owned block in `CLAUDE.md`, the local governance
-entry in `.mcp.json` and telemetry Git-ignore rules when needed.
+Apply checks that the plan, installed package and repository still match. If they
+have changed, create and review a new plan. It sets up the two Claude agents,
+project instructions in `CLAUDE.md`, the local tool connection in `.mcp.json`
+and Git-ignore rules for local usage records when needed.
 
-For this first adoption, expect `"overall": "prepared"` from `status`.
-**Apply intentionally does not change consumer authority**: it leaves your
-Authority Index, POP role bindings, existing platform startup configuration and
-framework release untouched. The `cutover_proposal` stays in the external plan;
-apply does not execute it. Status derives activation from current consumer
-authority, not from the presence of the generated files.
+For a first-time setup, expect `"overall": "prepared"`. This means the adapter
+files are ready, but the project has not yet switched its work responsibilities
+to Claude. You can open the read-only dashboard at this point. To use Claude for
+project tasks, complete activation next.
 
-**You can use the dashboard in prepared state because it is read-only. Governed
-Claude role execution requires an active consumer cutover.** A Claude launcher
-may start before cutover, but governed role resolution will return
-`BINDING_INACTIVE`.
+## Activate Claude
 
-### 5. Review and activate under the consumer's governance
+### Step 4: have the project review and apply the activation proposal
 
-Give your current governed runner the actual plan path printed by
-`printf '%s\n' "$ADOPTION_PLAN"`. The following is a **runner request, not a
-shell command**:
+Activation switches the project's planning, implementation, review, validation
+and record-keeping responsibilities to Claude. Installing and applying adapter
+files does not make that switch.
 
-```text
-For acme-billing at [absolute consumer path], review cutover_proposal in
-[absolute adoption-plan.json path] under this consumer's own governance.
-Verify its base hashes, close or hand off work tied to the current runner,
-and review the proposed profiles and authority changes. Obtain required
-authorization and review before applying the proposal atomically across all
-five role bindings, the Authority Index and platform startup configuration.
-Preserve historical evidence and verify activation after the approved cutover.
-```
+The plan includes a separate activation proposal. That proposal must be reviewed
+and applied by the project process that currently manages DEV FOUNDRY for this
+repository. The adapter does not apply it automatically.
 
-The switch covers authoring, implementation, independent audit, mechanical
-validation and evidence custody together. It retires the previous active runner
-startup binding for this repository. The proposal includes a warning that it has
-not been verified against the mature runner; your consumer review must establish
-compatibility. Handle generated file review/commits through the same project
-process. Do not apply just part of the authority switch.
-
-After the consumer process completes the cutover:
+Give that process the plan's location:
 
 ```sh
-dev-foundry-claude adopt status --root "$PWD"
+printf '%s\n' "$ADOPTION_PLAN"
 ```
 
-Expect `"overall": "active"`, all five roles reported as `claude-active`, and
-`bootstrap.claudeActive` set to `true`. `partial` means role/startup configuration
-is incomplete or mixed; return to your consumer's governed process to reconcile
-it before governed Claude work. Active bindings still require authorization for
-each task under your project's rules.
+The project must review the proposal's compatibility, finish or hand off existing
+work as needed, and approve and apply the complete switch together. Keep the plan
+available until this review and activation are finished.
 
-### 6. Open the dashboard
+Then check again:
 
-This command works after preparation as well as after activation:
+```sh
+dev-foundry-claude adopt status --root "$PROJECT_ROOT"
+```
+
+Expect `"overall": "active"` with all five roles shown as `claude-active`.
+`prepared` means the switch has not happened; `partial` means the configuration
+is incomplete or mixed. Return to the project's setup process to finish or
+resolve it before assigning Claude project work. Each task still needs whatever
+approval your project normally requires.
+
+## Open the dashboard
+
+### Step 5: view local work records
+
+Run this after preparation or activation:
+
+```sh
+dev-foundry-claude dashboard --port 43127 --root "$PROJECT_ROOT"
+```
+
+Open **http://127.0.0.1:43127**. Expect work execution, validation and transaction
+records, plus available Claude usage measurements from this repository. Empty or
+unavailable data is normal when the project has not produced those records.
+
+The dashboard is read-only and accessible only on this computer. It does not
+start Claude, collect new usage data or approve work. Stop it with Ctrl-C. When
+running inside your repository, you can omit `--root`:
 
 ```sh
 dev-foundry-claude dashboard --port 43127
 ```
 
-Open **http://127.0.0.1:43127**. It displays this consumer's execution, validation,
-transaction and available Claude telemetry records. Empty or unavailable evidence
-is expected when the project has not produced those records. It does not start
-Claude, collect new telemetry or authorize work. Ctrl-C stops the server.
+## Start Claude
 
-From another directory, select the consumer explicitly:
+### Step 6: launch with your existing provider setup
 
-```sh
-dev-foundry-claude dashboard --port 43127 --root "$CONSUMER_ROOT"
-```
-
-### 7. Start Claude using your existing provider setup
-
-After activation, run from the consumer repository or one of its subdirectories.
-Choose one mode:
+After activation, open another terminal with the adapter on `PATH`, enter your
+repository and choose one launch mode:
 
 ```sh
-# Installed Claude Code directly:
+cd "$HOME/Development/acme-billing"  # Replace with your repository path.
+
+# Claude Code directly:
 dev-foundry-claude run direct --
 
-# Existing DIAL launcher:
+# Your existing DIAL launcher:
 dev-foundry-claude run dial --
 
-# Existing CodeMie launcher:
+# Your existing CodeMie launcher:
 dev-foundry-claude run codemie --
 ```
 
-Any Claude arguments go after `--` and are passed through unchanged. The adapter
-checks the installed package against the consumer's pin, starts a local telemetry
-collector and launches `claude`, `dial` or `codemie-claude` with interactive input
-and output. Authentication, model choice and provider routing use your existing
-setup. Sanitized records go to the ignored `.dev-foundry/telemetry/local/` directory.
+Put additional Claude arguments after `--`. Expect an interactive Claude session
+using your existing login, model and provider configuration. The adapter checks
+that the installed package matches this repository's configuration and starts a
+local usage-data collector for the session.
 
-**MCP** (Model Context Protocol) is the local tool connection Claude uses to resolve
-your project's governing rules. Adoption adds the project-scoped
-`dev-foundry-governance` server entry in `.mcp.json`. Open the correct consumer
-workspace, review and approve its workspace trust/MCP prompts when the Claude host
-asks, and restart the session after configuration changes so it reloads the entry.
-The launching environment must have the adapter on `PATH`; the Claude host must
-provide `CLAUDE_PROJECT_DIR` pointing to this consumer.
+Open the correct project workspace and review the workspace trust and local tool
+connection prompts when Claude asks. Restart Claude after configuration changes
+so it reloads the connection. Before assigning work, confirm that Claude has
+loaded the project instructions and connected the project tools. Trust approval
+does not replace activation or task approval. Connection details are in the
+[advanced reference](#mcp-launch-entry).
 
-Before governed work, confirm project instructions are loaded and the governance
-MCP is connected with `resolve_governed_operation` available. Trust and MCP
-approval allow the local connection; they do not replace consumer cutover or task
-authorization. The adapter does not silently grant trust or pre-approve MCP.
+### Worked example: acme-billing
 
-## If you see this, do this
+The team keeps an existing product at `$HOME/Development/acme-billing`. It first
+completes DEV FOUNDRY 2.1.0 adoption while preserving its product and history.
+Then it follows Step 1 with the supplied package and checksum, uses that project
+path in Step 2, reviews the plan and applies it in Step 3.
 
-| Symptom | Action |
-| --- | --- |
-| `not-governed` | Confirm `--root` is the consumer Git top-level. Ask your governed runner to complete/reconcile active framework adoption, including the POP, Authority Index and selected release. Recreate the plan. |
-| `unsupported-framework` | Have your runner explicitly adopt DEV FOUNDRY 2.1.0, or reconcile contradictory recorded versions through the consumer's process. The adapter does not migrate the framework. |
-| `dirty-working-tree` | Preserve the work. Review and commit or otherwise resolve affected changes through your normal workflow; keep the plan outside the repository, then create/review a fresh plan. |
-| `adapter-runtime-mismatch` or `Adapter runtime verification failed.` | Check that `PATH` selects the exact build pinned by this consumer. Restore that immutable tarball into a fresh prefix if necessary. A different 1.2.0 build can also mismatch. Do not edit the pin to bypass verification; an older adapter consumer needs a governed upgrade. |
-| `BINDING_INACTIVE` | Run `adopt status`. In `prepared`, complete the reviewed consumer cutover; in `partial`, reconcile mixed role/startup authority through the consumer process. Installing or approving MCP cannot activate bindings. |
-| Dashboard requires a consumer Git repository or project operating profile | Run inside the intended consumer or pass `--root /absolute/path/to/consumer`. Complete framework adoption and adapter preparation. Never select the package prefix as the evidence root. |
-| Requested dashboard port is occupied | Choose another explicit port, for example `dev-foundry-claude dashboard --port 43128`, then open `http://127.0.0.1:43128`. There is no automatic fallback port. |
-| Dashboard command prints usage | Supply exactly one `--port` in 1024–65535 and, optionally, one `--root`. Unknown, duplicate or malformed arguments are rejected. |
+Status reads `prepared`; the dashboard can now open. The team has its existing
+project process review and apply the separate activation proposal. When status
+reads `active`, it starts `dev-foundry-claude run direct --` from acme-billing.
 
-## Technical reference
+## Troubleshooting
+
+Start with the next action below. The final column explains the technical cause;
+configuration terms are defined in the advanced reference.
+
+| Message or symptom | Next action | Technical explanation |
+| --- | --- | --- |
+| `not-governed` | Point `--root` at your project's Git top-level, complete or repair DEV FOUNDRY 2.1.0 setup, then create a fresh plan. | The CLI cannot recognize the required active project configuration and selected framework release. |
+| `unsupported-framework` | Complete migration to DEV FOUNDRY 2.1.0 through your project's normal adoption process; if it is already active, have that process reconcile conflicting version records. | The recorded framework versions are unsupported or disagree; the adapter cannot migrate them. |
+| `dirty-working-tree` | Preserve and resolve affected uncommitted work through your normal workflow, keep the plan outside the repository, then create and review a fresh plan. | Changes on paths checked by adoption prevent applying a stable plan. |
+| `adapter-runtime-mismatch` or `Adapter runtime verification failed.` | Make sure `PATH` selects the exact package build configured for this repository; reinstall that same supplied tarball into a fresh directory if necessary. For an older installation, follow the upgrade limitation below. | The installed files differ from the version and checksum recorded in the project; even two builds labeled 1.2.0 may differ. Do not change the recorded checksum to bypass verification. |
+| `BINDING_INACTIVE` | Run `adopt status`; finish activation if it says `prepared`, or have the project process resolve incomplete configuration if it says `partial`. | The project has not fully assigned its DEV FOUNDRY responsibilities to Claude; installing files or approving the tool connection cannot activate those assignments. |
+| Dashboard requires a Git repository or project operating profile | Run inside your intended project or pass `--root /absolute/path/to/project`, then complete DEV FOUNDRY setup and adapter preparation if needed. | The dashboard needs the project's Git root and valid profile. The package installation directory is not a project-data root. |
+| Requested dashboard port is occupied | Use another port, such as `dev-foundry-claude dashboard --port 43128 --root "$PROJECT_ROOT"`, and open `http://127.0.0.1:43128`. | The server does not automatically choose a fallback port. |
+| Dashboard command prints usage | Supply one `--port` between 1024 and 65535 and, optionally, one `--root`. | Unknown, duplicate or malformed dashboard arguments are rejected. |
+
+## Advanced / technical reference
+
+### Terms and project authority
+
+These terms describe the configuration behind the steps above:
+
+- **Runner / project process:** the tool, agent or workflow your project has
+  authorized to manage DEV FOUNDRY work, including adoption and activation.
+- **Project Operating Profile (POP):** the repository's configuration record for
+  its identity, active framework version and who performs each role; normally
+  `.dev-foundry/profiles/project-operating-profile.yaml`.
+- **Authority Index:** the map to the project's approved rules and configuration;
+  normally `.dev-foundry/authority-index.yaml`.
+- **Binding:** a recorded assignment of a role to a particular implementation.
+- **Source of truth (SoT):** the approved documents and configuration that decide
+  project behavior. This README helps you navigate; it does not replace them.
+- **Governed operation:** work performed under those rules, with the required
+  authorization, review and evidence.
+- **Adapter pin:** the exact package version and payload-manifest hash recorded
+  in the repository's local tool configuration. Version alone cannot identify
+  a package build.
+- **Activation / cutover:** the approved switch to Claude for all five role
+  bindings and platform startup configuration. The external plan calls its
+  activation proposal `cutover_proposal`.
+
+Framework adoption and version migration follow DEV FOUNDRY **OPS-005** through
+that project's process. Adapter installation does not perform framework adoption,
+accept it on the project's behalf or grant implementation authorization.
+
+`adopt plan` inspects identity, active framework selection, Authority Index routes,
+role/startup configuration, adapter files and pins, collisions and changes on
+checked paths. `adopt apply` writes only adapter preparation files. It leaves the
+Authority Index, POP bindings, existing startup configuration and framework
+release untouched; it never executes `cutover_proposal`.
+
+Activation requires current proposal base hashes and closure or handoff of work
+tied to the previous runner. The proposal retires the previous active startup
+binding and switches authoring, implementation, independent audit, mechanical
+validation and evidence custody together. It warns that mature-runner
+compatibility has not been verified; project review must establish it before
+applying the complete proposal.
+
+`adopt status` derives activation from project authority, not generated adapter
+files. Fully active status has all five roles `claude-active` and
+`bootstrap.claudeActive: true`. A launcher can start before activation, but the
+project's governed role resolution will return `BINDING_INACTIVE`.
 
 ### Producer, package and consumer
 
@@ -319,7 +326,7 @@ Producer authority is routed through `.dev-foundry/authority-index.yaml` and the
 project source of truth in `docs/`. Each consumer retains its own authority.
 README, templates, runtime records and installation do not authorize governed work.
 
-### Create a package in the producer
+### Producer npm pack workflow
 
 These commands are for maintainers with a producer checkout, not consumers with
 a received tarball. Vite 7 requires Node 20.19+ or 22.12+ (or a later supported
@@ -371,6 +378,14 @@ excluded. Root runtime dependency bundles remain part of the offline installatio
 and integrity model; the producer's development dependency tree is not distributed.
 
 ### MCP launch entry
+
+**MCP** (Model Context Protocol) is the local tool connection Claude uses to
+resolve the project's governing rules. The Claude host must provide
+`CLAUDE_PROJECT_DIR` pointing to the consumer repository, and its launching
+environment must have the adapter on `PATH`. Review the host's workspace
+trust/MCP prompts and confirm the `dev-foundry-governance` connection offers
+`resolve_governed_operation` before governed work. The adapter does not grant
+workspace trust or pre-approve MCP connections.
 
 The adoption plan renders this consumer `.mcp.json` entry:
 
@@ -438,7 +453,7 @@ The producer convenience command `node scripts/dashboard.mjs --port 43127` remai
 available after a producer UI build, using that checkout's evidence and the same
 server implementation.
 
-### Integrity, reinstall and upgrades
+### Package integrity, reinstall and upgrades
 
 The adapter **pin** binds the package version and SHA-256 of canonical manifest
 bytes. Every shipped regular file, including compiled dashboard assets, templates,
