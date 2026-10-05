@@ -147,6 +147,95 @@ implementation; independent audit is required only when triggered. Where a stage
 applies, completing the previous stage does not automatically complete or
 authorize it.
 
+## The Ponytail philosophy: do the smallest safe complete thing
+
+**Ponytail** is the human/project shorthand we use to explain the discipline
+already defined in DEV FOUNDRY 2.1.0's **OPS-007, “Minimal Sufficient Change and
+Sufficiency Review.”** The canonical release does not define the word
+“Ponytail.” This name adds no normative rule and does not replace OPS-007 or
+change the immutable 2.1.0 release.
+
+Ponytail does not mean “do less at all costs.” It means implement the **smallest
+safe complete change** that fully satisfies the governed intent: the approved
+outcome and its limits. **Safe** means preserving required safety, security,
+integrity and compatibility. **Complete** means meeting the whole authorized
+outcome, including required validation, evidence and acceptance. Those two words
+are as important as **smallest**. Cutting a required check or leaving part of
+the outcome unfinished is not Ponytail.
+
+### Reuse before creating
+
+Before adding anything, ask in this order, with investigation proportional to
+the change:
+
+1. Can **no change** satisfy the outcome?
+2. Can we **reuse existing authority or behavior**?
+3. Can we **compose existing pieces**?
+4. Can the **standard platform capability** solve it?
+5. Can an **already-approved dependency** solve it?
+6. Can **one bounded local change** solve it?
+7. Only then, is a **new abstraction, dependency, component, document or
+   lifecycle concept** necessary?
+
+Moving past an earlier option needs a concrete reason. A current requirement,
+risk or observed evidence must justify the addition. Without that justification,
+Ponytail rejects speculative abstractions, generic infrastructure, broad
+repository archaeology (exploring unrelated files and history), unrelated
+cleanup, premature extensibility, unnecessary documents, arbitrary test
+expansion, repeated proof that is still valid, and future capability implemented
+“just in case.”
+
+Valid proof can be reused only while it still applies to the state and boundary
+being checked. Repeat or broaden it when the change could invalidate it, a new
+risk requires it, or applicable authority requires fresh evidence. Minimality
+never excuses skipping required validation or audit.
+
+### Apply it to the whole work, not just the code
+
+Ponytail applies to documentation, prompts and execution packs, authority
+retrieval and model context, the number of steps, validation depth, audits,
+artifacts, dependencies and architecture. Ask what each addition contributes to
+the current authorized outcome. Use enough context, steps and proof to preserve
+the required boundaries; do not add them merely to make the process look bigger.
+
+For AI-assisted work, this discipline aims to give the model less irrelevant
+context and leave fewer ambiguous decisions to the executor. It reduces the need
+to spend tokens rediscovering decisions or exploring unrelated surfaces, favors
+shorter and more deterministic execution paths, and leaves less opportunity for
+scope creep. A small, explicit delta is also easier to review. These are reasons
+for the discipline, not guarantees of token savings or correctness.
+
+### Give the executor a resolved, bounded change
+
+The executor implements an already-resolved change with clear limits. Resolve
+ambiguous product decisions before implementation. When the relevant authority
+can be compressed into focused instructions and direct references, do not send
+the executor to “figure out the whole system.” A summary helps it find and apply
+authority; it does not replace that authority.
+
+Focused checks may uncover a regression or consistency fix directly caused by
+the change. The executor may handle it only when it is necessary for the approved
+outcome, remains inside the already-authorized capability, is the smallest
+sufficient correction, and needs no new decision. It must introduce no new
+capability, public behavior or dependency, cross no hard exclusion or protected
+surface, and have observable evidence of the affected relationship. If it needs
+new authority or a new decision, stop and return it for governance resolution.
+
+### Tiny example: invoice CSV export
+
+| Approach | What the change does |
+| --- | --- |
+| **Bad: build for imagined future needs** | Create a generic reporting framework, plugin architecture, abstraction layers and future export formats for a request that only needs invoice CSV. |
+| **Ponytail** | Reuse the existing invoice query and authorization rules. Add only the CSV behavior and contract required now, test the affected boundary, and record what observed requirement or evidence would justify evolution later. |
+
+For example, record that scheduled exports remain outside this change and that
+an observed, approved need for scheduling would justify reconsidering the design.
+Record the trigger without implementing scheduling now.
+
+In everyday language: **Don't build more than the current governed problem
+needs, but don't cut required safety or proof either. Reuse before creating,
+keep execution bounded, and evolve later when evidence justifies it.**
+
 ## 4. What are all these files?
 
 ### Ten document types, ten responsibilities
@@ -727,6 +816,16 @@ it after adapter preparation without provider credentials or an active Claude
 session. Viewing a record does not advance its lifecycle.
 
 ## 11. Advanced technical reference
+
+### Ponytail and canonical authority
+
+The canonical DEV FOUNDRY 2.1.0 authority for the philosophy explained above is
+[OPS-007 — Minimal Sufficient Change and Sufficiency Review](<.dev-foundry/releases/2.1.0/docs/30-operations/30 [OPS-007] DF - Minimal Sufficient Change and Sufficiency Review.md>).
+“Ponytail” is orientation shorthand in this README/project, not terminology
+defined by the canonical release, a new canonical artifact or a new rule. Read
+OPS-007 for the governing necessity, reuse, implementation, validation, audit and
+evidence-triggered evolution discipline. This README does not amend the immutable
+2.1.0 release.
 
 ### Project configuration and authority routing
 
