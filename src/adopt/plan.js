@@ -30,7 +30,8 @@ function blockSpan(content) {
   if (start < 0) return null;
   const endMarker = content.indexOf(BLOCK_END, start);
   if (endMarker < 0) return { start, end: -1 };
-  return { start, end: endMarker + BLOCK_END.length + (content[endMarker + BLOCK_END.length] === '\n' ? 1 : 0) };
+  const end = endMarker + BLOCK_END.length;
+  return { start, end: end + (content.startsWith('\r\n', end) ? 2 : content[end] === '\n' ? 1 : 0) };
 }
 
 async function actorProfileId(root, profilePath) {

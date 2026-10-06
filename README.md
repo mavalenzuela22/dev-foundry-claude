@@ -1,7 +1,7 @@
 # dev-foundry-claude
 
 A user guide to **DEV FOUNDRY 2.1.0**, followed by instructions for its
-**Claude Code adapter 1.2.2** (`@dev-foundry/claude-adapter`).
+**Claude Code adapter 1.2.3** (`@dev-foundry/claude-adapter`).
 
 If you know Git and normal software development but are new to structured AI
 work, start here. You do not need to choose between Claude, Codex, Cursor or a
@@ -535,7 +535,7 @@ are not active role assignments.
 You need:
 
 - Node.js 20 or newer, npm and Git.
-- The adapter package file `dev-foundry-claude-adapter-1.2.2.tgz` and its expected
+- The adapter package file `dev-foundry-claude-adapter-1.2.3.tgz` and its expected
   SHA-256 checksum from the person authorized to supply it. A checksum lets you
   check that you received the exact file they intended to send.
 - A Git repository with DEV FOUNDRY **2.1.0** setup complete and active, and a clean
@@ -559,7 +559,7 @@ Once the project has established **2.1.0 active**, return to **Step 1** below. T
 | Repository already on DEV FOUNDRY 2.1.0 | If setup is complete and active, start at Step 1. |
 | Repository on an older DEV FOUNDRY release | Review and complete [version adoption or migration](#an-existing-dev-foundry-project-version-adoption-or-migration) to 2.1.0, then return to Step 1. |
 | Repository halfway through a DEV FOUNDRY adoption | Reconcile the unfinished configuration and required decisions described in [project adoption](#7-how-a-project-adopts-dev-foundry); return when 2.1.0 is active. |
-| Existing dev-foundry-claude installation on an older adapter package | Start with [reinstall and upgrades](#package-integrity-reinstall-and-upgrades) and keep your current package available, because installing 1.2.2 does not upgrade an already configured repository. |
+| Existing dev-foundry-claude installation on an older adapter package | Start with [reinstall and upgrades](#package-integrity-reinstall-and-upgrades) and keep your current package available, because installing 1.2.3 does not upgrade an already configured repository. |
 
 ### Install dev-foundry-claude
 
@@ -575,7 +575,7 @@ Run the following blocks in the same terminal. Replace the package path if neede
 and paste the actual 64-character checksum supplied with it:
 
 ```sh
-ADAPTER_TARBALL="$HOME/Downloads/dev-foundry-claude-adapter-1.2.2.tgz"
+ADAPTER_TARBALL="$HOME/Downloads/dev-foundry-claude-adapter-1.2.3.tgz"
 EXPECTED_SHA256='paste-the-SHA-256-from-the-package-provider-here'
 printf '%s  %s\n' "$EXPECTED_SHA256" "$ADAPTER_TARBALL" | shasum -a 256 -c -
 ```
@@ -588,14 +588,14 @@ Install into a dedicated directory outside your project. Use a fresh directory
 if a different build already occupies this location:
 
 ```sh
-ADAPTER_PREFIX="$HOME/.local/share/dev-foundry/claude-adapter-1.2.2"
+ADAPTER_PREFIX="$HOME/.local/share/dev-foundry/claude-adapter-1.2.3"
 mkdir -p "$ADAPTER_PREFIX"
 npm install --prefix "$ADAPTER_PREFIX" --offline --ignore-scripts --no-audit --no-fund "$ADAPTER_TARBALL"
 export PATH="$ADAPTER_PREFIX/node_modules/.bin:$PATH"
 dev-foundry-claude --version
 ```
 
-Expect `1.2.2`. The package includes its runtime dependencies and prebuilt dashboard;
+Expect `1.2.3`. The package includes its runtime dependencies and prebuilt dashboard;
 you need no source checkout or dashboard build tools. Save the `ADAPTER_PREFIX`
 and `PATH` settings in your shell configuration so new terminals and Claude's
 local tools can find the installed command.
@@ -773,7 +773,7 @@ the concepts are introduced above and configuration fields are in the advanced r
 | `not-governed` | Point `--root` at your project's Git top-level, complete or repair DEV FOUNDRY 2.1.0 setup, then create a fresh plan. | The CLI cannot recognize the required active project configuration and selected framework release. |
 | `unsupported-framework` | Review [version adoption or migration](#an-existing-dev-foundry-project-version-adoption-or-migration) and complete the prerequisite; if 2.1.0 is already active, have the Governance Author reconcile conflicting version records. | The recorded framework versions are unsupported or disagree; the adapter cannot migrate them. |
 | `dirty-working-tree` | Preserve and resolve affected uncommitted work through your normal workflow, keep the plan outside the repository, then create and review a fresh plan. | Changes on paths checked by adoption prevent applying a stable plan. |
-| `adapter-runtime-mismatch` or `Adapter runtime verification failed.` | Make sure `PATH` selects the exact package build configured for this repository; reinstall that same supplied tarball into a fresh directory if necessary. For an older installation, follow the upgrade limitation below. | The installed files differ from the version and checksum recorded in the project; even two builds labeled 1.2.2 may differ. Do not change the recorded checksum to bypass verification. |
+| `adapter-runtime-mismatch` or `Adapter runtime verification failed.` | Make sure `PATH` selects the exact package build configured for this repository; reinstall that same supplied tarball into a fresh directory if necessary. For an older installation, follow the upgrade limitation below. | The installed files differ from the version and checksum recorded in the project; even two builds labeled 1.2.3 may differ. Do not change the recorded checksum to bypass verification. |
 | `BINDING_INACTIVE` | Run `adopt status`; finish activation if it says `prepared`, or have the project process resolve incomplete configuration if it says `partial`. | The project has not fully assigned its DEV FOUNDRY responsibilities to Claude; installing files or approving the tool connection cannot activate those assignments. |
 | Dashboard requires a Git repository or project operating profile | Run inside your intended project or pass `--root /absolute/path/to/project`, then complete DEV FOUNDRY setup and adapter preparation if needed. | The dashboard needs the project's Git root and valid profile. The package installation directory is not a project-data root. |
 | Requested dashboard port is occupied | Use another port, such as `dev-foundry-claude dashboard --port 43128 --root "$PROJECT_ROOT"`, and open `http://127.0.0.1:43128`. | The server does not automatically choose a fallback port. |
@@ -924,19 +924,21 @@ npm pack --pack-destination /absolute/path/to/artifacts
 The artifact directory must already exist. `prepack` always rebuilds the UI from
 `tools/dashboard`, then generates `payload-manifest.json` from npm's actual file
 list and verifies bundled runtime dependency versions against the root lockfile.
-The tarball is `dev-foundry-claude-adapter-1.2.2.tgz`. Its SHA-256 identifies that
+The tarball is `dev-foundry-claude-adapter-1.2.3.tgz`. Its SHA-256 identifies that
 concrete archive; tarballs built on different operating systems are not guaranteed
 to be byte-identical. The SHA-256 of `payload-manifest.json` identifies the installed
 runtime payload. The launcher is packaged with canonical LF line endings so
 supported npm installers do not rewrite a manifest-listed executable byte.
+Managed-block replanning is idempotent with both Windows CRLF and LF line endings;
+content edits inside the block still fail closed.
 There is no consumer install/build lifecycle script.
 
 Check the tarball/manifest relationship and record its identity for the governed
 artifact handoff:
 
 ```sh
-node scripts/package/payload-manifest.mjs --check /absolute/path/to/artifacts/dev-foundry-claude-adapter-1.2.2.tgz
-shasum -a 256 /absolute/path/to/artifacts/dev-foundry-claude-adapter-1.2.2.tgz
+node scripts/package/payload-manifest.mjs --check /absolute/path/to/artifacts/dev-foundry-claude-adapter-1.2.3.tgz
+shasum -a 256 /absolute/path/to/artifacts/dev-foundry-claude-adapter-1.2.3.tgz
 node --input-type=module -e 'import fs from "node:fs"; import crypto from "node:crypto"; const b=fs.readFileSync("payload-manifest.json"); console.log(JSON.parse(b).version+":sha256:"+crypto.createHash("sha256").update(b).digest("hex"));'
 ```
 

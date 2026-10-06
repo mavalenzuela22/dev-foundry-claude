@@ -3,13 +3,14 @@ import { cp, mkdtemp, readFile, rm, symlink, writeFile, chmod } from 'node:fs/pr
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { pathToFileURL } from 'node:url';
 import { parseDocument } from 'yaml';
 import { evaluateActivation } from '../../src/adopt/activation.js';
 import { applyPlan } from '../../src/adopt/apply.js';
 import { BOOTSTRAP_PATH, PROFILE_PATHS } from '../../src/adopt/common.js';
 import { createPlan } from '../../src/adopt/plan.js';
 import { createRemovePlan } from '../../src/adopt/remove.js';
-import { adapterIdentity, applyProposal, diffTrees, listTree, makeConsumer, readSetSnapshot, treeHash } from './fixture.js';
+import { adapterIdentity, applyProposal, diffTrees, listTree, makeConsumer, readSetSnapshot, repoRoot, treeHash } from './fixture.js';
 
 const POP = '.dev-foundry/profiles/project-operating-profile.yaml';
 const plan = (consumer, extra = {}) => createPlan({ root: consumer.root, adapter: adapterIdentity, ...extra });
@@ -23,6 +24,78 @@ async function editPop(consumer, mutate) {
   mutate(document);
   await consumer.put(POP, document.toString({ lineWidth: 0 }));
   consumer.commit();
+}
+
+async function withRenderedLineEnding(t, lineEnding) {
+  // Model installed template bytes on each platform without changing producer templates.
+  const root = await mkdtemp(path.join(os.tmpdir(), 'adopt-line-ending-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  for (const relative of ['src/adopt', 'templates', 'node_modules/yaml']) {
+    await cp(path.join(repoRoot, relative), path.join(root, relative), { recursive: true });
+  }
+  await writeFile(path.join(root, 'package.json'), '{"type":"module"}\n');
+  const template = path.join(root, 'templates/claude-md-block.md.tmpl');
+  await writeFile(template, (await readFile(template, 'utf8')).replace(/\r?\n/g, lineEnding));
+  const planner = await import(pathToFileURL(path.join(root, 'src/adopt/plan.js')).href);
+  const applier = await import(pathToFileURL(path.join(root, 'src/adopt/apply.js')).href);
+  return { ...planner, ...applier };
+}
+
+for (const [name, lineEnding] of [['LF', '\n'], ['CRLF', '\r\n']]) {
+  test(`${name} managed block apply -> commit -> replan is noop and preserves outside bytes`, async (t) => {
+    const consumer = await withConsumer(t);
+    const runtime = await withRenderedLineEnding(t, lineEnding);
+    const original = '# Acme billing\r\n\r\nKeep invoices immutable.\n';
+    await consumer.put('CLAUDE.md', original);
+    consumer.commit();
+    const first = await runtime.createPlan({ root: consumer.root, adapter: adapterIdentity });
+    assert.equal(first.plan.status, 'ready');
+    await runtime.applyPlan({ planBytes: first.bytes, planSha256: first.hash, adapter: adapterIdentity, root: consumer.root });
+    const applied = await consumer.read('CLAUDE.md');
+    assert.ok(applied.startsWith(original));
+    assert.ok(applied.endsWith(`<!-- DEV-FOUNDRY-CLAUDE-ADAPTER:END -->${lineEnding}`));
+    assert.ok(applied.includes(`${lineEnding}## DEV FOUNDRY Claude adapter${lineEnding}`));
+    consumer.commit();
+    const unchanged = await runtime.createPlan({ root: consumer.root, adapter: adapterIdentity });
+    assert.equal(unchanged.plan.status, 'noop');
+    assert.deepEqual(unchanged.plan.blockers, []);
+    // An extra line ending after the block belongs to the untouched consumer surface.
+    await consumer.put('CLAUDE.md', `${applied}\r\n# Consumer notes\n`);
+    consumer.commit();
+    const before = await treeHash(consumer.root);
+    const again = await runtime.createPlan({ root: consumer.root, adapter: adapterIdentity });
+    assert.equal(again.plan.status, 'noop');
+    assert.deepEqual(again.plan.blockers, []);
+    assert.equal(again.plan.create.length + again.plan.merge.length + again.plan.delete.length, 0);
+    assert.deepEqual(again.ops, { writes: [], deletes: [] });
+    assert.ok(again.plan.noop.includes('CLAUDE.md'));
+    assert.equal(again.plan.activation.overall, 'prepared');
+    assert.ok(again.plan.cutover_proposal);
+    assert.equal(await treeHash(consumer.root), before);
+  });
+
+  test(`${name} managed block content edits fail closed for adoption and removal`, async (t) => {
+    const consumer = await withConsumer(t);
+    const runtime = await withRenderedLineEnding(t, lineEnding);
+    const first = await runtime.createPlan({ root: consumer.root, adapter: adapterIdentity });
+    assert.equal(first.plan.status, 'ready');
+    await runtime.applyPlan({ planBytes: first.bytes, planSha256: first.hash, adapter: adapterIdentity, root: consumer.root });
+    const applied = await consumer.read('CLAUDE.md');
+    const modified = applied.replace('## DEV FOUNDRY Claude adapter', '## DEV FOUNDRY edited adapter');
+    assert.notEqual(modified, applied);
+    await consumer.put('CLAUDE.md', modified);
+    consumer.commit();
+    const before = await treeHash(consumer.root);
+    for (const [remove, code] of [[false, 'managed-block-modified'], [true, 'artifact-modified']]) {
+      const result = await runtime.createPlan({ root: consumer.root, adapter: adapterIdentity, remove });
+      assert.equal(result.plan.status, 'blocked');
+      assert.ok(result.plan.blockers.some((item) => item.code === code), JSON.stringify(result.plan.blockers));
+      assert.deepEqual(result.ops, { writes: [], deletes: [] });
+      assert.equal(result.plan.cutover_proposal, null);
+      assert.equal(await treeHash(consumer.root), before);
+      await assert.rejects(runtime.applyPlan({ planBytes: result.bytes, planSha256: result.hash, adapter: adapterIdentity, root: consumer.root }), { code: 'plan-not-ready' });
+    }
+  });
 }
 
 test('1 plan is non-mutating, deterministic, host-path free, and its proposal applies cleanly to a copy', async (t) => {
