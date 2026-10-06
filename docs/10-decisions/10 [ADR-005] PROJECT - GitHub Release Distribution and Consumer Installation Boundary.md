@@ -32,7 +32,6 @@ authority:
   governedBy:
     - ADR-003
     - ADR-004
-    - SPC-005
     - OPS-007
     - OPS-008
   supersedes: []
