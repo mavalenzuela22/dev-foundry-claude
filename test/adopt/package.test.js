@@ -94,6 +94,35 @@ function baseline() {
   return baselinePromise;
 }
 
+test('TSK-018 the source launcher has a canonical LF shebang and Git pins its line endings', async () => {
+  const launcher = await readFile(path.join(repoRoot, 'bin/dev-foundry-claude.js'));
+  const shebang = launcher.subarray(0, launcher.indexOf(0x0a) + 1);
+  assert.deepEqual(shebang, Buffer.from('#!/usr/bin/env node\n'));
+  assert.equal(shebang.includes(0x0d), false, 'no CR byte terminates the shebang');
+  assert.equal(launcher.includes(0x0d), false, 'all launcher line endings are LF');
+  const attributes = await readFile(path.join(repoRoot, '.gitattributes'), 'utf8');
+  assert.ok(attributes.split(/\r?\n/).includes('bin/dev-foundry-claude.js text eol=lf'));
+  const effective = execFileSync('git', ['-c', 'core.autocrlf=true', 'check-attr', 'text', 'eol', '--', 'bin/dev-foundry-claude.js'], { cwd: repoRoot, encoding: 'utf8' });
+  assert.equal(effective, 'bin/dev-foundry-claude.js: text: set\nbin/dev-foundry-claude.js: eol: lf\n');
+});
+
+test('TSK-018 packing and offline npm installation preserve every launcher byte', async () => {
+  const base = await baseline();
+  const source = await readFile(path.join(repoRoot, 'bin/dev-foundry-claude.js'));
+  const packed = execFileSync('tar', ['-xOzf', base.tarball, 'package/bin/dev-foundry-claude.js']);
+  const installed = await readFile(path.join(base.installed, 'bin/dev-foundry-claude.js'));
+  assert.deepEqual(packed, source);
+  assert.deepEqual(installed, packed);
+  const entry = base.manifest.files.find((file) => file.path === 'bin/dev-foundry-claude.js');
+  assert.equal(entry.size, installed.length);
+  assert.equal(entry.sha256, sha256(installed));
+  assert.equal(selfPin(base.installed).expect, base.pin);
+  const dir = await copyInstalled(base);
+  await writeFile(path.join(dir, 'bin/dev-foundry-claude.js'), Buffer.concat([source.subarray(0, source.indexOf(0x0a)), Buffer.from('\r\n'), source.subarray(source.indexOf(0x0a) + 1)]));
+  assert.throws(() => verifyPayload(dir, base.pin), /verification failed/, 'a CRLF shebang is still an exact-byte mismatch');
+  assert.throws(() => selfPin(dir), /verification failed/);
+});
+
 test('16 the manifest is complete and exact for the tarball and the offline install; package-lock.json is not payload', async (t) => {
   const base = await baseline();
   const checked = checkTarball(base.tarball);
@@ -408,10 +437,10 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
   assert.equal(lock.name, pkg.name);
   assert.equal(lock.version, pkg.version);
   assert.equal(lock.packages[''].version, pkg.version);
-  assert.equal(pkg.version, '1.2.1');
+  assert.equal(pkg.version, '1.2.2');
   const readme = await readFile(path.join(repoRoot, 'README.md'), 'utf8');
-  assert.match(readme, /\*\*Claude Code adapter 1\.2\.1\*\*/);
-  assert.ok(!readme.includes('1.2.0'));
+  assert.match(readme, /\*\*Claude Code adapter 1\.2\.2\*\*/);
+  assert.ok(!readme.includes('1.2.0') && !readme.includes('1.2.1'));
   const ignoreText = await readFile(path.join(repoRoot, '.gitignore'), 'utf8');
   assert.ok(ignoreText.split('\n').includes('/payload-manifest.json'));
 });
@@ -420,7 +449,7 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
 // adoption/MCP/run regression tests. Its temporary producer tree is deleted.
 test('TSK-016 package ships only dashboard runtime/assets and pins every dashboard byte', async () => {
   const base = await baseline();
-  assert.equal(base.manifest.version, '1.2.1', 'TSK-017 preserves the TSK-016 dashboard payload contract');
+  assert.equal(base.manifest.version, '1.2.2', 'TSK-018 preserves the TSK-016 dashboard payload contract');
   await assert.rejects(lstat(base.tree), /ENOENT/);
   const files = base.info.files.map((file) => file.path);
   for (const name of ['http', 'evidence', 'claude-otel', 'launch']) assert.ok(files.includes(`tools/dashboard/server/${name}.mjs`));
