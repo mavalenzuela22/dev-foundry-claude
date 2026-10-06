@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.29"
+artifactVersion: "2.1.0-local.30"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -150,6 +150,7 @@ The current project authority is:
 - TSK-017 for the Windows installed-payload verification corrective and 1.2.1 lineage.
 - TSK-018 for the completed and formally closed launcher LF/package-stability corrective and 1.2.2 Windows consumer proof;
 - TSK-018-CLOSURE for its terminal disposition.
+- TSK-019 for the active CRLF managed-block idempotence corrective and adapter 1.2.3 Windows consumer proof.
 
 No MTP is active.
 `dev-foundry-executor` and `dev-foundry-auditor` remain Claude adapter product
