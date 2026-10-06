@@ -12,7 +12,7 @@ canonical: true
 scope:
   owns:
     - github-release-adapter-distribution
-    - no-checkout-consumer-installation
+    - no-checkout-consumer-installation-implementation
     - compatible-consumer-upgrade
     - adapter-minor-release-1.3.0
     - pago-1.2.2-to-1.3.0-upgrade-proof
@@ -32,8 +32,6 @@ scope:
     - database-or-iis-runtime-change
 authority:
   governedBy:
-    - ADR-003
-    - ADR-004
     - ADR-005
     - SPC-005
     - OPS-007

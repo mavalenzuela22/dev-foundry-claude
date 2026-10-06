@@ -33,7 +33,6 @@ authority:
     - ADR-003
     - ADR-004
     - OPS-007
-    - OPS-008
   supersedes: []
 lifecycle:
   phase: accepted

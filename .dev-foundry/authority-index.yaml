@@ -323,7 +323,7 @@ routes:
     authority_class: task
     governs:
       - github-release-adapter-distribution
-      - no-checkout-consumer-installation
+      - no-checkout-consumer-installation-implementation
       - compatible-consumer-upgrade
       - adapter-minor-release-1.3.0
       - pago-1.2.2-to-1.3.0-upgrade-proof
