@@ -28,19 +28,17 @@ scope:
     - telemetry-change
 authority:
   governedBy:
-    - TSK-017
     - ADR-003
     - ADR-004
     - SPC-005
     - OPS-007
     - OPS-008
+  supersedes: []
 traceability:
-  dependsOn:
+  derivedFrom:
     - TSK-017
 lifecycle:
   phase: in-progress
-  dependsOn:
-    - TSK-017
   blockedBy: []
   promotionRequired: true
 portability: project-specific

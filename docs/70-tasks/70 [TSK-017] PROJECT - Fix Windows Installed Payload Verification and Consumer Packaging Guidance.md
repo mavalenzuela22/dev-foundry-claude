@@ -15,7 +15,7 @@ scope:
     - npm-bin-shim-integrity-boundary
     - cross-platform-package-consumer-smoke
     - adapter-installation-documentation-corrective
-    - adapter-patch-release
+    - adapter-patch-release-1.2.1
   appliesTo:
     components:
       - dev-foundry-claude
@@ -47,8 +47,7 @@ lifecycle:
   phase: in-progress
   dependsOn:
     - TSK-016-CLOSURE
-  blockedBy:
-    - TSK-018
+  blockedBy: []
   promotionRequired: true
 portability: project-specific
 ---
@@ -83,16 +82,15 @@ while applicable gates remain PASS.
 
 ## 2. Required outcome
 
-Release `@dev-foundry/claude-adapter` 1.2.2 so that:
+Release `@dev-foundry/claude-adapter` 1.2.1 so that:
 
 1. every manifest-listed payload byte remains fail-closed by exact size and SHA-256;
 2. installer-generated `node_modules/.bin/` launch artifacts are treated as
    installer-owned rather than payload-owned;
 3. arbitrary unlisted files outside that exact boundary still fail verification;
-4. the packaged `bin/dev-foundry-claude.js` launcher has a canonical LF shebang boundary that npm does not rewrite during Windows install;
-5. a real Windows offline install verifies and can run `adopt plan`;
-6. existing adoption, MCP, launcher and dashboard behavior remains unchanged;
-7. README explains the Windows behavior and archive-vs-payload identity plainly.
+4. a real Windows offline install verifies the installer-owned `.bin` shim boundary;
+5. existing adoption, MCP, launcher and dashboard behavior remains unchanged;
+6. README explains the Windows behavior and archive-vs-payload identity plainly.
 
 ## 3. Integrity boundary
 
@@ -121,13 +119,9 @@ npm rewrites only the first line ending of the package executable:
 - all other observed payload differences were already explained by installer-owned
   `node_modules/.bin/` shims.
 
-The 1.2.2 corrective SHALL make the launcher packaging stable across supported
-checkouts/installers by storing and enforcing the executable with an LF shebang
-before payload-manifest generation. The preferred minimal mechanism is repository
-line-ending authority for the launcher plus canonical LF source bytes.
+TSK-018 owns the required 1.2.2 launcher-packaging corrective. TSK-017 records this finding and remains in-progress until that successor provides the real Windows consumer proof.
 
-The verifier MUST NOT accept two hashes, normalize payload bytes while verifying,
-or otherwise weaken exact manifest verification to accommodate this behavior.
+The verifier MUST NOT accept two hashes, normalize payload bytes while verifying, or otherwise weaken exact manifest verification to accommodate this behavior.
 
 ## 5. Cross-platform identity
 

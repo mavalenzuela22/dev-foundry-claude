@@ -277,7 +277,7 @@ routes:
       - npm-bin-shim-integrity-boundary
       - cross-platform-package-consumer-smoke
       - adapter-installation-documentation-corrective
-      - adapter-patch-release
+      - adapter-patch-release-1.2.1
     section_id: null
   - id: TSK-018
     path: docs/70-tasks/70 [TSK-018] PROJECT - Canonicalize Adapter Launcher for Windows Package Stability.md
