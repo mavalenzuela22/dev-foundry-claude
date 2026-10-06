@@ -4,8 +4,8 @@ artifact:
   id: TSK-019
   type: TSK
   title: Fix CRLF Managed Block Idempotence in Adapter Planning
-  status: IN_PROGRESS
-artifactVersion: "2"
+  status: CLOSED
+artifactVersion: "3"
 authorityScope: tsk-019-crlf-managed-block-idempotence
 ownerRole: governance-author
 canonical: true
@@ -37,9 +37,11 @@ authority:
 traceability:
   derivedFrom:
     - TSK-017
+  closureArtifact: TSK-019-CLOSURE
 lifecycle:
-  phase: in-progress
+  phase: closed
   blockedBy: []
+  closureArtifact: TSK-019-CLOSURE
   promotionRequired: true
 portability: project-specific
 ---
@@ -168,3 +170,14 @@ and completed PASS with post-execution validation PASS.
 Do not weaken payload verification, broaden write scope, alter DEV FOUNDRY 2.1.0,
 perform Pago Electronico cutover, modify product code, or establish a public
 distribution channel.
+
+
+## 6. Terminal disposition
+
+TSK-019 is CLOSED after producer validation PASS, exact Windows same-release
+consumer proof V029 PASS, promotion/reconciliation/cleanup, and formal closure
+through TSK-019-CLOSURE.
+
+The separate cross-release `adapter-runtime-mismatch` observed when 1.2.3 is
+pointed at the real Pago Electronico repository prepared with 1.2.2 remains a
+deliberate fail-closed upgrade boundary and is not a defect in this corrective.
