@@ -62,7 +62,7 @@ function generate() {
 
 // Build-time check: tarball regular files minus the manifest equal the manifest entries.
 function check(tarball) {
-  const listing = execFileSync('tar', ['-tzf', tarball], { encoding: 'utf8' }).split('\n').filter(Boolean);
+  const listing = execFileSync('tar', ['-tzf', tarball], { encoding: 'utf8' }).split(/\r?\n/).filter(Boolean);
   const shipped = listing.filter((entry) => !entry.endsWith('/')).map((entry) => entry.replace(/^package\//, ''));
   const manifest = JSON.parse(execFileSync('tar', ['-xOzf', tarball, `package/${MANIFEST_NAME}`], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }));
   const left = shipped.filter((entry) => entry !== MANIFEST_NAME).sort();

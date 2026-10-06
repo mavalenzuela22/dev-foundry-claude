@@ -62,6 +62,45 @@ async function extract(tarball) {
 }
 const checkTarball = (tarball) => execFileSync(process.execPath, [path.join(repoRoot, 'scripts/package/payload-manifest.mjs'), '--check', tarball], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
+test('TSK-020 tar listing accepts LF and CRLF while preserving exact path comparison', async () => {
+  const dir = await scratch('tar-listing');
+  const fixture = path.join(dir, 'listing.json');
+  const preload = path.join(dir, 'tar.cjs');
+  // Replace only the external tar boundary; execute the real --check command.
+  await writeFile(preload, `const assert = require('node:assert/strict');
+const { readFileSync } = require('node:fs');
+require('node:child_process').execFileSync = (command, args) => {
+  assert.equal(command, 'tar');
+  const { listing, manifest } = JSON.parse(readFileSync(args[1], 'utf8'));
+  if (args[0] === '-tzf') {
+    assert.equal(args.length, 2);
+    return listing;
+  }
+  assert.deepEqual(args, ['-xOzf', args[1], 'package/payload-manifest.json']);
+  return JSON.stringify(manifest);
+};
+require('node:module').syncBuiltinESMExports();
+`);
+  const files = ['README.md', 'bin/dev-foundry-claude.js'];
+  const manifest = { files: files.map((file) => ({ path: file })) };
+  for (const eol of ['\n', '\r\n']) {
+    for (const [name, paths, status] of [
+      ['exact', files, 0],
+      ['extra', [...files, 'extra.txt'], 1],
+      ['missing', files.slice(1), 1],
+    ]) {
+      const listing = ['package/', 'package/bin/', ...paths.map((file) => `package/${file}`), `package/${MANIFEST_NAME}`, ''].join(eol);
+      await writeFile(fixture, JSON.stringify({ listing, manifest }));
+      const result = spawnSync(process.execPath, ['--require', preload, path.join(repoRoot, 'scripts/package/payload-manifest.mjs'), '--check', fixture], { encoding: 'utf8' });
+      assert.equal(result.status, status, `${JSON.stringify(eol)} ${name}: ${result.stderr}`);
+      assert.equal(result.stdout, '');
+      assert.equal(result.stderr, status === 0
+        ? 'payload-manifest: tarball matches manifest (2 files).\n'
+        : 'payload-manifest: tarball and manifest differ.\n');
+    }
+  }
+});
+
 async function regularFiles(packageRoot) {
   const files = [];
   const links = [];
