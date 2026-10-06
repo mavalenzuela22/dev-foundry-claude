@@ -10,7 +10,7 @@ import { performance } from 'node:perf_hooks';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { MANIFEST_NAME, buildManifestBytes, formatExpect, rootOf, selfPin, sha256, verifyPayload } from '../../src/adopt/pin.js';
-import { diffTrees, listTree, makeConsumer, repoRoot, applyProposal } from './fixture.js';
+import { diffTrees, listTree, makeConsumer, repoRoot, applyProposal, readSetSnapshot } from './fixture.js';
 
 const scratchDirs = [];
 const scratch = async (prefix) => {
@@ -437,9 +437,9 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
   assert.equal(lock.name, pkg.name);
   assert.equal(lock.version, pkg.version);
   assert.equal(lock.packages[''].version, pkg.version);
-  assert.equal(pkg.version, '1.2.3');
+  assert.equal(pkg.version, '1.3.0');
   const readme = await readFile(path.join(repoRoot, 'README.md'), 'utf8');
-  assert.match(readme, /\*\*Claude Code adapter 1\.2\.3\*\*/);
+  assert.match(readme, /\*\*Claude Code adapter 1\.3\.0\*\*/);
   assert.ok(!readme.includes('1.2.0') && !readme.includes('1.2.1'));
   const ignoreText = await readFile(path.join(repoRoot, '.gitignore'), 'utf8');
   assert.ok(ignoreText.split('\n').includes('/payload-manifest.json'));
@@ -449,7 +449,7 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
 // adoption/MCP/run regression tests. Its temporary producer tree is deleted.
 test('TSK-016 package ships only dashboard runtime/assets and pins every dashboard byte', async () => {
   const base = await baseline();
-  assert.equal(base.manifest.version, '1.2.3', 'TSK-019 preserves the TSK-016 dashboard payload contract');
+  assert.equal(base.manifest.version, '1.3.0', 'TSK-020 preserves the TSK-016 dashboard payload contract');
   await assert.rejects(lstat(base.tree), /ENOENT/);
   const files = base.info.files.map((file) => file.path);
   for (const name of ['http', 'evidence', 'claude-otel', 'launch']) assert.ok(files.includes(`tools/dashboard/server/${name}.mjs`));
@@ -640,4 +640,56 @@ test('TSK-016 dashboard rejects invalid args, roots, unsafe structure, stale pin
     const result = cli(dir, ['dashboard', '--port', '3000'], { cwd: consumer.root });
     assert.equal(result.status, 1, name); assert.equal(result.stdout, ''); assert.match(result.stderr, /verification failed/);
   }
+});
+
+test('TSK-020 installed CLI explicitly plans/applies compatible upgrade with exact verified target identity', async (t) => {
+  const base = await baseline();
+  const consumer = await makeConsumer(); t.after(consumer.cleanup);
+  const { createPlan } = await import('../../src/adopt/plan.js');
+  const { applyPlan } = await import('../../src/adopt/apply.js');
+  const old = { version: '1.2.2', payloadRoot: 'a'.repeat(64), expect: `1.2.2:sha256:${'a'.repeat(64)}` };
+  const adoption = await createPlan({ root: consumer.root, adapter: old });
+  await applyPlan({ root: consumer.root, adapter: old, planBytes: adoption.bytes, planSha256: adoption.hash });
+  consumer.commit();
+  const before = await listTree(consumer.root);
+  const authority = await readSetSnapshot(consumer.root);
+  const invoke = (args, installed = base.installed) => cli(installed, ['upgrade', ...args, '--root', consumer.root]);
+  assert.equal(JSON.parse(invoke(['status']).stdout).status, 'upgrade-needed');
+  const out = path.join(await scratch('upgrade-plan'), 'plan.json');
+  const planned = invoke(['plan', '--out', out]);
+  assert.equal(planned.status, 0, planned.stderr);
+  const summary = JSON.parse(planned.stdout);
+  assert.equal(summary.current.expect, old.expect);
+  assert.equal(summary.target.expect, base.pin);
+  assert.deepEqual(diffTrees(before, await listTree(consumer.root)), []);
+  const denied = invoke(['plan', '--out', path.join(consumer.root, 'docs/overwrite.json')]);
+  assert.equal(denied.status, 2);
+  assert.deepEqual(diffTrees(before, await listTree(consumer.root)), []);
+  const broken = await copyInstalled(base);
+  await bump(path.join(broken, 'README.md'));
+  const refused = invoke(['apply', '--plan', out, '--plan-sha256', summary.planSha256], broken);
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /Adapter runtime verification failed/);
+  assert.deepEqual(diffTrees(before, await listTree(consumer.root)), []);
+  // A different, internally valid build of the same version is also stale.
+  const changedReadme = await readFile(path.join(broken, 'README.md'));
+  await writeFile(path.join(broken, MANIFEST_NAME), buildManifestBytes({ version: base.manifest.version,
+    entries: base.manifest.files.map((entry) => entry.path === 'README.md'
+      ? { ...entry, size: changedReadme.length, sha256: sha256(changedReadme) } : entry) }));
+  assert.notEqual(selfPin(broken).expect, base.pin);
+  const differentBuild = invoke(['apply', '--plan', out, '--plan-sha256', summary.planSha256], broken);
+  assert.equal(differentBuild.status, 1);
+  assert.match(differentBuild.stderr, /plan-stale/);
+  assert.deepEqual(diffTrees(before, await listTree(consumer.root)), []);
+  const applied = invoke(['apply', '--plan', out, '--plan-sha256', summary.planSha256]);
+  assert.equal(applied.status, 0, applied.stderr);
+  assert.deepEqual(JSON.parse(applied.stdout), { written: 1, deleted: 0 });
+  assert.deepEqual(diffTrees(before, await listTree(consumer.root)), ['.mcp.json']);
+  assert.deepEqual(await readSetSnapshot(consumer.root), authority);
+  consumer.commit();
+  assert.equal(JSON.parse(invoke(['status']).stdout).status, 'current');
+  const replan = cli(base.installed, ['adopt', 'plan', '--root', consumer.root]);
+  assert.equal(replan.status, 0, replan.stderr);
+  assert.equal(JSON.parse(replan.stdout).status, 'noop');
+  assert.equal(JSON.parse(replan.stdout).activation.overall, 'prepared');
 });

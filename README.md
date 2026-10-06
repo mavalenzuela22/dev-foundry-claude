@@ -1,7 +1,7 @@
 # dev-foundry-claude
 
 A user guide to **DEV FOUNDRY 2.1.0**, followed by instructions for its
-**Claude Code adapter 1.2.3** (`@dev-foundry/claude-adapter`).
+**Claude Code adapter 1.3.0** (`@dev-foundry/claude-adapter`).
 
 If you know Git and normal software development but are new to structured AI
 work, start here. You do not need to choose between Claude, Codex, Cursor or a
@@ -535,9 +535,7 @@ are not active role assignments.
 You need:
 
 - Node.js 20 or newer, npm and Git.
-- The adapter package file `dev-foundry-claude-adapter-1.2.3.tgz` and its expected
-  SHA-256 checksum from the person authorized to supply it. A checksum lets you
-  check that you received the exact file they intended to send.
+- Access to the official GitHub Release download. No producer checkout is needed.
 - A Git repository with DEV FOUNDRY **2.1.0** setup complete and active, and a clean
   working tree. Save or commit your existing changes through your normal workflow
   before preparing the repository.
@@ -559,46 +557,66 @@ Once the project has established **2.1.0 active**, return to **Step 1** below. T
 | Repository already on DEV FOUNDRY 2.1.0 | If setup is complete and active, start at Step 1. |
 | Repository on an older DEV FOUNDRY release | Review and complete [version adoption or migration](#an-existing-dev-foundry-project-version-adoption-or-migration) to 2.1.0, then return to Step 1. |
 | Repository halfway through a DEV FOUNDRY adoption | Reconcile the unfinished configuration and required decisions described in [project adoption](#7-how-a-project-adopts-dev-foundry); return when 2.1.0 is active. |
-| Existing dev-foundry-claude installation on an older adapter package | Start with [reinstall and upgrades](#package-integrity-reinstall-and-upgrades) and keep your current package available, because installing 1.2.3 does not upgrade an already configured repository. |
+| Existing dev-foundry-claude installation on an older adapter package | Start with [reinstall and upgrades](#package-integrity-reinstall-and-upgrades) and keep your current package available, because installing 1.3.0 does not upgrade an already configured repository. |
 
 ### Install dev-foundry-claude
 
-#### Step 1: verify and install the supplied package
+#### Step 1: install the released adapter
 
-Ask the package provider for both the `.tgz` file and its expected SHA-256.
-That checksum verifies the concrete archive supplied to you; archives built on
-different operating systems need not have identical bytes.
-**No public registry or download channel has been selected by this project.**
-There is currently no public install URL.
-
-Run the following blocks in the same terminal. Replace the package path if needed
-and paste the actual 64-character checksum supplied with it:
+Install the latest released package without cloning or building the producer:
 
 ```sh
-ADAPTER_TARBALL="$HOME/Downloads/dev-foundry-claude-adapter-1.2.3.tgz"
-EXPECTED_SHA256='paste-the-SHA-256-from-the-package-provider-here'
-printf '%s  %s\n' "$EXPECTED_SHA256" "$ADAPTER_TARBALL" | shasum -a 256 -c -
-```
-
-Continue only when verification reports `OK`. If it fails, contact the package
-provider to resolve the discrepancy. Calculating a hash from the file alone
-cannot tell you whether it matches the file the provider intended to send.
-
-Install into a dedicated directory outside your project. Use a fresh directory
-if a different build already occupies this location:
-
-```sh
-ADAPTER_PREFIX="$HOME/.local/share/dev-foundry/claude-adapter-1.2.3"
-mkdir -p "$ADAPTER_PREFIX"
-npm install --prefix "$ADAPTER_PREFIX" --offline --ignore-scripts --no-audit --no-fund "$ADAPTER_TARBALL"
-export PATH="$ADAPTER_PREFIX/node_modules/.bin:$PATH"
+npm install -g https://github.com/mavalenzuela22/dev-foundry-claude/releases/latest/download/dev-foundry-claude-adapter.tgz
 dev-foundry-claude --version
 ```
 
-Expect `1.2.3`. The package includes its runtime dependencies and prebuilt dashboard;
-you need no source checkout or dashboard build tools. Save the `ADAPTER_PREFIX`
-and `PATH` settings in your shell configuration so new terminals and Claude's
-local tools can find the installed command.
+Adapter 1.3.0 introduces explicit compatible upgrades. The package includes its
+runtime dependencies and prebuilt dashboard. GitHub Releases also provide a
+versioned tarball and `SHA256SUMS` for exact-version or verified offline acquisition.
+The stable alias selects a download; the installed payload identifies the exact
+release. The release must have been published before its download URL is usable.
+
+Installing a newer package changes no repository files. For first preparation,
+continue to Step 2. For an already configured repository, use the explicit upgrade
+flow below before launching it with the newer package.
+
+### Upgrade an already prepared repository
+
+Set `PROJECT_ROOT` to your repository's absolute path. Keep your previous pinned
+package available until the upgrade is complete. Inspect status, then create and
+review a plan outside the repository:
+
+```sh
+PROJECT_ROOT="$HOME/Development/acme-billing"
+dev-foundry-claude upgrade status --root "$PROJECT_ROOT"
+UPGRADE_WORKDIR="$(mktemp -d /tmp/dev-foundry-claude-upgrade.XXXXXX)"
+UPGRADE_PLAN="$UPGRADE_WORKDIR/upgrade-plan.json"
+dev-foundry-claude upgrade plan --root "$PROJECT_ROOT" --out "$UPGRADE_PLAN"
+cat "$UPGRADE_PLAN"
+```
+
+Status reports `current`, `upgrade-needed` or `blocked`, with both exact pins.
+A `ready` plan binds the current and target releases and changes only the runtime
+pin in `.mcp.json`. Review it through your project's process, then apply the exact
+plan using the printed `planSha256`:
+
+```sh
+PLAN_SHA256='paste-the-printed-planSha256-here'
+dev-foundry-claude upgrade apply --root "$PROJECT_ROOT" --plan "$UPGRADE_PLAN" --plan-sha256 "$PLAN_SHA256"
+dev-foundry-claude upgrade status --root "$PROJECT_ROOT"
+dev-foundry-claude adopt status --root "$PROJECT_ROOT"
+```
+
+Record the change through your project's normal commit workflow. A subsequent
+`adopt plan` against the target package should be `noop`. A current repository
+produces a `noop` upgrade plan. Apply rejects repository drift, changed pins,
+dirty touched paths, changed target identity and stale plan bytes. Create and
+review a fresh plan after resolving drift.
+
+`upgrade-migration-required` means other adapter-owned bytes differ from the target.
+The compatible upgrader writes nothing in that state; broader migration requires
+separate project governance. Upgrade never changes agents, managed instructions,
+ignore rules, capability profiles, bootstraps, consumer authority or product code.
 
 ### Prepare the repository
 
@@ -756,7 +774,7 @@ task authority determine allowed work. Connection details are in the
 
 The team keeps an existing product at `$HOME/Development/acme-billing`. It first
 completes DEV FOUNDRY 2.1.0 adoption while preserving its product and history.
-Then it follows Step 1 with the supplied package and checksum, uses that project
+Then it follows Step 1 with the released package, uses that project
 path in Step 2, reviews the plan and applies it in Step 3.
 
 Status reads `prepared`; the dashboard can now open. The team has its existing
@@ -773,7 +791,7 @@ the concepts are introduced above and configuration fields are in the advanced r
 | `not-governed` | Point `--root` at your project's Git top-level, complete or repair DEV FOUNDRY 2.1.0 setup, then create a fresh plan. | The CLI cannot recognize the required active project configuration and selected framework release. |
 | `unsupported-framework` | Review [version adoption or migration](#an-existing-dev-foundry-project-version-adoption-or-migration) and complete the prerequisite; if 2.1.0 is already active, have the Governance Author reconcile conflicting version records. | The recorded framework versions are unsupported or disagree; the adapter cannot migrate them. |
 | `dirty-working-tree` | Preserve and resolve affected uncommitted work through your normal workflow, keep the plan outside the repository, then create and review a fresh plan. | Changes on paths checked by adoption prevent applying a stable plan. |
-| `adapter-runtime-mismatch` or `Adapter runtime verification failed.` | Make sure `PATH` selects the exact package build configured for this repository; reinstall that same supplied tarball into a fresh directory if necessary. For an older installation, follow the upgrade limitation below. | The installed files differ from the version and checksum recorded in the project; even two builds labeled 1.2.3 may differ. Do not change the recorded checksum to bypass verification. |
+| `adapter-runtime-mismatch` or `Adapter runtime verification failed.` | Make sure `PATH` selects the exact package build configured for this repository; reinstall that same supplied tarball into a fresh directory if necessary. For an older installation, follow the explicit upgrade flow above. | The installed files differ from the version and checksum recorded in the project; even two builds labeled 1.3.0 may differ. Do not change the recorded checksum to bypass verification. |
 | `BINDING_INACTIVE` | Run `adopt status`; finish activation if it says `prepared`, or have the project process resolve incomplete configuration if it says `partial`. | The project has not fully assigned its DEV FOUNDRY responsibilities to Claude; installing files or approving the tool connection cannot activate those assignments. |
 | Dashboard requires a Git repository or project operating profile | Run inside your intended project or pass `--root /absolute/path/to/project`, then complete DEV FOUNDRY setup and adapter preparation if needed. | The dashboard needs the project's Git root and valid profile. The package installation directory is not a project-data root. |
 | Requested dashboard port is occupied | Use another port, such as `dev-foundry-claude dashboard --port 43128 --root "$PROJECT_ROOT"`, and open `http://127.0.0.1:43128`. | The server does not automatically choose a fallback port. |
@@ -918,13 +936,18 @@ npm --prefix tools/dashboard run build
 npm --prefix tools/dashboard test
 npm test
 npm pack --dry-run --json
-npm pack --pack-destination /absolute/path/to/artifacts
+node scripts/release/build-assets.mjs --out /absolute/path/to/empty-release-assets
 ```
 
-The artifact directory must already exist. `prepack` always rebuilds the UI from
+The release builder creates its output directory and requires it to be empty.
+It runs normal `npm pack`, verifies the packed payload, writes the versioned
+tarball and byte-identical `dev-foundry-claude-adapter.tgz`, and writes
+`SHA256SUMS` covering both exact filenames. Repeating from identical package
+inputs in a fresh output directory produces identical assets. `prepack` always
+rebuilds the UI from
 `tools/dashboard`, then generates `payload-manifest.json` from npm's actual file
 list and verifies bundled runtime dependency versions against the root lockfile.
-The tarball is `dev-foundry-claude-adapter-1.2.3.tgz`. Its SHA-256 identifies that
+The tarball is `dev-foundry-claude-adapter-1.3.0.tgz`. Its SHA-256 identifies that
 concrete archive; tarballs built on different operating systems are not guaranteed
 to be byte-identical. The SHA-256 of `payload-manifest.json` identifies the installed
 runtime payload. The launcher is packaged with canonical LF line endings so
@@ -937,16 +960,20 @@ Check the tarball/manifest relationship and record its identity for the governed
 artifact handoff:
 
 ```sh
-node scripts/package/payload-manifest.mjs --check /absolute/path/to/artifacts/dev-foundry-claude-adapter-1.2.3.tgz
-shasum -a 256 /absolute/path/to/artifacts/dev-foundry-claude-adapter-1.2.3.tgz
+node scripts/package/payload-manifest.mjs --check /absolute/path/to/artifacts/dev-foundry-claude-adapter-1.3.0.tgz
+shasum -a 256 /absolute/path/to/artifacts/dev-foundry-claude-adapter-1.3.0.tgz
 node --input-type=module -e 'import fs from "node:fs"; import crypto from "node:crypto"; const b=fs.readFileSync("payload-manifest.json"); console.log(JSON.parse(b).version+":sha256:"+crypto.createHash("sha256").update(b).digest("hex"));'
 ```
 
 Retain the tarball SHA-256 and the printed `<version>:sha256:<payload-root>`.
 Keep that tarball immutable. Version alone cannot identify a build. Packing does
-not publish to a registry or create a tag/release. Any future hosted/signed release
-channel requires separate governance and must preserve immutable version/payload
-identity. The offline tarball/prefix install mechanism has been tested with
+not publish to a registry or create a tag/release. After validation and promotion,
+a maintainer may dispatch `.github/workflows/release.yml` from `main`. It restores
+dependencies, builds these assets and creates `v<version>` at the exact workflow
+commit using GitHub's token. It rejects existing tags/releases and non-main refs,
+uploads only the two tarballs and `SHA256SUMS`, and publishes to neither npm nor
+GitHub Packages. Publication is a separate authorized step. The offline
+tarball/prefix install mechanism has been tested with
 registry access disabled and the temporary producer build tree deleted.
 
 ### Package contents and exclusions
@@ -1056,12 +1083,12 @@ preserves the consumer's existing pin. Replacing it with another version/build
 does not update `.mcp.json`; runtime verification fails. `adopt plan` reports
 `adapter-runtime-mismatch` against a different existing adapter pin.
 
-There is currently **no supported automatic adapter upgrade command or in-place
-pin migration**. Keep the existing pinned release available. Moving an adopted
-consumer to a new release requires a separately governed upgrade capability under
-the project's adapter release/consumer upgrade contract (SPC-005). Do not manually
-bypass the pin to make a new installation run. Framework version adoption under
-OPS-005 and an adapter release upgrade are separate operations.
+Use the explicit `upgrade status`, `upgrade plan` and `upgrade apply` flow in
+[installation](#upgrade-an-already-prepared-repository). Upgrades verify the installed
+target payload and bind both exact release pins. They support only a byte-compatible
+owned surface plus pin replacement; broader migrations fail closed. Installing a
+package alone never upgrades a repository. Framework version adoption under
+OPS-005 and an adapter release upgrade remain separate operations.
 
 ### Canonical 2.1.0 reading reference
 

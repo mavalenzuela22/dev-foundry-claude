@@ -2,6 +2,7 @@ import { mkdir, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, wr
 import path from 'node:path';
 import { createPlan } from './plan.js';
 import { sha256 } from './pin.js';
+import { createUpgradePlan } from './upgrade.js';
 
 export class ApplyError extends Error {
   constructor(code, message) {
@@ -14,15 +15,17 @@ const readOrNull = (target) => readFile(target).catch(() => null);
 const isDirectory = (target) => stat(target).then((info) => info.isDirectory(), () => false);
 
 // Writes only the plan's create/merge/delete entries via staging and rename, with rollback.
-export async function applyPlan({ planBytes, planSha256, adapter, root: rootArgument }) {
+export async function applyPlan({ planBytes, planSha256, adapter, root: rootArgument, upgrade = false }) {
   if (sha256(planBytes) !== planSha256) throw new ApplyError('plan-hash-mismatch', 'The plan hash does not match the plan file.');
   let supplied;
   try { supplied = JSON.parse(planBytes.toString('utf8')); } catch { throw new ApplyError('plan-invalid', 'The plan file is not valid JSON.'); }
-  if (supplied.status !== 'ready') throw new ApplyError('plan-not-ready', 'The plan is not ready to apply.');
-  const current = await createPlan({
+  const upgrading = supplied.mode === 'upgrade';
+  if (upgrading !== upgrade) throw new ApplyError('plan-invalid', 'The plan mode does not match the command.');
+  if (supplied.status !== 'ready' && !(upgrading && supplied.status === 'noop')) throw new ApplyError('plan-not-ready', 'The plan is not ready to apply.');
+  const current = upgrading ? await createUpgradePlan({ root: rootArgument, adapter }) : await createPlan({
     root: rootArgument, project: supplied.target?.project, idPrefix: supplied.target?.idPrefix, remove: supplied.mode === 'remove', adapter,
   });
-  if (current.hash !== planSha256 || current.plan.status !== 'ready') throw new ApplyError('plan-stale', 'Repository or adapter state drifted from the plan.');
+  if (!current.bytes.equals(planBytes) || current.hash !== planSha256 || current.plan.status !== supplied.status) throw new ApplyError('plan-stale', 'Repository or adapter state drifted from the plan.');
   const root = await realpath(path.resolve(rootArgument ?? process.cwd()));
   const absolute = (relative) => path.join(root, ...relative.split('/'));
 
