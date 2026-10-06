@@ -279,6 +279,14 @@ routes:
       - adapter-installation-documentation-corrective
       - adapter-patch-release
     section_id: null
+  - id: TSK-018
+    path: docs/70-tasks/70 [TSK-018] PROJECT - Canonicalize Adapter Launcher for Windows Package Stability.md
+    authority_class: task
+    governs:
+      - launcher-line-ending-canonicalization
+      - windows-package-install-byte-stability
+      - adapter-patch-release-1.2.2
+    section_id: null
 
 bindings:
   - id: project-operating-profile

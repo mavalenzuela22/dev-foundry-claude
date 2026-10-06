@@ -47,7 +47,8 @@ lifecycle:
   phase: in-progress
   dependsOn:
     - TSK-016-CLOSURE
-  blockedBy: []
+  blockedBy:
+    - TSK-018
   promotionRequired: true
 portability: project-specific
 ---
@@ -159,3 +160,8 @@ At minimum:
 TSK-017 does not authorize public package publication, registry/release-channel
 selection, methodology changes, mature-runner changes, or Pago Electronico
 product/database/runtime mutation.
+
+
+## 8. Corrective successor
+
+TSK-018 owns the post-1.2.1 launcher LF packaging corrective discovered by the real Windows consumer smoke. TSK-017 remains in-progress until TSK-018 proves the 1.2.2 consumer path and supplies terminal corrective evidence.
