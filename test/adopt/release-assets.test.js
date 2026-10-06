@@ -9,20 +9,29 @@ import { selfPin, sha256 } from '../../src/adopt/pin.js';
 import { buildReleaseAssets, selectNpmInvocation } from '../../scripts/release/build-assets.mjs';
 import { repoRoot } from './fixture.js';
 
-test('npm invocation falls back to npm.cmd on Windows without npm_execpath', () => {
-  assert.deepEqual(selectNpmInvocation('win32', undefined), ['npm.cmd', []]);
+test('npm invocation runs the Windows npm.cmd fallback through ComSpec or cmd.exe', () => {
+  for (const npmExecPath of [undefined, '', 'C:\\Program Files\\nodejs\\npm.cmd']) {
+    assert.deepEqual(selectNpmInvocation('win32', npmExecPath), ['cmd.exe', ['/d', '/s', '/c', 'npm.cmd']]);
+    assert.deepEqual(selectNpmInvocation('win32', npmExecPath, ''), ['cmd.exe', ['/d', '/s', '/c', 'npm.cmd']]);
+    const comSpec = 'C:\\Windows\\System32\\cmd.exe';
+    assert.deepEqual(selectNpmInvocation('win32', npmExecPath, comSpec), [comSpec, ['/d', '/s', '/c', 'npm.cmd']]);
+  }
 });
 
 test('npm invocation preserves bare npm on non-Windows without npm_execpath', () => {
   for (const platform of ['darwin', 'linux']) {
-    assert.deepEqual(selectNpmInvocation(platform, undefined), ['npm', []]);
+    for (const npmExecPath of [undefined, '', '/usr/local/bin/npm']) {
+      assert.deepEqual(selectNpmInvocation(platform, npmExecPath, 'C:\\Windows\\System32\\cmd.exe'), ['npm', []]);
+    }
   }
 });
 
 test('npm invocation uses Node with an explicit JS or CJS npm CLI on every platform', () => {
   for (const platform of ['win32', 'darwin', 'linux']) {
     for (const cli of ['C:\\Program Files\\nodejs\\npm-cli.js', '/opt/node/npm-cli.cjs']) {
-      assert.deepEqual(selectNpmInvocation(platform, cli), [process.execPath, [cli]]);
+      for (const comSpec of [undefined, 'C:\\Windows\\System32\\cmd.exe']) {
+        assert.deepEqual(selectNpmInvocation(platform, cli, comSpec), [process.execPath, [cli]]);
+      }
     }
   }
 });

@@ -7,10 +7,12 @@ import { selfPin, sha256 } from '../../src/adopt/pin.js';
 
 const packageRoot = fileURLToPath(new URL('../../', import.meta.url));
 
-export function selectNpmInvocation(platform, npmExecPath) {
-  return npmExecPath && /\.c?js$/.test(npmExecPath)
-    ? [process.execPath, [npmExecPath]]
-    : [platform === 'win32' ? 'npm.cmd' : 'npm', []];
+export function selectNpmInvocation(platform, npmExecPath, comSpec) {
+  if (npmExecPath && /\.c?js$/.test(npmExecPath)) return [process.execPath, [npmExecPath]];
+  // Windows batch shims require the command interpreter, not direct execution.
+  return platform === 'win32'
+    ? [comSpec || 'cmd.exe', ['/d', '/s', '/c', 'npm.cmd']]
+    : ['npm', []];
 }
 
 // Normal npm pack owns the build and payload manifest. This script only verifies
@@ -23,7 +25,7 @@ export async function buildReleaseAssets(outputDirectory) {
   try {
     const pkg = JSON.parse(await readFile(path.join(packageRoot, 'package.json'), 'utf8'));
     if (!/^\d+\.\d+\.\d+$/.test(pkg.version)) throw new Error('Expected an exact stable release version.');
-    const [command, prefix] = selectNpmInvocation(process.platform, process.env.npm_execpath);
+    const [command, prefix] = selectNpmInvocation(process.platform, process.env.npm_execpath, process.env.ComSpec);
     const packed = JSON.parse(execFileSync(command, [...prefix, 'pack', '--json', '--pack-destination', scratch], {
       cwd: packageRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 16 * 1024 * 1024,
     }));
