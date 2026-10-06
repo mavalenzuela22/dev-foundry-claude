@@ -6,8 +6,26 @@ import path from 'node:path';
 import test from 'node:test';
 import { parse } from 'yaml';
 import { selfPin, sha256 } from '../../src/adopt/pin.js';
-import { buildReleaseAssets } from '../../scripts/release/build-assets.mjs';
+import { buildReleaseAssets, selectNpmInvocation } from '../../scripts/release/build-assets.mjs';
 import { repoRoot } from './fixture.js';
+
+test('npm invocation falls back to npm.cmd on Windows without npm_execpath', () => {
+  assert.deepEqual(selectNpmInvocation('win32', undefined), ['npm.cmd', []]);
+});
+
+test('npm invocation preserves bare npm on non-Windows without npm_execpath', () => {
+  for (const platform of ['darwin', 'linux']) {
+    assert.deepEqual(selectNpmInvocation(platform, undefined), ['npm', []]);
+  }
+});
+
+test('npm invocation uses Node with an explicit JS or CJS npm CLI on every platform', () => {
+  for (const platform of ['win32', 'darwin', 'linux']) {
+    for (const cli of ['C:\\Program Files\\nodejs\\npm-cli.js', '/opt/node/npm-cli.cjs']) {
+      assert.deepEqual(selectNpmInvocation(platform, cli), [process.execPath, [cli]]);
+    }
+  }
+});
 
 test('release builder produces reproducible normal-package assets, exact identity, alias and both checksums', async (t) => {
   const scratch = await mkdtemp(path.join(os.tmpdir(), 'release-assets-test-'));

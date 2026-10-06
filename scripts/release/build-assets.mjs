@@ -7,6 +7,12 @@ import { selfPin, sha256 } from '../../src/adopt/pin.js';
 
 const packageRoot = fileURLToPath(new URL('../../', import.meta.url));
 
+export function selectNpmInvocation(platform, npmExecPath) {
+  return npmExecPath && /\.c?js$/.test(npmExecPath)
+    ? [process.execPath, [npmExecPath]]
+    : [platform === 'win32' ? 'npm.cmd' : 'npm', []];
+}
+
 // Normal npm pack owns the build and payload manifest. This script only verifies
 // and arranges its immutable output; an empty destination prevents stale assets.
 export async function buildReleaseAssets(outputDirectory) {
@@ -17,8 +23,7 @@ export async function buildReleaseAssets(outputDirectory) {
   try {
     const pkg = JSON.parse(await readFile(path.join(packageRoot, 'package.json'), 'utf8'));
     if (!/^\d+\.\d+\.\d+$/.test(pkg.version)) throw new Error('Expected an exact stable release version.');
-    const execPath = process.env.npm_execpath;
-    const [command, prefix] = execPath && /\.c?js$/.test(execPath) ? [process.execPath, [execPath]] : ['npm', []];
+    const [command, prefix] = selectNpmInvocation(process.platform, process.env.npm_execpath);
     const packed = JSON.parse(execFileSync(command, [...prefix, 'pack', '--json', '--pack-destination', scratch], {
       cwd: packageRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 16 * 1024 * 1024,
     }));
