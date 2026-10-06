@@ -4,8 +4,8 @@ artifact:
   id: TSK-018
   type: TSK
   title: Canonicalize Adapter Launcher for Windows Package Stability
-  status: IN_PROGRESS
-artifactVersion: "1"
+  status: CLOSED
+artifactVersion: "2"
 authorityScope: tsk-018-launcher-lf-package-corrective
 ownerRole: governance-author
 canonical: true
@@ -37,9 +37,11 @@ authority:
 traceability:
   derivedFrom:
     - TSK-017
+  closureArtifact: TSK-018-CLOSURE
 lifecycle:
-  phase: in-progress
+  phase: closed
   blockedBy: []
+  closureArtifact: TSK-018-CLOSURE
   promotionRequired: true
 portability: project-specific
 ---
@@ -95,3 +97,10 @@ At minimum PASS:
 
 Promotion and formal closure are permitted only after the Windows consumer proof
 passes with zero manifest-listed mismatches.
+
+
+## 5. Terminal disposition
+
+TSK-018 is CLOSED after producer validation PASS, exact Windows/Pago V014 consumer
+proof PASS, promotion through PR #36, integration/reconciliation/cleanup, and
+formal closure through TSK-018-CLOSURE.
