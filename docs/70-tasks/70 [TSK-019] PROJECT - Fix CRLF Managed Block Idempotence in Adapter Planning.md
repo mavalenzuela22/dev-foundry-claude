@@ -5,7 +5,7 @@ artifact:
   type: TSK
   title: Fix CRLF Managed Block Idempotence in Adapter Planning
   status: IN_PROGRESS
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: tsk-019-crlf-managed-block-idempotence
 ownerRole: governance-author
 canonical: true
@@ -92,8 +92,12 @@ Release `@dev-foundry/claude-adapter` 1.2.3 with the smallest safe complete fix:
 5. add regression coverage proving both LF and CRLF blocks re-plan idempotently;
 6. prove a modified managed block still fails closed;
 7. advance package metadata and minimal README version guidance to 1.2.3;
-8. prove the exact candidate against the real prepared Pago Electronico consumer
-   before promotion.
+8. prove the exact candidate on Windows against a machine-local clone of the
+   Pago Electronico consumer baseline immediately before the 1.2.2 preparation
+   commit;
+9. preserve the real Pago Electronico repository unchanged and verify that a
+   different adapter release against its existing 1.2.2 pin fails closed with
+   `adapter-runtime-mismatch` rather than silently performing an upgrade.
 
 ## 4. Acceptance
 
@@ -105,10 +109,59 @@ At minimum PASS:
 - dashboard typecheck/build/tests;
 - package dry-run;
 - `git diff --check`;
-- exact Windows/Pago consumer `adopt status = prepared`;
-- exact Windows/Pago consumer fresh `adopt plan = noop` with no blockers and
-  separate cutover proposal;
-- consumer repository remains unchanged by the read-only proof.
+- exact 1.2.3 candidate packs and installs normally on Windows with complete
+  payload-manifest integrity;
+- a machine-local clone of Pago Electronico at the parent of preparation commit
+  `0321f44f9e1c7c37e681769eac8d6598f0006b28` can be planned and prepared by
+  1.2.3, committed locally, and then freshly replanned as `noop` with no
+  blockers, `activation.overall = prepared`, and a separate cutover proposal;
+- the real Pago Electronico repository remains clean at
+  `0321f44f9e1c7c37e681769eac8d6598f0006b28`;
+- the real prepared 1.2.2 consumer is expected to reject the 1.2.3 runtime with
+  `adapter-runtime-mismatch`; that cross-release transition is an upgrade
+  concern governed separately by SPC-005 and is not implemented by TSK-019.
+
+### 4.1. Windows V028 observation
+
+The exact candidate commit
+`7a58c5aac743251a921c76958c56a949bb74f6d3` successfully packed and installed
+on Windows as 1.2.3. The installed payload manifest contained 1,213 listed files
+with zero missing files and zero mismatches, and `--version` returned 1.2.3.
+
+When that runtime inspected the real Pago Electronico repository, `adopt status`
+remained `prepared`, while fresh `adopt plan` correctly failed closed with
+`adapter-runtime-mismatch` because the repository is pinned to the previously
+prepared 1.2.2 release. The real consumer remained unchanged.
+
+This is not a CRLF regression. It demonstrates the already-governed separation
+between same-release replanning and cross-release upgrade.
+
+### 4.2. Windows V029 same-release proof
+
+The follow-up Windows proof used candidate
+`7a58c5aac743251a921c76958c56a949bb74f6d3` and a machine-local clone of
+Pago Electronico at pre-preparation baseline
+`da6e9d79c6366c57c4b80adda4dc5cdbc52f2167`.
+
+V029 passed all required gates:
+
+- candidate package version: `1.2.3`;
+- installed payload manifest: 1,213 files, 0 missing, 0 mismatched;
+- first 1.2.3 adoption plan on the temporary clone: `ready`;
+- exact reviewed plan applied only inside the temporary clone;
+- post-preparation `adopt status`: `prepared`;
+- fresh 1.2.3 replan: `noop`;
+- replan blockers: 0;
+- replan preparation writes: 0;
+- replan activation: `prepared`;
+- separate cutover proposal present;
+- real Pago Electronico repository remained clean and unchanged at
+  `0321f44f9e1c7c37e681769eac8d6598f0006b28`.
+
+The governed Windows execution was
+`TSK-041/windows-release-smoke-v029` /
+`execution_940bec7407e1a27591125e8f6dccc021ef889ea620f8ea512bbedc5f1e529d21`
+and completed PASS with post-execution validation PASS.
 
 ## 5. Hard constraints
 
