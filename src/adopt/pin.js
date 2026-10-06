@@ -6,7 +6,8 @@ export const MANIFEST_FORMAT = 'dev-foundry.payload-manifest.v1';
 export const MANIFEST_NAME = 'payload-manifest.json';
 
 const EXPECT_PATTERN = /^(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?):sha256:([0-9a-f]{64})$/;
-const BIN_LINK = /(?:^|\/)node_modules\/\.bin\//;
+// npm owns launch links/shims only as direct children of this package's .bin.
+const isInstallerBinArtifact = (relative) => path.posix.dirname(relative) === 'node_modules/.bin';
 
 export const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
@@ -84,11 +85,11 @@ export function verifyPayload(packageRoot, expectValue) {
     for (const item of found) {
       if (item.kind === 'other') throw new PinError();
       if (item.kind === 'link') {
-        if (!BIN_LINK.test(`${item.rel}/`) && !BIN_LINK.test(item.rel)) throw new PinError();
+        if (!isInstallerBinArtifact(item.rel)) throw new PinError();
         continue;
       }
       if (item.rel === MANIFEST_NAME) continue;
-      if (!listed.has(item.rel)) throw new PinError();
+      if (!listed.has(item.rel) && !isInstallerBinArtifact(item.rel)) throw new PinError();
     }
     return { version: manifest.version, root: expect.root };
   } catch (error) {

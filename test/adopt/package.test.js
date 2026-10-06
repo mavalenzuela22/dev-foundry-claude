@@ -9,7 +9,7 @@ import test, { after } from 'node:test';
 import { performance } from 'node:perf_hooks';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import { MANIFEST_NAME, formatExpect, rootOf, verifyPayload } from '../../src/adopt/pin.js';
+import { MANIFEST_NAME, buildManifestBytes, formatExpect, rootOf, selfPin, sha256, verifyPayload } from '../../src/adopt/pin.js';
 import { diffTrees, listTree, makeConsumer, repoRoot, applyProposal } from './fixture.js';
 
 const scratchDirs = [];
@@ -106,8 +106,8 @@ test('16 the manifest is complete and exact for the tarball and the offline inst
   assert.deepEqual(shipped.filter((file) => file !== MANIFEST_NAME), base.manifest.files.map((entry) => entry.path));
   assert.equal(base.manifest.version, JSON.parse(await readFile(path.join(repoRoot, 'package.json'), 'utf8')).version);
   const { files, links } = await regularFiles(base.installed);
-  assert.deepEqual(files.filter((file) => file !== MANIFEST_NAME), base.manifest.files.map((entry) => entry.path));
-  assert.ok(links.every((link) => /(?:^|\/)node_modules\/\.bin\//.test(link)), links.join(','));
+  assert.deepEqual(files.filter((file) => file !== MANIFEST_NAME && path.posix.dirname(file) !== 'node_modules/.bin'), base.manifest.files.map((entry) => entry.path));
+  assert.ok(links.every((link) => path.posix.dirname(link) === 'node_modules/.bin'), links.join(','));
   assert.ok(!files.includes('package-lock.json'));
   const started = performance.now();
   verifyPayload(base.installed, base.pin);
@@ -168,13 +168,33 @@ function tampers(base) {
     'deleted payload file': (dir) => rm(path.join(dir, 'templates/mcp-entry.json.tmpl')),
     'unlisted file in the package': (dir) => writeFile(path.join(dir, 'src/extra.js'), 'x'),
     'unlisted file in a bundled dependency': (dir) => writeFile(path.join(dir, 'node_modules/yaml/extra.txt'), 'x'),
+    'nested regular file inside .bin': async (dir) => {
+      await mkdir(path.join(dir, 'node_modules/.bin/nested'), { recursive: true });
+      await writeFile(path.join(dir, 'node_modules/.bin/nested/extra.cmd'), 'x');
+    },
+    'nested symlink inside .bin': async (dir) => {
+      await mkdir(path.join(dir, 'node_modules/.bin/nested'), { recursive: true });
+      await symlink('../../yaml/bin.mjs', path.join(dir, 'node_modules/.bin/nested/yaml'));
+    },
+    'unlisted shim in a dependency .bin': async (dir) => {
+      await mkdir(path.join(dir, 'node_modules/yaml/node_modules/.bin'), { recursive: true });
+      await writeFile(path.join(dir, 'node_modules/yaml/node_modules/.bin/extra.cmd'), 'x');
+    },
+    'unlisted file in .bin lookalike': async (dir) => {
+      await mkdir(path.join(dir, 'node_modules/.bin-extra'), { recursive: true });
+      await writeFile(path.join(dir, 'node_modules/.bin-extra/extra.ps1'), 'x');
+    },
+    '.bin directory replaced by a symlink': async (dir) => {
+      await rm(path.join(dir, 'node_modules/.bin'), { recursive: true, force: true });
+      await symlink('yaml', path.join(dir, 'node_modules/.bin'), 'dir');
+    },
     'symlink outside .bin': (dir) => symlink('../README.md', path.join(dir, 'src/link')),
     'changed manifest': (dir) => bump(path.join(dir, MANIFEST_NAME)),
     'missing manifest': (dir) => rm(path.join(dir, MANIFEST_NAME)),
   };
 }
 
-test('14 the only tolerated difference is a link under node_modules/.bin/', async () => {
+test('14 installer symlinks directly inside node_modules/.bin are tolerated', async () => {
   const base = await baseline();
   const dir = await copyInstalled(base);
   await mkdir(path.join(dir, 'node_modules/.bin'), { recursive: true });
@@ -185,8 +205,49 @@ test('14 the only tolerated difference is a link under node_modules/.bin/', asyn
   await rm(path.join(dir, 'node_modules/.bin/yaml'), { force: true });
   await symlink('../zod', path.join(dir, 'node_modules/.bin/added2'));
   assert.doesNotThrow(() => verifyPayload(dir, base.pin));
-  await writeFile(path.join(dir, 'node_modules/.bin/regular'), 'x');
-  assert.throws(() => verifyPayload(dir, base.pin), /verification failed/);
+});
+
+test('TSK-017 Windows npm regular direct-child launch shims verify and allow installed adoption', async (t) => {
+  const base = await baseline();
+  const dir = await copyInstalled(base);
+  await mkdir(path.join(dir, 'node_modules/.bin'), { recursive: true });
+  const shims = { yaml: '#!/bin/sh\nnode "$basedir/../yaml/bin.mjs" "$@"\n', 'yaml.cmd': '@ECHO off\r\nnode "%~dp0\\..\\yaml\\bin.mjs" %*\r\n', 'yaml.ps1': '& node "$PSScriptRoot/../yaml/bin.mjs" $args\r\n' };
+  for (const [name, content] of Object.entries(shims)) {
+    const file = path.join(dir, 'node_modules/.bin', name);
+    await rm(file, { force: true });
+    await writeFile(file, content);
+    assert.equal((await lstat(file)).isFile(), true, name);
+  }
+  assert.doesNotThrow(() => verifyPayload(dir, base.pin));
+  assert.equal(selfPin(dir).expect, base.pin);
+  const consumer = await makeConsumer();
+  t.after(() => consumer.cleanup());
+  const plan = await adoptThroughInstalledCli({ ...base, installed: dir }, consumer);
+  assert.equal(plan.adapter.expect, base.pin);
+  const call = await connect(t, process.execPath, [path.join(dir, 'bin/dev-foundry-claude.js'), 'mcp', '--expect', base.pin], consumer.root);
+  assert.equal((await call({ targetProject: 'acme-billing', requestedAction: 'author', boundaryId: 'B-1' })).errorCode, 'BINDING_INACTIVE');
+});
+
+test('TSK-017 even manifest-listed .bin files require exact size and SHA-256', async () => {
+  const base = await baseline();
+  const dir = await copyInstalled(base);
+  const relative = 'node_modules/.bin/listed.cmd';
+  const file = path.join(dir, relative);
+  const bytes = Buffer.from('@ECHO off\r\n');
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, bytes);
+  const manifest = buildManifestBytes({ version: base.manifest.version, entries: [...base.manifest.files, { path: relative, size: bytes.length, sha256: sha256(bytes) }] });
+  await writeFile(path.join(dir, MANIFEST_NAME), manifest);
+  const pin = formatExpect(base.manifest.version, rootOf(manifest));
+  assert.doesNotThrow(() => verifyPayload(dir, pin));
+  await writeFile(file, Buffer.alloc(bytes.length, 'x'));
+  assert.throws(() => verifyPayload(dir, pin), /verification failed/, 'same-size SHA mismatch');
+  await writeFile(file, Buffer.concat([bytes, Buffer.from('x')]));
+  assert.throws(() => verifyPayload(dir, pin), /verification failed/, 'size mismatch');
+  await rm(file);
+  assert.throws(() => verifyPayload(dir, pin), /verification failed/, 'missing listed file');
+  await symlink('../yaml/bin.mjs', file);
+  assert.throws(() => verifyPayload(dir, pin), /verification failed/, 'listed file replaced by tolerated link');
 });
 
 test('14 every tamper, a mismatched version, and a bad --expect exit non-zero before serving', async (t) => {
@@ -346,6 +407,11 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
   const lock = JSON.parse(await readFile(path.join(repoRoot, 'package-lock.json'), 'utf8'));
   assert.equal(lock.name, pkg.name);
   assert.equal(lock.version, pkg.version);
+  assert.equal(lock.packages[''].version, pkg.version);
+  assert.equal(pkg.version, '1.2.1');
+  const readme = await readFile(path.join(repoRoot, 'README.md'), 'utf8');
+  assert.match(readme, /\*\*Claude Code adapter 1\.2\.1\*\*/);
+  assert.ok(!readme.includes('1.2.0'));
   const ignoreText = await readFile(path.join(repoRoot, '.gitignore'), 'utf8');
   assert.ok(ignoreText.split('\n').includes('/payload-manifest.json'));
 });
@@ -354,7 +420,7 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
 // adoption/MCP/run regression tests. Its temporary producer tree is deleted.
 test('TSK-016 package ships only dashboard runtime/assets and pins every dashboard byte', async () => {
   const base = await baseline();
-  assert.equal(base.manifest.version, '1.2.0', 'TSK-016 advances the 1.1.0 compatibility baseline');
+  assert.equal(base.manifest.version, '1.2.1', 'TSK-017 preserves the TSK-016 dashboard payload contract');
   await assert.rejects(lstat(base.tree), /ENOENT/);
   const files = base.info.files.map((file) => file.path);
   for (const name of ['http', 'evidence', 'claude-otel', 'launch']) assert.ok(files.includes(`tools/dashboard/server/${name}.mjs`));
