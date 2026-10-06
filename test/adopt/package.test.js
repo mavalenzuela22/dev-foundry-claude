@@ -437,9 +437,9 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
   assert.equal(lock.name, pkg.name);
   assert.equal(lock.version, pkg.version);
   assert.equal(lock.packages[''].version, pkg.version);
-  assert.equal(pkg.version, '1.2.2');
+  assert.equal(pkg.version, '1.2.3');
   const readme = await readFile(path.join(repoRoot, 'README.md'), 'utf8');
-  assert.match(readme, /\*\*Claude Code adapter 1\.2\.2\*\*/);
+  assert.match(readme, /\*\*Claude Code adapter 1\.2\.3\*\*/);
   assert.ok(!readme.includes('1.2.0') && !readme.includes('1.2.1'));
   const ignoreText = await readFile(path.join(repoRoot, '.gitignore'), 'utf8');
   assert.ok(ignoreText.split('\n').includes('/payload-manifest.json'));
@@ -449,7 +449,7 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
 // adoption/MCP/run regression tests. Its temporary producer tree is deleted.
 test('TSK-016 package ships only dashboard runtime/assets and pins every dashboard byte', async () => {
   const base = await baseline();
-  assert.equal(base.manifest.version, '1.2.2', 'TSK-018 preserves the TSK-016 dashboard payload contract');
+  assert.equal(base.manifest.version, '1.2.3', 'TSK-019 preserves the TSK-016 dashboard payload contract');
   await assert.rejects(lstat(base.tree), /ENOENT/);
   const files = base.info.files.map((file) => file.path);
   for (const name of ['http', 'evidence', 'claude-otel', 'launch']) assert.ok(files.includes(`tools/dashboard/server/${name}.mjs`));
