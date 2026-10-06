@@ -147,6 +147,8 @@ The current project authority is:
   isolated package-consumer smoke task;
 - TSK-016-CLOSURE for TSK-016 terminal disposition, promotion evidence, known
   distribution limit, and formal closure.
+- TSK-017 for the active Windows installed-payload verification corrective,
+  cross-platform package-consumer regression, patch release, and README clarification.
 
 No MTP is active.
 `dev-foundry-executor` and `dev-foundry-auditor` remain Claude adapter product

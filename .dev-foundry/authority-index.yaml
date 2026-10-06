@@ -269,6 +269,16 @@ routes:
       - tsk-016-terminal-disposition
       - claude-adapter-dashboard-distribution-closure
     section_id: null
+  - id: TSK-017
+    path: docs/70-tasks/70 [TSK-017] PROJECT - Fix Windows Installed Payload Verification and Consumer Packaging Guidance.md
+    authority_class: task
+    governs:
+      - windows-installed-payload-verification
+      - npm-bin-shim-integrity-boundary
+      - cross-platform-package-consumer-smoke
+      - adapter-installation-documentation-corrective
+      - adapter-patch-release
+    section_id: null
 
 bindings:
   - id: project-operating-profile
