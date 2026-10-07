@@ -535,13 +535,18 @@ project authorization determines what that tool may do.
 You need:
 
 - Node.js 20 or newer, npm and Git.
-- Access to the official GitHub Release download. No producer checkout is needed.
+- Access to the official public GitHub Release download. The documented 1.3.0
+  install URL supports anonymous access; no producer checkout or GitHub
+  credentials are required.
 - A Git repository with DEV FOUNDRY **2.1.0** setup complete and active, and a clean
   working tree. Save or commit your existing changes through your normal workflow
   before preparing the repository.
 - For starting Claude: Claude Code and your existing login/provider configuration.
   DIAL users also need `dial`; CodeMie users need `codemie-claude` on `PATH`.
   The dashboard needs no Claude session or provider credentials.
+
+Authenticated acquisition from a private producer repository is outside the
+1.3.0 baseline.
 
 The adapter cannot set up DEV FOUNDRY itself or migrate its version. If your
 repository is not ready, establish and review the project setup described in
@@ -975,6 +980,10 @@ uploads only the two tarballs and `SHA256SUMS`, and publishes to neither npm nor
 GitHub Packages. Publication is a separate authorized step. The offline
 tarball/prefix install mechanism has been tested with
 registry access disabled and the temporary producer build tree deleted.
+
+The anonymous consumer download URL assumes the producer repository and release
+assets remain publicly readable. Making the repository private requires an
+authenticated acquisition flow outside the 1.3.0 baseline.
 
 ### Package contents and exclusions
 
