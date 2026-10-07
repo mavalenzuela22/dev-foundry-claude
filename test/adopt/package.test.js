@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { legacyPackage } from './legacy-fixture.js';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:net';
 import { request } from 'node:http';
@@ -27,7 +28,7 @@ const npm = (args, cwd, env = {}) => execFileSync('npm', args, { cwd, encoding: 
 // Builds a tarball from a copy of the tracked package inputs plus the prod node_modules.
 async function build(mutate) {
   const tree = await scratch('build-tree');
-  for (const entry of ['package.json', 'package-lock.json', 'README.md', 'bin', 'src', 'templates', 'scripts/package']) {
+  for (const entry of ['package.json', 'package-lock.json', 'README.md', 'bin', 'src', 'templates', 'framework', 'migrations', 'scripts/package']) {
     await cp(path.join(repoRoot, entry), path.join(tree, entry), { recursive: true });
   }
   await cp(path.join(repoRoot, 'tools/dashboard'), path.join(tree, 'tools/dashboard'), {
@@ -383,13 +384,15 @@ test('7 14 19 the installed package adopts a consumer, serves prepared-then-acti
     { requestedAction: 'validate', boundaryId: 'B-1' }, { requestedAction: 'close', boundaryId: 'B-1' },
   ];
   for (const request of roleRequests) assert.equal((await call({ targetProject: 'acme-billing', ...request })).errorCode, 'BINDING_INACTIVE');
-  // Consumer-governed cutover: the guard re-evaluates on every call.
+  // Consumer-governed activation changes runtime identity and requires a fresh session.
   await applyProposal(consumer.root, plan.cutover_proposal);
+  for (const request of roleRequests) assert.equal((await call({ targetProject: 'acme-billing', ...request })).errorCode, 'STALE_SESSION');
+  const freshCall = await connect(t, process.execPath, [await realpath(binLink), ...entry.args], consumer.root);
   for (const request of roleRequests) {
-    const result = await call({ targetProject: 'acme-billing', ...request });
+    const result = await freshCall({ targetProject: 'acme-billing', ...request });
     assert.equal(result.ok, true, JSON.stringify(result));
   }
-  assert.equal((await call({ targetProject: 'dev-foundry-claude', ...roleRequests[0] })).errorCode, 'TARGET_MISMATCH');
+  assert.equal((await freshCall({ targetProject: 'dev-foundry-claude', ...roleRequests[0] })).errorCode, 'TARGET_MISMATCH');
   assert.equal(JSON.parse(cli(base.installed, ['adopt', 'status', '--root', consumer.root]).stdout).overall, 'active');
   // The installed adapter refuses to plan when it fails self-verification.
   const broken = await copyInstalled(base);
@@ -687,7 +690,7 @@ test('TSK-020 installed CLI explicitly plans/applies compatible upgrade with exa
   const consumer = await makeConsumer(); t.after(consumer.cleanup);
   const { createPlan } = await import('../../src/adopt/plan.js');
   const { applyPlan } = await import('../../src/adopt/apply.js');
-  const old = { version: '1.2.2', payloadRoot: 'a'.repeat(64), expect: `1.2.2:sha256:${'a'.repeat(64)}` };
+  const old = { version: '1.4.0', payloadRoot: 'a'.repeat(64), expect: `1.4.0:sha256:${'a'.repeat(64)}` };
   const adoption = await createPlan({ root: consumer.root, adapter: old });
   await applyPlan({ root: consumer.root, adapter: old, planBytes: adoption.bytes, planSha256: adoption.hash });
   consumer.commit();
@@ -740,8 +743,8 @@ test('TSK-021 isolated installed package guides fresh and brownfield setup, stat
   for (const file of ['src/consumer/help.js', 'src/consumer/command.js', 'src/telemetry/launch.js']) assert.ok(base.manifest.files.some((entry) => entry.path === file));
   const fresh = await makeConsumer({ governed: false }); t.after(fresh.cleanup);
   const freshBefore = await listTree(fresh.root);
-  const freshResult = cli(base.installed, ['setup', '--yes'], { cwd: fresh.root });
-  assert.equal(freshResult.status, 2); assert.match(freshResult.stdout, /owner/);
+  const freshResult = cli(base.installed, ['setup'], { cwd: fresh.root });
+  assert.equal(freshResult.status, 0); assert.match(freshResult.stdout, /Human Operator: Test/);
   assert.deepEqual(diffTrees(freshBefore, await listTree(fresh.root)), []);
   const c = await makeConsumer(); t.after(c.cleanup);
   const invoke = (command, args = [], env = {}) => cli(base.installed, [command, ...args], { cwd: c.root, env });
@@ -795,30 +798,21 @@ test('TSK-021 isolated installed package guides fresh and brownfield setup, stat
   });
 });
 
-test('TSK-021 installed 1.4.0 upgrades a verified isolated 1.2.2-shaped package with differing managed bytes', async (t) => {
+test('TSK-021 installed 1.4.0 bridges the exact historical 1.2.2 package', async (t) => {
   const base = await baseline();
-  const oldBuild = await build(async (tree) => {
-    for (const file of ['package.json', 'package-lock.json']) {
-      const absolute = path.join(tree, file); const data = JSON.parse(await readFile(absolute, 'utf8'));
-      data.version = '1.2.2'; if (data.packages) data.packages[''].version = '1.2.2';
-      await writeFile(absolute, JSON.stringify(data, null, 2) + '\n');
-    }
-    for (const file of ['agents/dev-foundry-executor.md.tmpl', 'agents/dev-foundry-auditor.md.tmpl', 'claude-md-block.md.tmpl']) {
-      const absolute = path.join(tree, 'templates', file); const text = await readFile(absolute, 'utf8');
-      await writeFile(absolute, file.startsWith('agents/') ? `${text}\n<!-- Adapter 1.2.2 managed agent -->\n` : text.replace(/DEV FOUNDRY/g, 'DEV FOUNDRY 1.2.2 integration'));
-    }
-  });
-  const oldPackage = await extract(oldBuild.tarball);
+  const { source: oldPackage } = await legacyPackage(t);
   const c = await makeConsumer(); t.after(c.cleanup);
-  const setup = cli(oldPackage, ['setup', '--yes', '--json'], { cwd: c.root });
+  const oldPlanFile = path.join(await scratch('historical-plan'), 'plan.json');
+  const plannedOld = cli(oldPackage, ['adopt', 'plan', '--root', c.root, '--out', oldPlanFile]); assert.equal(plannedOld.status, 0, plannedOld.stderr);
+  const setup = cli(oldPackage, ['adopt', 'apply', '--root', c.root, '--plan', oldPlanFile, '--plan-sha256', JSON.parse(plannedOld.stdout).planSha256]);
   assert.equal(setup.status, 0, setup.stderr); c.commit();
   const before = await listTree(c.root); const authority = await readSetSnapshot(c.root);
   const invoke = (args) => cli(base.installed, ['upgrade', ...args], { cwd: c.root });
   const without = invoke([]); assert.equal(without.status, 2); assert.match(without.stdout, /managed files need to be refreshed/);
   const planned = invoke(['--from-package', oldPackage, '--json']); assert.equal(planned.status, 0, planned.stderr);
-  const data = JSON.parse(planned.stdout); assert.equal(data.plan.upgradeKind, 'managed-refresh');
+  const data = JSON.parse(planned.stdout); assert.equal(data.plan.upgradeKind, 'legacy-bridge');
   assert.equal(data.plan.current.expect, selfPin(oldPackage).expect); assert.equal(data.plan.target.expect, base.pin);
-  assert.equal(data.plan.merge.length, 4); assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  assert.equal(data.plan.merge.length, 1); assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
   const planFile = path.join(await scratch('managed-plan'), 'plan.json');
   const exact = cli(base.installed, ['upgrade', 'plan', '--root', c.root, '--from-package', oldPackage, '--out', planFile]);
   assert.equal(exact.status, 0, exact.stderr);
@@ -827,8 +821,58 @@ test('TSK-021 installed 1.4.0 upgrades a verified isolated 1.2.2-shaped package 
   assert.equal(denied.status, 1); assert.match(denied.stderr, /plan-hash-mismatch/);
   assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
   const applied = cli(base.installed, ['upgrade', 'apply', '--root', c.root, '--plan', planFile, '--plan-sha256', hash]);
-  assert.equal(applied.status, 0, applied.stderr); assert.deepEqual(JSON.parse(applied.stdout), { written: 4, deleted: 0 });
-  assert.deepEqual(diffTrees(before, await listTree(c.root)), ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md']);
+  assert.equal(applied.status, 0, applied.stderr); assert.deepEqual(JSON.parse(applied.stdout), { written: 1, deleted: 0 });
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), ['.mcp.json']);
   assert.deepEqual(await readSetSnapshot(c.root), authority);
   c.commit(); assert.equal(JSON.parse(cli(base.installed, ['adopt', 'plan', '--root', c.root]).stdout).status, 'noop');
+});
+
+test('V005 installed package bootstraps without producer authority; source/target staging preserves runtime and pin; MCP cutover fails stale', async (t) => {
+  const base = await baseline();
+  for (const file of ['framework/dev-foundry-2.1.0.bundle.json', 'migrations/release.json', 'src/governance-mcp/session.js']) assert.ok(base.manifest.files.some((entry) => entry.path === file));
+  assert.equal((await import('../../src/adopt/migration.js')).MIGRATION_MATERIAL, 'migrations/release.json');
+  const c = await makeConsumer({ governed: false }); t.after(c.cleanup);
+  const before = await listTree(c.root);
+  const preview = cli(base.installed, ['setup', '--json'], { cwd: c.root }); assert.equal(preview.status, 0, preview.stderr);
+  const planned = JSON.parse(preview.stdout); assert.equal(planned.plan.mode, 'initial-bootstrap');
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  const applied = cli(base.installed, ['setup', '--yes', '--json'], { cwd: c.root }); assert.equal(applied.status, 0, applied.stderr);
+  const data = JSON.parse(applied.stdout); assert.equal(data.plan.bootstrap.classification, 'brownfield'); assert.ok(['active', 'ready'].includes(data.integration));
+  for (const [file, hash] of before) if (!['CLAUDE.md', '.mcp.json', '.dev-foundry/.gitignore'].includes(file)) assert.equal((await listTree(c.root)).get(file), hash);
+  const { frameworkFiles } = await import('../../src/adopt/bootstrap.js');
+  for (const [file, bytes] of await frameworkFiles()) assert.deepEqual(await readFile(path.join(c.root, file)), bytes);
+  assert.equal(JSON.parse(cli(base.installed, ['setup', '--json'], { cwd: c.root }).stdout).plan.status, 'noop'); c.commit();
+  const migration = cli(base.installed, ['migration'], { cwd: os.tmpdir() }); assert.equal(migration.status, 0, migration.stderr);
+  const material = JSON.parse(migration.stdout); assert.equal(material.identity.expect, base.pin); assert.equal(material.material.selfUpdateBaseline, '1.4.0');
+  assert.equal(material.materialSha256, sha256(await readFile(path.join(base.installed, 'migrations/release.json'))));
+  const tampered = await copyInstalled(base); await bump(path.join(tampered, 'migrations/release.json'));
+  assert.equal(cli(tampered, ['migration']).status, 1); assert.equal(cli(tampered, ['setup'], { cwd: c.root }).status, 1);
+  const client = new Client({ name: 'source-session-cutover', version: '1.0.0' });
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(base.installed, 'bin/dev-foundry-claude.js'), 'mcp', '--expect', base.pin], env: { CLAUDE_PROJECT_DIR: c.root }, cwd: os.tmpdir() })); t.after(() => client.close());
+  const call = async (action = 'inspect') => JSON.parse((await client.callTool({ name: 'resolve_governed_operation', arguments: { requestedAction: action, targetProject: data.project, taskId: 'TSK-001' } })).content[0].text);
+  assert.equal((await call()).ok, true);
+  const initialTask = '.dev-foundry/onboarding/TSK-001.md'; await c.put(initialTask, `${await c.read(initialTask)}\nVerified observation.\n`);
+  const { parse, stringify } = await import('yaml'); const index = parse(await c.read('.dev-foundry/authority-index.yaml'));
+  await c.put('.dev-foundry/onboarding/TSK-002.md', (await c.read(initialTask)).replace('id: TSK-001', 'id: TSK-002'));
+  index.routes.push({ id: 'additional-task', path: '.dev-foundry/onboarding/TSK-002.md', authority_class: 'task', governs: ['observations'], section_id: null });
+  await c.put('.dev-foundry/authority-index.yaml', stringify(index)); assert.equal((await call()).ok, true); c.commit();
+  const sourceTree = await listTree(base.installed); const consumerTree = await listTree(c.root); const selection = await c.read('.mcp.json');
+  // Simulate a future release carrying semantic deltas. It is an isolated target
+  // test artifact; this source release does not implement those future semantics.
+  const targetBuild = await build(async (tree) => {
+    for (const file of ['package.json', 'package-lock.json']) { const absolute = path.join(tree, file); const pkg = JSON.parse(await readFile(absolute, 'utf8')); pkg.version = '1.4.1'; if (pkg.packages) pkg.packages[''].version = '1.4.1'; await writeFile(absolute, JSON.stringify(pkg, null, 2) + '\n'); }
+    const file = path.join(tree, 'migrations/release.json'); const material = JSON.parse(await readFile(file, 'utf8')); material.targetVersion = '1.4.1'; material.selfUpdate.requiresGovernedReconciliation = true; material.selfUpdate.mode = 'governed-semantic-reconciliation'; await writeFile(file, JSON.stringify(material, null, 2) + '\n');
+  });
+  const prefix = await scratch('staged-target-install'); npm(['install', '--offline', '--ignore-scripts', '--prefix', prefix, targetBuild.tarball], os.tmpdir());
+  const targetRoot = path.join(prefix, 'node_modules/@dev-foundry/claude-adapter'); const targetPin = selfPin(targetRoot);
+  assert.equal(JSON.parse(cli(targetRoot, ['migration']).stdout).identity.expect, targetPin.expect);
+  assert.deepEqual(diffTrees(sourceTree, await listTree(base.installed)), []); assert.deepEqual(diffTrees(consumerTree, await listTree(c.root)), []); assert.equal(await c.read('.mcp.json'), selection); assert.equal((await call()).ok, true);
+  const refuse = cli(targetRoot, ['upgrade', '--yes', '--json'], { cwd: c.root }); assert.equal(refuse.status, 2); const refusal = JSON.parse(refuse.stdout);
+  assert.ok(refusal.plan.blockers.some((blocker) => blocker.code === 'governed-migration-required')); assert.match(refusal.nextAction, /currently governed Claude session/); assert.deepEqual(refusal.plan.merge, []);
+  assert.deepEqual(diffTrees(consumerTree, await listTree(c.root)), []); assert.equal((await call()).ok, true);
+  // A fixture-governed cutover changes only the pin to test session enforcement.
+  const config = JSON.parse(selection); config.mcpServers['dev-foundry-governance'].args[2] = targetPin.expect; await c.put('.mcp.json', JSON.stringify(config));
+  for (const action of ['inspect', 'author', 'implement', 'validate', 'audit', 'promote', 'close']) { const denied = await call(action); assert.equal(denied.errorCode, 'STALE_SESSION'); assert.equal(denied.nextAction, 'dev-foundry-claude start'); }
+  assert.match((await client.readResource({ uri: 'dev-foundry://help/upgrade' })).contents[0].text, /mandatory|restart/);
+  assert.deepEqual(diffTrees(sourceTree, await listTree(base.installed)), []);
 });

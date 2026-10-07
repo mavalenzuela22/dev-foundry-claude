@@ -1,6 +1,7 @@
 import path from 'node:path';
+import { currentMigrationMaterial, legacyVersion, migrationRequiresGovernedSession } from './migration.js';
 import { readFile, realpath } from 'node:fs/promises';
-import { AGENT_PATHS, CLAUDE_MD, MCP_FILE, MCP_SERVER_NAME, isObject, readContained } from './common.js';
+import { AGENT_PATHS, CLAUDE_MD, MCP_FILE, MCP_SERVER_NAME, POP_PATH, isObject, readContained, readYamlContained } from './common.js';
 import { makeUnifiedDiff } from './diff.js';
 import { git } from './ignore.js';
 import { createPlan } from './plan.js';
@@ -35,9 +36,35 @@ export async function createUpgradePlan({ root: rootArgument, adapter, currentPa
     return finish();
   }
 
+  const release = await currentMigrationMaterial();
+  plan.migrationMaterialSha256 = release.materialSha256;
+  const currentFrameworkVersion = (await readYamlContained(root, POP_PATH))?.framework?.adopted_version;
+  const governedMigration = migrationRequiresGovernedSession(release.material, currentFrameworkVersion);
+  if (plan.current.expect !== adapter.expect && governedMigration) {
+    block('governed-migration-required', 'This release changes project governance. Continue the upgrade in your currently governed Claude session using the verified staged target.');
+    plan.nextAction = 'Continue in your currently governed Claude session; after cutover run dev-foundry-claude start';
+    return finish();
+  }
+  const legacy = adapter.version === release.material.selfUpdateBaseline && legacyVersion(plan.current.version);
+  if (legacy) {
+    const recipe = release.material.legacy.find((item) => item.source === plan.current.expect);
+    if (!recipe || recipe.configuredAuthorityTransforms?.length !== 0 || recipe.preserveForeignRuntime !== true || !Array.isArray(recipe.allowedPaths) ||
+        recipe.allowedPaths.length !== 4 || new Set(recipe.allowedPaths).size !== 4 ||
+        recipe.allowedPaths.some((file) => ![...Object.values(AGENT_PATHS), CLAUDE_MD, MCP_FILE].includes(file))) {
+      block('legacy-source-unsupported', 'This exact legacy build has no verified bridge. Keep the current runtime and obtain its released package and provenance.');
+      return finish();
+    }
+    plan.legacyRecipe = recipe.id;
+    plan.upgradeKind = 'legacy-bridge';
+    if (!currentPackageRoot) {
+      block('legacy-package-required', 'A one-time legacy bridge is available. Keep the exact previous package and pass it with --from-package to prove managed-file ownership.');
+      return finish();
+    }
+  }
+
   // Keep the current pin while comparing managed bytes through adoption.
   let compatible = await createPlan({ root, adapter: plan.current });
-  if (compatible.plan.status !== 'noop' && currentPackageRoot) {
+  if ((legacy || compatible.plan.status !== 'noop') && currentPackageRoot) {
     try {
       const source = await realpath(path.resolve(currentPackageRoot));
       if (selfPin(source).expect !== plan.current.expect) throw new Error();
@@ -51,7 +78,7 @@ export async function createUpgradePlan({ root: rootArgument, adapter, currentPa
       if (compatible.plan.status === 'blocked' || compatible.plan.create.length || compatible.plan.delete.length ||
           compatible.ops.writes.some((item) => !allowed.has(item.path))) throw new Error();
       plan.currentPackageRoot = source;
-      plan.upgradeKind = 'managed-refresh';
+      plan.upgradeKind = legacy ? 'legacy-bridge' : 'managed-refresh';
     } catch {
       block('upgrade-ownership-unverified', 'The previous package must match the project pin and every existing managed file. Restore the original managed files or provide the exact previous package with --from-package.');
     }
@@ -66,7 +93,7 @@ export async function createUpgradePlan({ root: rootArgument, adapter, currentPa
     block('upgrade-repository-invalid', 'Repository state cannot be established.');
   }
   plan.repository = { root, head: head.stdout.trim(), diffSha256: sha256(drift.stdout), statusSha256: sha256(status.stdout) };
-  if (compatible.plan.status !== 'noop' && plan.upgradeKind !== 'managed-refresh') {
+  if (compatible.plan.status !== 'noop' && !['managed-refresh', 'legacy-bridge'].includes(plan.upgradeKind)) {
     plan.blockers.push(...compatible.plan.blockers);
     block('upgrade-migration-required', 'Some DEV FOUNDRY-managed files need to be refreshed. Supply the exact previous installed package with --from-package to verify ownership. Your application code will not be changed.');
   }

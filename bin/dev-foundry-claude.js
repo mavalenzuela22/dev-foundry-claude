@@ -27,12 +27,17 @@ if (!command || ['setup', 'start', 'status', 'doctor', 'help', '--help'].include
   const { consumerCommand } = await import('../src/consumer/command.js');
   try { process.exitCode = await consumerCommand({ command: !command || command === '--help' ? 'help' : command, argv: rest, packageRoot }); }
   catch (error) { fail(`The operation could not complete safely. No application files were changed. ${error.exitCode === 2 ? error.message : `Next: dev-foundry-claude doctor. Use --verbose for technical diagnostics.${rest.includes('--verbose') ? ` Detail: ${error.code ?? error.message}` : ''}`}`, error.exitCode ?? 1); }
+} else if (command === 'migration') {
+  if (rest.length) fail('Usage: dev-foundry-claude migration', 2);
+  const { inspectMigrationRelease } = await import('../src/adopt/migration.js');
+  try { console.log(JSON.stringify(await inspectMigrationRelease(packageRoot), null, 2)); } catch { verificationFailure(); }
 } else if (command === '--version') {
   console.log(packageVersion());
 } else if (command === 'mcp') {
   if (rest.length !== 2 || rest[0] !== '--expect') verificationFailure();
   try { verifyPayload(packageRoot, rest[1]); } catch { verificationFailure(); }
   globalThis[Symbol.for('dev-foundry-claude.consumer-mode-guard')] = true;
+  globalThis[Symbol.for('dev-foundry-claude.consumer-runtime-pin')] = rest[1];
   await import(pathToFileURL(path.join(packageRoot, 'src/governance-mcp/server.js')).href);
 } else if (command === 'dashboard') {
   const { dashboardCommand } = await import('../src/dashboard/command.js');

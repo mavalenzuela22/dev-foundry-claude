@@ -24,9 +24,9 @@ Replace `<project>` with your Git project directory. `setup` inspects first and
 prints the next action. If it offers a managed-file plan, review it and run
 `dev-foundry-claude setup --yes` to prepare the integration.
 
-**A new project may need an additional owner-approved step.** This adapter does
-not automatically adopt DEV FOUNDRY or activate Claude. Follow the guidance from
-`setup`; `start` launches once the project is ready. For an explanation at any
+For a project with no DEV FOUNDRY authority, `setup --yes` explicitly confirms
+adoption of the packaged DEV FOUNDRY 2.1.0 release and establishes the first
+active Claude integration. `start` launches once runtime preflight passes. For an explanation at any
 point, run `dev-foundry-claude help setup`.
 
 ## What setup and start do
@@ -52,9 +52,16 @@ approve or silently rewrite approved project rules. Upgrade stays within verifie
 DEV FOUNDRY-owned integration files. Local edits or unclear ownership can prevent
 these operations from proceeding.
 
-If the project has no DEV FOUNDRY configuration, its owner must adopt the
-framework through the project's decision process first. `setup` explains this
-remaining step; installing the adapter does not create approved project rules.
+If the project has no DEV FOUNDRY configuration, setup previews the project
+identity, classification, human Operator, framework and exact paths. It derives
+defaults from repository facts. Supply missing choices with `--project <name>`,
+`--classification greenfield|brownfield` and `--operator "Your name"`.
+`setup --yes` (or `--apply`) is explicit human confirmation to create minimum
+project authority and active Claude bindings. The installed package carries the
+byte-exact immutable framework; no producer checkout or network lookup is needed.
+The first task establishes a verified baseline. For a brownfield project,
+ordinary product implementation waits until the existing system is observed.
+Existing incomplete governance is refused for review, never overwritten.
 
 If files are prepared but Claude is not active, the owner must review and
 approve Claude's project responsibilities through that same process.
@@ -139,20 +146,48 @@ Opening the dashboard does not invoke Claude or spend Claude tokens. If port
 4319 is occupied, choose another local port, such as 4320, and use the newly
 printed URL.
 
+## Choose your setup or upgrade path
+
+- **No DEV FOUNDRY:** `setup` preview → `setup --yes` → `start`.
+- **Legacy pre-1.4.0:** stage 1.4.0 alongside the exact previous package,
+  preview the one-time bridge with `upgrade --from-package <previous-package>`,
+  apply with the same arguments plus `--yes`, then `start`. Exact supported
+  builds are the 1.2.2 TSK-018 artifact, 1.3.0 validation artifact and reproduced
+  v1.3.0 public-tag package, identified by
+  payload checksum in packaged migration material. Product files, historical
+  evidence and foreign active governance bindings are preserved.
+- **1.4.0+ governance changes:** continue in the current governed Claude session,
+  review the staged target under current project authority, obtain reserved human
+  decisions and validation/audit, cross the authorized cutover, then run a fresh
+  `dev-foundry-claude start`. The old session cannot resolve further governed work.
+
+For upgrades, preserve the source installation and stage targets outside the
+project in an isolated directory. For example, with an acquired tarball:
+
+```sh
+npm install --prefix /path/to/isolated-target /path/to/release.tgz --offline --ignore-scripts
+node /path/to/isolated-target/node_modules/@dev-foundry/claude-adapter/bin/dev-foundry-claude.js migration
+```
+
+`migration` verifies the staged package and exposes its migration contract and
+exact identity without changing project files. A target requiring semantic
+reconciliation routes `upgrade` to your currently governed Claude session;
+CLI code cannot make those project decisions. There are no background updates.
+
 ## Upgrading to adapter 1.4.0
 
 Installing a release changes the tool on your machine. `upgrade` separately
 moves a configured project's selection to that installed tool. Review its
 preview before applying changes.
 
-Before replacing an older installation, keep its exact package available outside
-the project. A refresh may need it to prove which existing files the adapter owns.
+Keep the older installation available outside the project and acquire the target
+side-by-side without replacing the source runtime. A refresh may need it to prove which existing files the adapter owns.
 Commit or restore pending changes to files the upgrade would touch.
 
 ```sh
-npm install -g https://github.com/mavalenzuela22/dev-foundry-claude/releases/latest/download/dev-foundry-claude-adapter.tgz
+npm install --prefix /path/to/isolated-target /path/to/release.tgz --offline --ignore-scripts
 cd <project>
-dev-foundry-claude upgrade
+node /path/to/isolated-target/node_modules/@dev-foundry/claude-adapter/bin/dev-foundry-claude.js upgrade
 ```
 
 `latest` is an acquisition alias: it downloads the current public release. It

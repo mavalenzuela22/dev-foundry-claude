@@ -2,16 +2,18 @@ import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import test from 'node:test';
+import test, { after } from 'node:test';
 import { consumerCommand, inspectConsumer } from '../../src/consumer/command.js';
 import { renderHelp, helpTopics, helpUri } from '../../src/consumer/help.js';
 import { createPlan } from '../../src/adopt/plan.js';
 import { applyPlan } from '../../src/adopt/apply.js';
-import { adapterIdentity, applyProposal, diffTrees, listTree, makeConsumer, readSetSnapshot, repoRoot } from './fixture.js';
+import { adapterIdentity, applyProposal, diffTrees, listTree, makeConsumer, makePresentationPackage, readSetSnapshot, repoRoot } from './fixture.js';
 
+const presentationPackage = await makePresentationPackage();
+after(presentationPackage.cleanup);
 const invoke = async (c, command, argv = [], overrides = {}) => {
   const lines = [];
-  const code = await consumerCommand({ command, argv, cwd: c.root, packageRoot: repoRoot,
+  const code = await consumerCommand({ command, argv, cwd: c.root, packageRoot: presentationPackage.root,
     getAdapter: () => adapterIdentity, executableAvailable: () => true, output: (line) => lines.push(line), ...overrides });
   return { code, text: lines.join('\n'), lines };
 };
@@ -23,15 +25,15 @@ async function prepared(t, active = false) {
   if (active) { await applyProposal(c.root, plan.plan.cutover_proposal); c.commit(); }
   return c;
 }
-const inspectOptions = (c) => ({ root: c.root, packageRoot: repoRoot, adapter: adapterIdentity, executableAvailable: () => true });
+const inspectOptions = (c) => ({ root: c.root, packageRoot: presentationPackage.root, adapter: adapterIdentity, executableAvailable: () => true });
 
 test('setup classifies fresh, governed, prepared, partial and ready and never silently writes', async (t) => {
   const fresh = await makeConsumer({ governed: false }); t.after(fresh.cleanup);
   const before = await listTree(fresh.root);
   const freshView = await inspectConsumer(inspectOptions(fresh));
-  assert.equal(freshView.integration, 'unconfigured');
-  assert.equal(freshView.nextAction, 'dev-foundry-claude help setup');
-  assert.match((await invoke(fresh, 'setup', ['--yes'])).text, /project.*owner|owner.*project/i);
+  assert.equal(freshView.integration, 'initial-bootstrap');
+  assert.equal(freshView.nextAction, 'dev-foundry-claude setup');
+  assert.match((await invoke(fresh, 'setup')).text, /Human Operator: Test/);
   assert.deepEqual(diffTrees(before, await listTree(fresh.root)), []);
   const c = await makeConsumer(); t.after(c.cleanup);
   const authority = await readSetSnapshot(c.root);

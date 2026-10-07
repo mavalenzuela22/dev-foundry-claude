@@ -1,3 +1,4 @@
+import { createBootstrapPlan } from './bootstrap.js';
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -39,7 +40,7 @@ async function actorProfileId(root, profilePath) {
   return data && typeof data.id === 'string' ? data.id : path.posix.basename(profilePath).replace(/\.yaml$/, '');
 }
 
-export async function createPlan({ root: rootArgument, project, idPrefix, remove = false, adapter, templatesRoot, managedRefreshHashes = {} }) {
+export async function createPlan({ root: rootArgument, project, idPrefix, remove = false, adapter, templatesRoot, managedRefreshHashes = {}, initialBootstrap = false, classification, operator }) {
   const facts = await inspect(rootArgument, { project, idPrefix });
   const plan = {
     planFormat: PLAN_FORMAT,
@@ -59,6 +60,7 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
     const bytes = Buffer.from(canonicalJson(plan), 'utf8');
     return { plan, bytes, hash: sha256(bytes), ops };
   };
+  if (!facts.governed && initialBootstrap && !remove) return createBootstrapPlan({ facts, adapter, project, classification, operator });
   if (!facts.governed) {
     if (!facts.blockers.length || facts.root !== null) plan.status = 'not-governed';
     return finish();

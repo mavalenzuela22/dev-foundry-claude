@@ -7,6 +7,7 @@ import { selfPin } from '../adopt/pin.js';
 import { git, isIgnored, PROBE_PATH } from '../adopt/ignore.js';
 import { pathHasSymlink, readContained, POP_PATH, INDEX_PATH } from '../adopt/common.js';
 import { runLauncher, RUNTIMES } from '../telemetry/launch.js';
+import { legacyVersion } from '../adopt/migration.js';
 import { renderHelp } from './help.js';
 
 const cli = 'dev-foundry-claude';
@@ -15,7 +16,7 @@ export class ConsumerUsageError extends Error { constructor(message) { super(mes
 function optionsFor(command, argv) {
   const allowed = new Set(['--root', '--verbose', ...(command === 'start' ? ['--runtime'] : ['--json']),
     ...(['setup', 'upgrade'].includes(command) ? ['--yes', '--apply'] : []),
-    ...(command === 'upgrade' ? ['--from-package'] : []), ...(command === 'doctor' ? ['--runtime'] : [])]);
+    ...(command === 'setup' ? ['--project', '--classification', '--operator'] : []), ...(command === 'upgrade' ? ['--from-package'] : []), ...(command === 'doctor' ? ['--runtime'] : [])]);
   const boolean = new Set(['--verbose', '--json', '--yes', '--apply']);
   const options = { claudeArgs: [] };
   for (let index = 0; index < argv.length; index += 1) {
@@ -51,7 +52,7 @@ function writableAncestor(target, root) {
   } catch { return false; }
 }
 
-export async function inspectConsumer({ root: selected, packageRoot, adapter, runtime = 'direct', env = process.env, executableAvailable = runtimeAvailable }) {
+export async function inspectConsumer({ root: selected, packageRoot, adapter, runtime = 'direct', env = process.env, executableAvailable = runtimeAvailable, bootstrapInputs = {} }) {
   const top = git(selected, ['rev-parse', '--show-toplevel']);
   let root = null;
   try { if (top.status === 0 && top.stdout.trim()) root = realpathSync(top.stdout.trim()); } catch { /* diagnostics below */ }
@@ -60,7 +61,7 @@ export async function inspectConsumer({ root: selected, packageRoot, adapter, ru
     telemetry: 'not-ready', dashboardAvailable: existsSync(path.join(packageRoot, 'tools/dashboard/dist/index.html')),
     readyToWork: false, nextAction: `${cli} help getting-started`, diagnostics: [], plan: null };
   if (!root) { result.summary = 'Open a Git project before setting up Claude.'; result.diagnostics.push('repository-unavailable'); return result; }
-  const planned = await createPlan({ root, adapter });
+  const planned = await createPlan({ root, adapter, initialBootstrap: true, ...bootstrapInputs });
   const plan = planned.plan;
   result.plan = plan;
   result.project = plan.target.project;
@@ -74,8 +75,9 @@ export async function inspectConsumer({ root: selected, packageRoot, adapter, ru
   if (result.adoption === 'unconfigured') {
     const partial = await readContained(root, POP_PATH) || await readContained(root, INDEX_PATH) || entry;
     result.integration = partial ? 'partially-configured' : 'unconfigured';
-    result.summary = partial ? 'Project configuration is incomplete or unreadable. Ask the project owner to review it.' : 'This project needs DEV FOUNDRY setup by its owner before Claude can be connected.';
-    result.nextAction = `${cli} help setup`;
+    result.integration = plan.mode === 'initial-bootstrap' && plan.status === 'ready' ? 'initial-bootstrap' : partial ? 'partially-configured' : 'unconfigured';
+    result.summary = result.integration === 'initial-bootstrap' ? 'This repository is not configured yet. Setup can establish DEV FOUNDRY here.' : plan.blockers[0]?.message.split(' Next: ')[0] ?? 'Project configuration needs review.';
+    result.nextAction = result.integration === 'initial-bootstrap' ? `${cli} setup` : (plan.blockers[0]?.message.split('Next: ')[1] ?? `${cli} doctor --verbose`);
     return result;
   }
   const active = plan.activation?.overall === 'active';
@@ -103,6 +105,12 @@ export async function inspectConsumer({ root: selected, packageRoot, adapter, ru
     result.summary = `The ${runtime} launch executable is unavailable. Install the selected runtime and complete its sign-in separately.`; result.nextAction = `${cli} help start`;
   } else {
     result.summary = 'Local telemetry or the packaged dashboard needs attention.'; result.nextAction = `${cli} help doctor`;
+  }
+  if (legacyVersion(result.selectedAdapterVersion ?? '')) {
+    result.integration = active ? 'legacy-active' : 'legacy-prepared';
+    result.readyToWork = false;
+    result.summary = 'This project uses a legacy adapter. Check its exact build for the one-time bridge to the 1.4.0 self-update baseline; the exact previous package is required.';
+    result.nextAction = `${cli} upgrade --from-package <previous-package-directory>`;
   }
   return result;
 }
@@ -132,7 +140,8 @@ export async function consumerCommand({ command, argv = [], packageRoot, cwd = p
   }
   const selected = path.resolve(cwd, options['--root'] ?? '.');
   const runtime = options['--runtime'] ?? 'direct';
-  const view = await inspectConsumer({ root: selected, packageRoot, adapter, runtime, env, executableAvailable });
+  const bootstrapInputs = { project: options['--project'], classification: options['--classification'], operator: options['--operator'] };
+  const view = await inspectConsumer({ root: selected, packageRoot, adapter, runtime, env, executableAvailable, bootstrapInputs });
   if (command === 'status' || command === 'doctor') {
     const data = publicView(view);
     if (command === 'doctor') data.checks = {
@@ -154,28 +163,31 @@ export async function consumerCommand({ command, argv = [], packageRoot, cwd = p
   }
   if (command === 'setup') {
     if (!view.plan || !['ready', 'noop'].includes(view.plan.status)) { emit({ ...publicView(view), plan: view.plan }, `${humanView(view)}\nApplication files affected: 0.`); return 2; }
-    const result = await createPlan({ root: view.repository, adapter });
+    const result = await createPlan({ root: view.repository, adapter, initialBootstrap: true, ...bootstrapInputs });
     let applied = null;
     if ((options['--yes'] || options['--apply']) && result.plan.status === 'ready') {
       applied = await applyPlan({ root: view.repository, adapter, planBytes: result.bytes, planSha256: result.hash });
     }
     const after = applied ? await inspectConsumer({ root: view.repository, packageRoot, adapter, runtime, env, executableAvailable }) : view;
-    const nextAction = applied || result.plan.status === 'noop' ? after.nextAction : `${cli} setup --yes`;
-    const summary = applied ? `Claude integration files were prepared. ${after.summary}` : view.summary;
+    const explicitInputs = Object.entries(bootstrapInputs).filter(([, value]) => value !== undefined).map(([key, value]) => ` --${key} ${quotedPath(value)}`).join('');
+    const nextAction = applied || result.plan.status === 'noop' ? after.nextAction : `${cli} setup --yes${explicitInputs}`;
+    const summary = applied ? `${result.plan.mode === 'initial-bootstrap' ? 'DEV FOUNDRY setup is complete.' : 'Claude integration files were prepared.'} ${after.summary}` : view.summary;
     emit({ ...publicView(after), summary, nextAction, applied, plan: result.plan, planSha256: result.hash },
-      `${summary}\nManaged files ${applied ? 'prepared' : 'planned'}: ${changes(result.plan).join(', ') || 'none'}\nApplication files affected: 0. Project rules are not changed by setup.\nNext: ${nextAction}`);
+      `${summary}${result.plan.bootstrap ? `\nProject: ${result.plan.bootstrap.project}\nClassification: ${result.plan.bootstrap.classification}\nHuman Operator: ${result.plan.bootstrap.operator}\nSelected framework: DEV FOUNDRY 2.1.0` : ''}\nManaged/configured files ${applied ? 'prepared' : 'planned'}:\n${changes(result.plan).map((file) => `  ${file}`).join('\n') || '  none'}\nApplication files affected: 0.\nNext: ${nextAction}`);
     return 0;
   }
   if (command === 'upgrade') {
     if (!view.repository) { emit(publicView(view), humanView(view)); return 2; }
     const result = await createUpgradePlan({ root: view.repository, adapter, currentPackageRoot: options['--from-package'] ? path.resolve(cwd, options['--from-package']) : undefined });
     const plan = result.plan;
-    const refresh = plan.upgradeKind === 'managed-refresh' || plan.blockers.some((item) => item.code === 'upgrade-migration-required');
+    const refresh = ['managed-refresh', 'legacy-bridge'].includes(plan.upgradeKind) || plan.blockers.some((item) => item.code === 'upgrade-migration-required');
     const blocked = plan.status === 'blocked';
     let applied = null;
     if (!blocked && (options['--yes'] || options['--apply'])) applied = await applyPlan({ root: view.repository, adapter, upgrade: true, planBytes: result.bytes, planSha256: result.hash });
-    const nextAction = blocked ? refresh ? `${cli} help upgrade` : `${cli} doctor` : applied || plan.status === 'noop' ? `${cli} status` : `${cli} upgrade${options['--from-package'] ? ` --from-package ${quotedPath(path.resolve(cwd, options['--from-package']))}` : ''} --yes`;
-    const summary = blocked ? refresh ? 'Some DEV FOUNDRY-managed files need to be refreshed. Keep the exact previous package to verify ownership before applying.' : 'Upgrade could not be planned safely. Review the current project configuration.'
+    const governed = plan.blockers.some((item) => item.code === 'governed-migration-required');
+    const unsupported = plan.blockers.some((item) => item.code === 'legacy-source-unsupported');
+    const nextAction = applied && plan.activation?.overall === 'active' ? `${cli} start` : governed ? plan.nextAction : blocked ? refresh || unsupported ? `${cli} help upgrade` : `${cli} doctor` : applied || plan.status === 'noop' ? `${cli} status` : `${cli} upgrade${options['--from-package'] ? ` --from-package ${quotedPath(path.resolve(cwd, options['--from-package']))}` : ''} --yes`;
+    const summary = unsupported ? 'This exact legacy build has no proven bridge. Keep the current runtime and obtain the exact previous release and its provenance.' : governed ? 'This release changes project governance configuration. Continue the upgrade in your current governed Claude session.' : blocked ? refresh ? 'Some DEV FOUNDRY-managed files need to be refreshed. The one-time legacy bridge requires the exact previous package to verify ownership before applying.' : 'Upgrade could not be planned safely. Review the current project configuration.'
       : applied ? 'DEV FOUNDRY upgrade applied.' : plan.status === 'noop' ? 'This project already selects the installed adapter.' : refresh ? 'Some DEV FOUNDRY-managed files need to be refreshed.' : 'A compatible runtime pin upgrade is available.';
     emit({ summary, nextAction, applied, plan, planSha256: result.hash, applicationFilesAffected: 0 },
       `${summary}\nAdapter: ${plan.current?.version ?? 'unknown'} -> ${plan.target.version}\nManaged files ${applied ? 'changed' : 'planned'}: ${blocked ? 'none (plan refused)' : changes(plan).join(', ') || 'none'}\nYour application code will not be changed. Application files affected: 0.\nNext: ${nextAction}`);
