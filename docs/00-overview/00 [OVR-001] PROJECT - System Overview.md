@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: System Overview
   status: ACTIVE
-artifactVersion: "2.1.0-local.22"
+artifactVersion: "2.1.0-local.23"
 authorityScope: dev-foundry-claude-project
 ownerRole: governance-author
 canonical: false
@@ -82,7 +82,12 @@ The approved direction is to:
 - preserve role separation and explicit Operator authorization;
 - keep provider authentication, credentials, enterprise routing, and private
   launcher configuration outside reusable methodology and project SoT unless a
-  concrete non-secret contract requires them.
+  concrete non-secret contract requires them;
+- make the consumer experience self-explaining so a developer can install,
+  configure, start, inspect, upgrade and diagnose the adapter without first
+  learning internal DEV FOUNDRY artifact taxonomy;
+- make the packaged telemetry launcher reachable through the normal consumer
+  command surface rather than requiring launcher-script knowledge.
 
 ## 4. Current Non-Goals
 
@@ -126,8 +131,11 @@ Claude Code remains the target runtime of the adapter and of any consumer that
 explicitly adopts a release. Root `CLAUDE.md`, `.mcp.json`, `.claude/**`, the
 Claude Capability Profiles and package templates remain as product,
 distribution and test surface and bind no producer role. Adapter version 1.1.0
-(TSK-012) is the initial consumer baseline; SPC-005 (PLANNED) records the future
-release and upgrade contract, whose implementation is not yet authorized.
+(TSK-012) is the initial consumer baseline; SPC-005 is active and TSK-020 is formally closed after adapter 1.3.0 established
+the public GitHub Release channel and compatible-upgrade baseline. ADR-006,
+SPC-007 and TSK-021 now govern the beginner-first consumer product surface,
+including guided setup/status/upgrade/doctor/help and telemetry-aware Claude
+startup.
 Canonical DEV FOUNDRY 2.1.0 remains the selected reusable methodology; the local
 Project Operating Profile and Authority Index bind that release to
 `dev-foundry-claude`.
