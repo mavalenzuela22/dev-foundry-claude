@@ -800,31 +800,34 @@ test('TSK-021 isolated installed package guides fresh and brownfield setup, stat
 
 test('TSK-021 installed 1.4.0 bridges the exact historical 1.2.2 package', async (t) => {
   const base = await baseline();
-  const { source: oldPackage } = await legacyPackage(t);
-  const c = await makeConsumer(); t.after(c.cleanup);
-  const oldPlanFile = path.join(await scratch('historical-plan'), 'plan.json');
-  const plannedOld = cli(oldPackage, ['adopt', 'plan', '--root', c.root, '--out', oldPlanFile]); assert.equal(plannedOld.status, 0, plannedOld.stderr);
-  const setup = cli(oldPackage, ['adopt', 'apply', '--root', c.root, '--plan', oldPlanFile, '--plan-sha256', JSON.parse(plannedOld.stdout).planSha256]);
-  assert.equal(setup.status, 0, setup.stderr); c.commit();
-  const before = await listTree(c.root); const authority = await readSetSnapshot(c.root);
-  const invoke = (args) => cli(base.installed, ['upgrade', ...args], { cwd: c.root });
-  const without = invoke([]); assert.equal(without.status, 2); assert.match(without.stdout, /managed files need to be refreshed/);
-  const planned = invoke(['--from-package', oldPackage, '--json']); assert.equal(planned.status, 0, planned.stderr);
-  const data = JSON.parse(planned.stdout); assert.equal(data.plan.upgradeKind, 'legacy-bridge');
-  assert.equal(data.plan.current.expect, selfPin(oldPackage).expect); assert.equal(data.plan.target.expect, base.pin);
-  assert.equal(data.plan.merge.length, 1); assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
-  const planFile = path.join(await scratch('managed-plan'), 'plan.json');
-  const exact = cli(base.installed, ['upgrade', 'plan', '--root', c.root, '--from-package', oldPackage, '--out', planFile]);
-  assert.equal(exact.status, 0, exact.stderr);
-  const hash = JSON.parse(exact.stdout).planSha256;
-  const denied = cli(base.installed, ['upgrade', 'apply', '--root', c.root, '--plan', planFile, '--plan-sha256', '0'.repeat(64)]);
-  assert.equal(denied.status, 1); assert.match(denied.stderr, /plan-hash-mismatch/);
-  assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
-  const applied = cli(base.installed, ['upgrade', 'apply', '--root', c.root, '--plan', planFile, '--plan-sha256', hash]);
-  assert.equal(applied.status, 0, applied.stderr); assert.deepEqual(JSON.parse(applied.stdout), { written: 1, deleted: 0 });
-  assert.deepEqual(diffTrees(before, await listTree(c.root)), ['.mcp.json']);
-  assert.deepEqual(await readSetSnapshot(c.root), authority);
-  c.commit(); assert.equal(JSON.parse(cli(base.installed, ['adopt', 'plan', '--root', c.root]).stdout).status, 'noop');
+  for (const version of ['1.2.2', '1.2.2-windows']) await t.test(version, async (t) => {
+    const { source: oldPackage } = await legacyPackage(t, version);
+    const c = await makeConsumer(); t.after(c.cleanup);
+    const oldPlanFile = path.join(await scratch('historical-plan'), 'plan.json');
+    const plannedOld = cli(oldPackage, ['adopt', 'plan', '--root', c.root, '--out', oldPlanFile]); assert.equal(plannedOld.status, 0, plannedOld.stderr);
+    const setup = cli(oldPackage, ['adopt', 'apply', '--root', c.root, '--plan', oldPlanFile, '--plan-sha256', JSON.parse(plannedOld.stdout).planSha256]);
+    assert.equal(setup.status, 0, setup.stderr); c.commit();
+    const before = await listTree(c.root); const authority = await readSetSnapshot(c.root);
+    const invoke = (args) => cli(base.installed, ['upgrade', ...args], { cwd: c.root });
+    const without = invoke([]); assert.equal(without.status, 2); assert.match(without.stdout, /managed files need to be refreshed/);
+    const planned = invoke(['--from-package', oldPackage, '--json']); assert.equal(planned.status, 0, planned.stderr);
+    const data = JSON.parse(planned.stdout); assert.equal(data.plan.upgradeKind, 'legacy-bridge');
+    assert.equal(data.plan.current.expect, selfPin(oldPackage).expect); assert.equal(data.plan.target.expect, base.pin);
+    const changed = version === '1.2.2-windows' ? ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md'] : ['.mcp.json'];
+    assert.equal(data.plan.merge.length, changed.length); assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+    const planFile = path.join(await scratch('managed-plan'), 'plan.json');
+    const exact = cli(base.installed, ['upgrade', 'plan', '--root', c.root, '--from-package', oldPackage, '--out', planFile]);
+    assert.equal(exact.status, 0, exact.stderr);
+    const hash = JSON.parse(exact.stdout).planSha256;
+    const denied = cli(base.installed, ['upgrade', 'apply', '--root', c.root, '--plan', planFile, '--plan-sha256', '0'.repeat(64)]);
+    assert.equal(denied.status, 1); assert.match(denied.stderr, /plan-hash-mismatch/);
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+    const applied = cli(base.installed, ['upgrade', 'apply', '--root', c.root, '--plan', planFile, '--plan-sha256', hash]);
+    assert.equal(applied.status, 0, applied.stderr); assert.deepEqual(JSON.parse(applied.stdout), { written: changed.length, deleted: 0 });
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), changed);
+    assert.deepEqual(await readSetSnapshot(c.root), authority);
+    c.commit(); assert.equal(JSON.parse(cli(base.installed, ['adopt', 'plan', '--root', c.root]).stdout).status, 'noop');
+  });
 });
 
 test('V005 installed package bootstraps without producer authority; source/target staging preserves runtime and pin; MCP cutover fails stale', async (t) => {

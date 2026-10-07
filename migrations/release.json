@@ -27,6 +27,26 @@
         "CLAUDE.md"
       ],
       "configuredAuthorityTransforms": [],
+      "id": "legacy-1.2.2-windows-candidate-managed-surface",
+      "preserveForeignRuntime": true,
+      "previousPackageRequired": true,
+      "proof": {
+        "gitCommit": "bf5f590b609e7aed972ad25be12e17ea984a6da8",
+        "evidence": "docs/70-tasks/70 [TSK-018-CLOSURE] PROJECT - Canonicalize Adapter Launcher for Windows Package Stability Closure.md",
+        "evidenceCommit": "f0ebac6e2f8bd6d217f3cff577faa986df00941a",
+        "reproduction": "Two byte-identical npm pack builds from independent clean checkouts of gitCommit with core.autocrlf=true and its historical launcher eol=lf attribute; root and dashboard npm ci --offline --ignore-scripts from their historical locks; unmodified historical prepack/dashboard/payload-manifest scripts; Node 20.19.5, npm 10.8.2, macOS. Both extracted packages verify 1213 files and the exact source self-pin. LF checkout reproduces the separately supported 5fc99b build. tarballSha256 identifies these reproduced tarballs, not the Windows archive recorded in the closure.",
+        "tarballSha256": "1f32b627b4534cb1f1cb3abf6ddf6b66610e979851cbeee7c34d9d32bbca5fe8"
+      },
+      "source": "1.2.2:sha256:c2beefd78db3417c20d313cf7e189152c134d1f6abc11c14555630e2036462c2"
+    },
+    {
+      "allowedPaths": [
+        ".claude/agents/dev-foundry-auditor.md",
+        ".claude/agents/dev-foundry-executor.md",
+        ".mcp.json",
+        "CLAUDE.md"
+      ],
+      "configuredAuthorityTransforms": [],
       "id": "legacy-1.3.0-validation-artifact-managed-surface",
       "preserveForeignRuntime": true,
       "previousPackageRequired": true,
