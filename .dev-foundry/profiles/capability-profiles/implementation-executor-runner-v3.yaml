@@ -43,7 +43,7 @@ environment_constraints:
   - runner_must_be_available
   - codex_cli_executor_must_be_available
   - active_pop_must_bind_implementation_executor_to_this_profile
-  - task_authority_must_be_closed_before_execution
+  - task_authority_must_exist_be_active_or_in_progress_and_be_explicitly_authorized_for_implementation
   - exact_execution_contract_must_bind_branch_prompt_paths_and_validation
 stop_conditions:
   - missing_or_conflicting_task_authority
