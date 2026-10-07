@@ -5,7 +5,7 @@ artifact:
   type: SPC
   title: Claude Adapter Release and Consumer Upgrade Contract
   status: ACTIVE
-artifactVersion: "2"
+artifactVersion: "3"
 authorityScope: claude-adapter-release-and-consumer-upgrade-contract
 ownerRole: governance-author
 canonical: true
@@ -61,6 +61,11 @@ and consumer upgrade explicit, immutable and fail-closed.
 - A convenience `latest` download URL may select an acquisition target, but the
   installed package self-pin and the consumer runtime pin SHALL bind the exact
   version and payload root.
+- The 1.3.0 baseline GitHub Release acquisition flow is anonymous and therefore
+  requires the producer repository/release assets to be publicly readable.
+- Authenticated acquisition from a private producer repository is a different
+  transport profile and is outside the 1.3.0 baseline; it does not alter release
+  identity or consumer pin semantics.
 - Adapter 1.2.3 is the pre-TSK-020 producer baseline. TSK-020 targets 1.3.0 as
   the first release with governed compatible-upgrade support.
 

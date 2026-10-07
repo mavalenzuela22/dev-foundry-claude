@@ -5,7 +5,7 @@ artifact:
   type: TSK
   title: Establish GitHub Release Installation and Compatible Consumer Upgrade
   status: IN_PROGRESS
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: tsk-020-github-release-install-upgrade
 ownerRole: governance-author
 canonical: true
@@ -119,7 +119,10 @@ At minimum PASS:
 - `git diff --check`;
 - after promotion: actual GitHub Release publication;
 - after publication: fresh Windows and macOS installation from the release URL
-  with no producer checkout.
+  with no producer checkout;
+- the anonymous release-download baseline is proven with the producer repository
+  publicly readable; authenticated private-repository acquisition is not claimed
+  by TSK-020.
 
 ## 5. Hard constraints
 
@@ -129,3 +132,27 @@ installation, publish to npm/GitHub Packages, or implement arbitrary template
 migration under the compatible-upgrade command.
 
 The public release may only be published after the exact candidate is promoted.
+
+## 6. Post-publication observation
+
+The Operator changed `mavalenzuela22/dev-foundry-claude` from private to public
+before the final public-install smokes because the anonymous GitHub Release URL
+used by this task depends on public readability. This is now an explicit
+distribution precondition under ADR-005/SPC-005 rather than an implicit hosting
+assumption.
+
+Release `v1.3.0` was then published from promoted `main`. The versioned
+`dev-foundry-claude-adapter-1.3.0.tgz` and stable
+`dev-foundry-claude-adapter.tgz` assets were both observed with SHA-256
+`16e4b228184a65b2c4624e98c45c01eb6fa089d19bbcecfec5bc83ba7ace0631`.
+
+Post-publication consumer observations:
+
+- macOS: anonymous GitHub Release installation completed and
+  `dev-foundry-claude --version` returned `1.3.0`;
+- Windows: anonymous GitHub Release installation completed, npm created the
+  expected Windows shims, and direct shim execution returned `1.3.0`;
+- the Windows shell initially did not include the active CodeMie npm global
+  prefix on `PATH`; adding that already-selected npm prefix to the process
+  `PATH` made the bare `dev-foundry-claude --version` command return
+  `1.3.0`. This is an environment PATH condition, not a package defect.
