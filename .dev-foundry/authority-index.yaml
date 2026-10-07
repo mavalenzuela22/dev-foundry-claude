@@ -3,7 +3,7 @@ id: DFC-AUTHORITY-INDEX
 title: dev-foundry-claude Repository Authority Index
 kind: authority-index
 status: active
-artifact_version: "2.1.0-local.27"
+artifact_version: "2.1.0-local.28"
 canonical: false
 
 subject:
@@ -50,6 +50,7 @@ routes:
       - claude-code-adapter-components
       - claude-code-primitive-responsibility-map
       - claude-code-context-loading-boundary
+      - consumer-bootstrap-and-self-update-architecture
     section_id: null
   - id: TSK-001
     path: docs/70-tasks/70 [TSK-001] PROJECT - Establish Claude-Native Adapter Architecture Baseline.md
@@ -204,6 +205,7 @@ routes:
       - claude-adapter-release-asset-layout
       - no-checkout-consumer-installation
       - latest-release-acquisition-alias
+      - side-by-side-upgrade-target-acquisition
     section_id: null
   - id: beginner-first-self-explaining-consumer-experience
     path: docs/10-decisions/10 [ADR-006] PROJECT - Beginner-First Self-Explaining Consumer Experience.md
@@ -213,6 +215,16 @@ routes:
       - progressive-disclosure-of-governance
       - human-first-cli-language
       - next-action-guidance
+    section_id: null
+  - id: governed-self-update-legacy-migration-boundary
+    path: docs/10-decisions/10 [ADR-007] PROJECT - Governed Self-Update and Legacy Migration Boundary.md
+    authority_class: decision
+    governs:
+      - governed-self-update-lifecycle
+      - initial-consumer-bootstrap-boundary
+      - legacy-pre-self-update-migration-boundary
+      - side-by-side-target-release-staging
+      - stale-session-after-upgrade-cutover
     section_id: null
   - id: claude-adapter-release-consumer-upgrade-contract
     path: docs/40-specifications/40 [SPC-005] PROJECT - Claude Adapter Release and Consumer Upgrade Contract.md
@@ -233,6 +245,17 @@ routes:
       - guided-upgrade-contract
       - consumer-doctor-contract
       - canonical-help-resource-contract
+    section_id: null
+  - id: consumer-bootstrap-legacy-self-update-contract
+    path: docs/40-specifications/40 [SPC-008] PROJECT - Consumer Bootstrap Legacy Bridge and Governed Self-Update Contract.md
+    authority_class: product
+    governs:
+      - initial-consumer-bootstrap-contract
+      - legacy-bridge-contract
+      - self-update-migration-package-contract
+      - model-assisted-upgrade-contract
+      - stale-session-restart-contract
+      - pago-legacy-dogfood-acceptance-boundary
     section_id: null
   - id: TSK-013
     path: docs/70-tasks/70 [TSK-013] PROJECT - Establish Producer Maintenance Mode and Adapter Release Lifecycle.md
@@ -366,6 +389,10 @@ routes:
       - mcp-help-resources
       - guided-telemetry-start
       - managed-surface-upgrade-ux
+      - initial-consumer-bootstrap-implementation
+      - legacy-bridge-to-self-update-baseline
+      - governed-self-update-foundation
+      - stale-session-enforcement
       - adapter-minor-release-1.4.0
     section_id: null
 

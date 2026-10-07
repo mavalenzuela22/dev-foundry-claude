@@ -5,7 +5,7 @@ artifact:
   type: ADR
   title: Reusable Claude Adapter Package and Consumer Boundary
   status: ACCEPTED
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: dev-foundry-claude-adapter-package-and-consumer-boundary
 ownerRole: governance-author
 canonical: true
@@ -78,18 +78,26 @@ runner binding.
    malformed expectation, or a missing manifest stops the process before serving or launching.
    The pin is adapter-owned configuration, is not product or methodology authority, and
    involves no network lookup.
-4. **Write boundary.** The adapter writes only adapter-owned, non-authority surface in a
-   consumer: two subagent definitions, a marker-delimited `CLAUDE.md` block, the MCP entry,
-   and, only when needed, one telemetry ignore line. It never writes or edits POP, Authority
-   Index, Platform Bootstrap, Actor or Capability Profiles, or the selected framework release.
-   Every configured-authority change is emitted as one reviewable cutover proposal for the
-   consumer's own governed authoring and Operator authorization.
-5. **Prepared versus active.** After adoption the adapter is prepared and not active.
-   Consumer authority stays byte-identical until the consumer's own atomic cutover, which
-   binds all five governed roles and activates the Claude Platform Bootstrap together. No
-   dual binding or compatibility layer is introduced. Activation derives only from consumer
-   authority (POP, Platform Bootstrap, Authority Index, referenced profiles); adapter-owned
-   files and capability confer no authority.
+4. **Ordinary write boundary.** For an already governed consumer, ordinary adapter
+   installation, setup, managed refresh, and package replacement directly write only
+   adapter-owned non-authority surface: the subagent definitions, marker-delimited
+   `CLAUDE.md` block, MCP entry, and required telemetry ignore rule. They do not
+   arbitrarily rewrite established POP, Authority Index, Platform Bootstrap, Actor or
+   Capability Profiles, project decisions, or the selected framework release.
+   ADR-007 and SPC-008 define two explicit lifecycle exceptions to that ordinary
+   direct-write boundary: (a) Operator-confirmed initial authority bootstrap when no
+   valid project authority exists, and (b) a bounded legacy/governed migration whose
+   exact source/target identities, migration boundary and authorization are independently
+   established. Those paths are not permission for generic adapter code to edit authority.
+5. **Prepared versus active.** For an already governed brownfield consumer, ordinary
+   adapter preparation remains non-active until the consumer's own atomic cutover binds
+   the governed roles and activates the Claude Platform Bootstrap. No dual binding or
+   compatibility layer is introduced. Activation derives only from consumer authority
+   (POP, Platform Bootstrap, Authority Index, referenced profiles); adapter-owned files
+   and capability confer no authority. An ungoverned repository has no prior runtime
+   binding to preserve: its explicit initial bootstrap may establish the first active
+   Claude bindings as part of the Operator-confirmed DEV FOUNDRY adoption defined by
+   ADR-007/SPC-008.
 6. **Consumer-mode guard.** When launched through the packaged `mcp` entry, the MCP returns
    `BINDING_INACTIVE` for governed resolution unless activation is complete. The guard sits at
    the MCP boundary; `resolver.js` and authority-resolution semantics are unchanged. Source-run
@@ -103,21 +111,24 @@ runner binding.
 - A separate adapter lock artifact: adds a configured artifact needing routing and a second
   read path where one argument suffices.
 - Version-only or source-only pins: two materially different builds could share a pin.
-- Preparing Claude bootstrap or profiles in consumer authority before cutover: no evidence
-  that the mature runner tolerates additional configured entries; an unrouted active profile
-  also violates the Authority Index rule.
+- Preparing Claude bootstrap or profiles inside an already governed consumer before its
+  authorized cutover: no evidence that a foreign active runtime tolerates those configured
+  entries, and an unrouted active profile violates the Authority Index rule. This does not
+  prohibit ADR-007 initial bootstrap in a repository that has no prior project authority.
 - Dual binding or a bridge between runner and Claude: excluded; one role has one binding.
 
 ## 4. Consequences
 
 - A consumer receives configuration, not code; the runtime is loaded from the installed
   package and is verifiable against the pin.
-- Brownfield authority and the mature runner are untouched until the consumer chooses to cut
-  over, and Claude role work fails closed meanwhile.
+- Existing governed brownfield authority and any active mature runner remain untouched by
+  ordinary adapter preparation until the consumer chooses to cut over. Explicit legacy or
+  governed migration is a separate ADR-007/SPC-008 lifecycle, not an implicit package side effect.
 - A different adapter build on `PATH` fails closed rather than silently governing.
 - The pin detects drift and differing builds. It does not defend against a hostile local
   actor who can alter both the install and its verifier, and it does not cover Node or the OS.
-- Adapter upgrades are not automatic; a different build requires installing the pinned build
-  or a future governed re-adoption.
+- Adapter upgrades are not automatic. The project remains pinned until an explicit upgrade
+  or migration is authorized. Releases from the 1.4.0 self-update baseline forward use the
+  governed migration/restart lifecycle in ADR-007/SPC-008 when authority changes are required.
 - The self-hosted repository is unchanged apart from additive distribution files and the
   default-off guard.

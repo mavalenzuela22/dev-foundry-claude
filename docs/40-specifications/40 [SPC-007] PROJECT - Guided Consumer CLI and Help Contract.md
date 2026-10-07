@@ -5,7 +5,7 @@ artifact:
   type: SPC
   title: Guided Consumer CLI and Help Contract
   status: ACTIVE
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: guided-consumer-cli-and-help-contract
 ownerRole: governance-author
 canonical: true
@@ -75,9 +75,17 @@ It SHALL:
 - never silently mutate consumer governance authority;
 - surface a concrete next action until setup is complete.
 
-For a project whose authority requires a separately governed activation step,
-`setup` SHALL explain that remaining step in user language and preserve the
-underlying proposal/evidence for advanced workflows.
+For a repository with no valid DEV FOUNDRY project authority, `setup` SHALL
+implement the SPC-008 initial-bootstrap UX: preview the minimum bootstrap,
+identify/ask only the human choices that cannot be derived, state that application
+code is unaffected, and require explicit Operator confirmation before
+materialization. It SHALL not stop at an unexplained instruction to "adopt DEV
+FOUNDRY first."
+
+For an already governed project whose authority requires a separately governed
+activation step, `setup` SHALL preserve existing authority, explain the
+remaining step in user language and preserve the underlying proposal/evidence
+for advanced workflows.
 
 ## 3. start
 
@@ -133,6 +141,22 @@ It SHALL:
 A normal migration message SHOULD be equivalent to:
 "Some DEV FOUNDRY-managed files need to be refreshed. Your application code will
 not be changed."
+
+Upgrade UX SHALL additionally classify SPC-008 lifecycle cases:
+
+- a supported legacy consumer receives the one-time bridge to the 1.4.0
+  self-update baseline;
+- a self-update-capable consumer with only deterministic adapter-owned changes
+  may continue through ordinary exact plan/apply mechanics;
+- a self-update-capable consumer whose target requires semantic/configured
+  authority migration is told to continue in the currently governed Claude
+  session, which reviews the verified staged target under source authority;
+- after governed cutover the old session reports completion only and directs the
+  user to `dev-foundry-claude start`.
+
+The CLI remains the safe front door and deterministic substrate; it SHALL NOT
+pretend that a Node-only wizard can make project-specific semantic decisions on
+the Operator's behalf.
 
 ## 6. doctor
 
@@ -211,4 +235,8 @@ A developer unfamiliar with DEV FOUNDRY SHALL be able to:
 3. understand whether application code is affected;
 4. reach a state where `dev-foundry-claude start` launches Claude with telemetry;
 5. discover `status`, `upgrade`, `doctor` and contextual help without reading
-   the complete README or understanding governance artifact taxonomy.
+   the complete README or understanding governance artifact taxonomy;
+6. bootstrap a normal Git repository with no DEV FOUNDRY configuration through
+   explicit human confirmation rather than manual artifact construction;
+7. understand when a legacy one-time bridge or a model-assisted upgrade/restart
+   is required without learning internal migration artifact names.

@@ -5,7 +5,7 @@ artifact:
   type: TSK
   title: Implement Self-Explaining Consumer UX and Guided Claude Start
   status: IN_PROGRESS
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: tsk-021-self-explaining-consumer-ux
 ownerRole: governance-author
 canonical: true
@@ -16,6 +16,10 @@ scope:
     - mcp-help-resources
     - guided-telemetry-start
     - managed-surface-upgrade-ux
+    - initial-consumer-bootstrap-implementation
+    - legacy-bridge-to-self-update-baseline
+    - governed-self-update-foundation
+    - stale-session-enforcement
     - adapter-minor-release-1.4.0
   appliesTo:
     components:
@@ -24,22 +28,26 @@ scope:
       - claude-governance-mcp
       - telemetry-launcher
       - local-operations-dashboard
+      - consumer-project-bootstrap
+      - migration-runtime
       - README
   excludes:
     - reusable-dev-foundry-methodology-change
     - consumer-product-code
     - provider-authentication
     - silent-consumer-authority-mutation
-    - PagoElectronico-real-repository-mutation
+    - PagoElectronico-real-repository-mutation-before-producer-candidate-validation
 authority:
   governedBy:
     - ADR-003
     - ADR-004
     - ADR-005
     - ADR-006
+    - ADR-007
     - SPC-005
     - SPC-006
     - SPC-007
+    - SPC-008
     - OPS-007
     - OPS-008
   supersedes: []
@@ -92,7 +100,31 @@ Release adapter 1.4.0 with the smallest complete implementation of SPC-007:
 12. prove the packaged experience in isolated fresh and brownfield fixtures;
 13. prove the known Pago 1.2.2-shaped fixture can be guided through the managed
     adapter-surface migration without touching application code;
-14. do not mutate the real Pago Electronico repository during producer work.
+14. implement the SPC-008 initial bootstrap so an ordinary Git repository with
+    no DEV FOUNDRY configuration can preview and explicitly establish the
+    minimum 2.1.0 project authority/integration required for first governed
+    Claude launch without manual POP/Authority Index/TSK authoring;
+15. package the immutable DEV FOUNDRY 2.1.0 release bytes required by that
+    bootstrap under the adapter payload integrity model;
+16. make 1.4.0 the first self-update-capable baseline and implement the declared
+    legacy bridge from supported exact pre-baseline consumer builds into that
+    baseline;
+17. preserve foreign active governance runtime bindings during legacy bridge
+    planning/apply unless a separately authorized cutover explicitly replaces
+    them;
+18. package integrity-bound migration material needed by future source sessions
+    to evaluate target releases without consulting producer main;
+19. establish side-by-side target staging semantics so a future upgrade cannot
+    replace the runtime serving its own source governance session before cutover;
+20. establish a mechanically checkable source-session startup
+    runtime/authority fingerprint and fail-closed stale-session behavior after
+    a migration cutover;
+21. update help/README/status/doctor/upgrade output for the three product paths:
+    initial bootstrap, legacy bridge, and governed model-assisted self-update;
+22. do not mutate the real PagoElectronico repository during producer
+    implementation or isolated validation; after the producer candidate passes,
+    perform the real legacy migration as a separate governed PagoElectronico
+    dogfood operation before TSK-021 closure.
 
 ## 3. User-facing baseline
 
@@ -112,25 +144,61 @@ A healthy status SHALL answer that the user is ready to work.
 A recoverable problem SHALL recommend one concrete command such as `doctor`,
 `setup` or `upgrade`.
 
-## 4. Upgrade migration boundary
+## 4. Bootstrap and migration boundary
 
-TSK-020 deliberately shipped only a pin-compatible upgrade profile.
+TSK-020 deliberately shipped only a pin-compatible upgrade profile. Later
+dogfooding proved that profile insufficient for the real PagoElectronico legacy
+surface. TSK-021 therefore implements ADR-007/SPC-008 rather than treating the
+failure as a fixture to erase.
 
-TSK-021 MAY extend product behavior to refresh adapter-owned managed surface when
-the target release renders different adapter-owned bytes, provided that:
+### 4.1 Initial bootstrap
 
-- current and target adapter identities are verified;
-- a deterministic migration plan exists before mutation;
-- exact plan bytes/hash are enforced at apply time;
-- every changed repository path is adapter-owned;
-- consumer application/product code is excluded;
-- consumer authority is not silently mutated;
-- non-adapter collisions or ambiguous ownership fail closed;
-- user-facing output explains the refresh without requiring governance jargon.
+For an unconfigured Git repository, setup SHALL preview and, only after explicit
+Operator confirmation, materialize the minimum DEV FOUNDRY 2.1.0 project
+authority and Claude integration required for the first governed session.
 
-The real Pago Electronico blocker observed during dogfooding is product input,
-not producer implementation authority. Producer proof SHALL use fixtures or
-temporary clones only.
+Bootstrap output is deterministic from integrity-bound release bytes, repository
+facts and explicit Operator choices. Application/product code remains outside
+the write boundary. Brownfield bootstrap creates an initial baseline task whose
+purpose is to verify the existing system before ordinary implementation.
+
+### 4.2 Adapter-owned managed refresh
+
+TSK-021 continues to support deterministic refresh of adapter-owned managed
+surface when target templates differ, with exact current/target identities,
+plan/precondition/hash enforcement, preserved outside-block content and
+fail-closed ownership checks.
+
+### 4.3 Legacy bridge
+
+Supported exact pre-1.4.0 consumers SHALL have one bridge to the 1.4.0
+self-update baseline. Unknown builds, ambiguous configured authority, modified
+owned bytes whose provenance cannot be proved, unresolved Operator choices, or
+unsafe paths stop the bridge.
+
+The bridge preserves historical evidence, completed-work meaning and product
+code. Reset/reinstall does not satisfy legacy acceptance.
+
+A prepared consumer whose active governance runtime is not Claude SHALL keep
+that active runtime until separately authorized cutover.
+
+### 4.4 Governed self-update foundation
+
+The 1.4.0 package SHALL establish the foundation required for future
+model-assisted self-update:
+
+- integrity-bound migration material in target releases;
+- side-by-side target staging;
+- source-session operation under source authority until cutover;
+- deterministic tooling for exact transforms and proof;
+- model-assisted semantic reconciliation for project-specific changes;
+- reserved Operator decisions/authorization;
+- atomic target cutover;
+- stale-session fail-closed behavior;
+- mandatory fresh dev-foundry-claude start after cutover.
+
+Target release/framework bytes are migration input and do not become active
+authority until the authorized cutover.
 
 ## 5. Help architecture
 
@@ -148,12 +216,21 @@ At minimum PASS:
 
 - focused unit tests for all six primary commands;
 - setup state classification and next-action tests;
+- unconfigured-repository bootstrap preview/apply/idempotence tests with zero
+  application-file changes;
+- packaged immutable 2.1.0 release integrity/bootstrap tests;
 - start launcher delegation tests including telemetry/dashboard messaging;
 - status human and JSON modes;
 - doctor healthy and recoverable-problem diagnostics;
 - compatible pin-only upgrade regression;
 - managed adapter-surface migration plan/apply with exact SHA enforcement;
-- migration refuses any non-adapter/product path;
+- migration refuses any undeclared product/application path;
+- supported legacy exact-release bridge tests, including prepared and active
+  states, authority/evidence preservation and unsupported-source refusal;
+- side-by-side target staging tests proving source runtime/pin stays unchanged
+  before cutover;
+- source-session fingerprint/staleness tests proving governed work is rejected
+  after cutover and a new session is required;
 - help topic parity between CLI and MCP resources;
 - package dry-run and isolated install;
 - packaged launcher/start smoke without public/LAN exposure;
@@ -163,15 +240,27 @@ At minimum PASS:
 - dashboard regression suite;
 - `git diff --check`;
 - exact release candidate remains consumer-independent;
-- no real Pago Electronico mutation.
+- no real PagoElectronico mutation before producer candidate validation;
+- after producer candidate validation, separate real PagoElectronico dogfood
+  migration from its actual legacy state, preserving evidence/history/product
+  code, is required before TSK-021 closure.
 
 ## 7. Product success criterion
 
-A user with no prior DEV FOUNDRY vocabulary can install the adapter and determine
-the next action entirely from the installed product.
+A user with no prior DEV FOUNDRY vocabulary can move from a normal Git repository
+to the first governed Claude launch entirely through the installed product, with
+explicit human authorization but without manual construction of POP, Authority
+Index, TSK or MTP artifacts.
 
-Time-to-first-governed-Claude-launch SHOULD be measured in minutes and require no
-manual creation of TSK/MTP artifacts for installation or normal adapter use.
+A supported legacy consumer can reach the 1.4.0 self-update baseline without
+reset/reinstall, product-code mutation, or loss/reinterpretation of historical
+evidence.
+
+A self-update-capable consumer can later migrate through its currently governed
+Claude session, cross an authorized cutover, and be forced into a fresh session
+before further governed work.
+
+Time-to-first-governed-Claude-launch SHOULD be measured in minutes.
 
 ## 8. Hard constraints
 
@@ -183,3 +272,10 @@ consumer action.
 
 Do not create a second telemetry launcher, second help source or second upgrade
 integrity model when existing mechanisms can be reused.
+
+Do not replace the runtime serving a governed source session before migration
+cutover. Do not let target release/framework bytes govern their own adoption.
+Do not let a post-cutover stale source session continue governed work.
+
+Historical evidence and completed authority/work retain the semantics applicable
+when they were produced.

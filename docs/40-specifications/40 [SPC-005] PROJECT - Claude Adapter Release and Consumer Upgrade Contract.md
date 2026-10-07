@@ -5,7 +5,7 @@ artifact:
   type: SPC
   title: Claude Adapter Release and Consumer Upgrade Contract
   status: ACTIVE
-artifactVersion: "3"
+artifactVersion: "4"
 authorityScope: claude-adapter-release-and-consumer-upgrade-contract
 ownerRole: governance-author
 canonical: true
@@ -23,7 +23,7 @@ scope:
       - consumer-upgrade
   excludes:
     - package-registry-selection-or-publication
-    - consumer-authority-mutation
+    - arbitrary-consumer-authority-mutation
     - mature-runner-modification
     - compatibility-layer
     - methodology-change
@@ -66,8 +66,14 @@ and consumer upgrade explicit, immutable and fail-closed.
 - Authenticated acquisition from a private producer repository is a different
   transport profile and is outside the 1.3.0 baseline; it does not alter release
   identity or consumer pin semantics.
-- Adapter 1.2.3 is the pre-TSK-020 producer baseline. TSK-020 targets 1.3.0 as
-  the first release with governed compatible-upgrade support.
+- Adapter 1.2.3 is the pre-TSK-020 producer baseline. TSK-020 established 1.3.0
+  as the first release with governed compatible-upgrade support.
+- Adapter 1.4.0 is the first self-update-capable baseline under ADR-007/SPC-008.
+  Supported older consumers cross the bounded legacy bridge once; later releases
+  use the governed model-assisted migration lifecycle when semantic or configured
+  authority changes are required.
+- Migration material shipped for a target release is part of that immutable
+  payload identity and is verified by the same package-integrity model.
 
 ## 3. Consumer states
 
@@ -90,14 +96,23 @@ An upgrade capability SHALL:
 3. verify the consumer's current pin matches the expected current release and
    fail closed if it is stale;
 4. verify the target package against its own payload integrity before use;
-5. mutate only adapter-owned consumer surface (ADR-003 write boundary);
-6. never mutate consumer authority, including POP, Platform Bootstrap,
-   Authority Index, Actor or Capability Profiles, or the framework release;
-7. emit any required authority migration separately as a proposal for the
-   consumer's own governed operation;
-8. fail closed on package or pin mismatch;
-9. never read or follow producer `main` implicitly;
-10. require exact plan bytes and plan SHA-256 at apply time.
+5. direct ordinary upgrade/apply mechanics mutate only adapter-owned consumer
+   surface under the ADR-003 ordinary write boundary;
+6. configured consumer authority may change only through the explicit
+   ADR-007/SPC-008 initial-bootstrap, declared legacy-bridge, or governed
+   self-update lifecycle, never as an implicit package-install side effect;
+7. a self-update target that requires authority/semantic migration is staged
+   side-by-side and reviewed from the currently active source session before
+   cutover;
+8. target framework or migration bytes are input, not active project authority,
+   until explicit project adoption/cutover;
+9. fail closed on package or pin mismatch, unsupported source, unresolved
+   Operator choice, stale migration candidate, or failed required validation;
+10. never read or follow producer `main` implicitly;
+11. require exact plan bytes and plan SHA-256 wherever a deterministic apply
+    boundary is used;
+12. invalidate the source governed session after a cutover that changes its
+    starting runtime/authority identity and require a fresh session.
 
 ### 4.1 Compatible-upgrade baseline
 
@@ -125,13 +140,17 @@ For this compatible profile:
 - if any other adapter-owned byte would need migration, planning fails closed with
   `upgrade-migration-required` and produces zero writes.
 
-This profile is sufficient for the proven 1.2.2 -> 1.3.0 Pago Electronico
-transition because the TSK-019 product correction changes planner behavior, not
-the already materialized consumer templates.
+The original TSK-020 assumption that the compatible profile was sufficient for
+PagoElectronico 1.2.2 -> 1.3.0 was disproved by later dogfooding: the real
+consumer exposed managed-agent/block drift and a migration-required boundary.
+That evidence is preserved. TSK-021/ADR-007/SPC-008 replace reset/reinstall as
+the acceptance strategy with a real legacy bridge into the 1.4.0 baseline.
 
 ## 5. Out of scope
 
 Public npm/GitHub Package registry publication, signing infrastructure, silent
-automatic updates, background update checks, consumer authority migration, and
-automatic migration of changed adapter-owned templates remain out of scope unless
-separately governed.
+background updates, and arbitrary consumer-authority authoring remain out of
+scope. Initial bootstrap, changed adapter-owned template migration, the
+pre-baseline legacy bridge, and governed model-assisted self-update are governed
+by ADR-007/SPC-008 and TSK-021 rather than being implicit extensions of this
+release contract.
