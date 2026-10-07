@@ -6,9 +6,27 @@ import test from 'node:test';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { makeProject } from './fixture.js';
+import { helpTopics, helpUri, renderHelp } from '../../src/consumer/help.js';
+import { execFileSync } from 'node:child_process';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const serverPath = path.join(repoRoot, 'src/governance-mcp/server.js');
+
+test('read-only MCP help and installed CLI render the same canonical versioned content', async () => {
+  const transport = new StdioClientTransport({ command: process.execPath, args: [serverPath], cwd: '/tmp' });
+  const client = new Client({ name: 'help-parity', version: '1.0.0' });
+  try {
+    await client.connect(transport);
+    const { resources } = await client.listResources();
+    assert.deepEqual(resources.map((resource) => resource.uri).sort(), Object.keys(helpTopics).map(helpUri).sort());
+    for (const topic of Object.keys(helpTopics)) {
+      const resource = await client.readResource({ uri: helpUri(topic) });
+      assert.equal(resource.contents[0].text, renderHelp(topic));
+      const cli = execFileSync(process.execPath, [path.join(repoRoot, 'bin/dev-foundry-claude.js'), 'help', topic], { encoding: 'utf8', cwd: '/tmp' });
+      assert.equal(cli, resource.contents[0].text);
+    }
+  } finally { await client.close(); }
+});
 
 test('stdio MCP smoke lists exactly one tool and calls the resolver', async () => {
   const project = await makeProject();

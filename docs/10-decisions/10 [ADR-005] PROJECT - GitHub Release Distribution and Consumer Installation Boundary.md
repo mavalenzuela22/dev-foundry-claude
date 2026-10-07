@@ -5,7 +5,7 @@ artifact:
   type: ADR
   title: GitHub Release Distribution and Consumer Installation Boundary
   status: ACCEPTED
-artifactVersion: "2"
+artifactVersion: "3"
 authorityScope: claude-adapter-github-release-distribution
 ownerRole: governance-author
 canonical: true
@@ -15,6 +15,7 @@ scope:
     - claude-adapter-release-asset-layout
     - no-checkout-consumer-installation
     - latest-release-acquisition-alias
+    - side-by-side-upgrade-target-acquisition
   appliesTo:
     components:
       - dev-foundry-claude
@@ -76,6 +77,13 @@ to install the Claude adapter.
 9. A private repository MAY use an authenticated GitHub acquisition flow, but
    that flow is outside this baseline and MUST NOT be represented as equivalent
    to the anonymous public installation UX.
+10. A self-update-capable consumer SHALL acquire a target release side-by-side
+    with the runtime serving the current governed session. Target acquisition and
+    integrity verification do not update the consumer pin, activate target authority
+    or replace the source runtime before the authorized cutover.
+11. Migration material required by ADR-007/SPC-008 SHALL be payload-integrity-bound
+    as part of the immutable target release. Producer `main` or mutable release
+    prose cannot substitute for the migration material carried by that release.
 
 ## 3. Consequences
 
@@ -90,6 +98,10 @@ to install the Claude adapter.
 - Existing payload integrity and fail-closed runtime pinning remain unchanged.
 - The adapter can later add another distribution channel without changing
   consumer release identity.
+- First-time global installation and side-by-side upgrade staging are different
+  acquisition modes. A future implementation may use an isolated npm prefix,
+  extracted verified tarball or equivalent staging location, but it must preserve
+  the source runtime until cutover.
 
 ## 4. Alternatives not chosen
 

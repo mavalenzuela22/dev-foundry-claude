@@ -5,7 +5,7 @@ artifact:
   type: ARC
   title: Claude Code Adapter Architecture
   status: ACTIVE
-artifactVersion: "4"
+artifactVersion: "5"
 authorityScope: dev-foundry-claude-adapter-architecture
 ownerRole: governance-author
 canonical: true
@@ -15,6 +15,7 @@ scope:
     - claude-code-primitive-responsibility-map
     - claude-code-context-loading-boundary
     - claude-adapter-distribution-components
+    - consumer-bootstrap-and-self-update-architecture
   appliesTo:
     components:
       - dev-foundry-claude
@@ -111,9 +112,29 @@ three responsibilities around the existing MCP and launcher: brownfield adoption
 apply for adapter-owned files only, a read-only activation status, and thin `mcp` and `run`
 entry points that verify a runtime pin first.
 
-A consumer receives configuration, not code. Until the consumer's own atomic cutover the adapter
-is prepared and not active, and the packaged MCP fails closed with `BINDING_INACTIVE` for role
-work. No component exists to coexist with, bridge, or modify the mature runner.
+An already governed consumer receives configuration, not copied runtime code. Until its
+authorized cutover the adapter may remain prepared and not active, and the packaged MCP fails
+closed for role work when Claude bindings are inactive. No ordinary adapter preparation path
+coexists with, bridges, or silently modifies another active governance runtime.
+
+ADR-007/SPC-008 add two lifecycle components without changing that ordinary boundary:
+
+- a deterministic initial-bootstrap component for repositories with no prior DEV FOUNDRY
+  authority, using integrity-bound framework bytes, templates, repository facts and explicit
+  Operator choices;
+- a migration subsystem with one legacy bridge into adapter 1.4.0 and a self-update path for
+  later releases.
+
+Self-update-capable target packages are staged side-by-side. The currently active Claude session
+remains on source runtime/authority while it performs semantic migration analysis. Deterministic
+tools own exact package verification, bounded transforms, plan hashes and validation; the model
+owns semantic reconciliation under the currently active Governance Author binding; reserved
+Operator choices remain human decisions. The cutover invalidates the source session and requires
+a fresh `dev-foundry-claude start` session.
+
+The governance MCP/runtime SHALL therefore carry a mechanically checkable session-start
+authority/runtime fingerprint. A session whose starting fingerprint no longer matches the
+project after upgrade cutover fails closed for subsequent governed work.
 
 ## 5. Hooks and permissions
 

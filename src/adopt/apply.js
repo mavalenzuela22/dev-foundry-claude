@@ -22,8 +22,9 @@ export async function applyPlan({ planBytes, planSha256, adapter, root: rootArgu
   const upgrading = supplied.mode === 'upgrade';
   if (upgrading !== upgrade) throw new ApplyError('plan-invalid', 'The plan mode does not match the command.');
   if (supplied.status !== 'ready' && !(upgrading && supplied.status === 'noop')) throw new ApplyError('plan-not-ready', 'The plan is not ready to apply.');
-  const current = upgrading ? await createUpgradePlan({ root: rootArgument, adapter }) : await createPlan({
+  const current = upgrading ? await createUpgradePlan({ root: rootArgument, adapter, currentPackageRoot: supplied.currentPackageRoot }) : await createPlan({
     root: rootArgument, project: supplied.target?.project, idPrefix: supplied.target?.idPrefix, remove: supplied.mode === 'remove', adapter,
+    initialBootstrap: supplied.mode === 'initial-bootstrap', classification: supplied.bootstrap?.classification, operator: supplied.bootstrap?.operator,
   });
   if (!current.bytes.equals(planBytes) || current.hash !== planSha256 || current.plan.status !== supplied.status) throw new ApplyError('plan-stale', 'Repository or adapter state drifted from the plan.');
   const root = await realpath(path.resolve(rootArgument ?? process.cwd()));

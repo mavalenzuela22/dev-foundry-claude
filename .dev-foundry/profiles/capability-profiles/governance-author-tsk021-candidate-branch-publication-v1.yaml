@@ -1,0 +1,54 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-GOVERNANCE-AUTHOR-TSK021-CANDIDATE-BRANCH-PUBLICATION-V1
+status: active
+implementation_class: operator-assisted-dev-foundry-copilot
+supported_actions:
+  - publish_exact_task_branch_for_consumer_dogfood
+  - verify_exact_remote_branch_head_after_push
+prohibited_actions:
+  - create_pull_request
+  - merge_branch
+  - create_or_move_tag
+  - create_release
+  - publish_package_registry_artifact
+  - mutate_other_branches
+  - mutate_consumer_repository
+  - broaden_task_scope
+  - bypass_required_validation_or_audit
+limits:
+  repository: dev-foundry-claude
+  task_id: TSK-021
+  source_branch: task/tsk-021-self-explaining-consumer-ux
+  exact_candidate_commit: 49b9269551aabcc7f0f39d88b253553ddab70208
+  publication_target: same_named_remote_branch_with_exact_candidate_commit_reachable
+  purpose: make_exact_candidate_reachable_for_PagoElectronico_legacy_bridge_dogfood
+  promotion: operator_authorized_only
+  pull_request: prohibited
+  merge: prohibited
+  tag: prohibited
+  release: prohibited
+  package_publication: prohibited
+  expires_on:
+    - remote_branch_verified_to_contain_exact_candidate_commit
+    - exact_candidate_commit_is_no_longer_ancestor_of_local_branch
+proof_capabilities:
+  - local_branch_and_head_reobservation
+  - exact_remote_branch_head_verification
+  - exact_candidate_commit_remote_reachability_verification
+  - repository_transaction_evidence
+environment_constraints:
+  - process_bound_repository_must_be_dev_foundry_claude
+  - repository_must_be_clean
+  - local_branch_must_equal_source_branch
+  - exact_candidate_commit_must_exist_and_be_ancestor_of_local_branch
+  - explicit_operator_push_authorization_required
+stop_conditions:
+  - exact_candidate_commit_missing_or_not_ancestor_of_local_branch
+  - local_branch_differs_from_source_branch
+  - repository_not_clean
+  - remote_target_is_not_same_named_branch
+  - Pago_dogfood_does_not_checkout_exact_candidate_commit
+  - push_requires_force
+  - pull_request_merge_tag_release_or_package_publication_requested
+  - remote_state_is_indeterminate
+portability: project-specific

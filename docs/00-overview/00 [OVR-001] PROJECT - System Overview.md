@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: System Overview
   status: ACTIVE
-artifactVersion: "2.1.0-local.22"
+artifactVersion: "2.1.0-local.24"
 authorityScope: dev-foundry-claude-project
 ownerRole: governance-author
 canonical: false
@@ -55,11 +55,12 @@ The project SHALL NOT embed or recreate the runner merely to read or mutate the
 same repository from Claude Code. The runner and this adapter are distinct
 runtime integrations.
 
-When separately governed (TSK-012, ADR-003), the project MAY distribute its reusable runtime
-as a versioned package that an existing governed repository installs, receiving only
-project-specific generated configuration. A consumer SHALL NOT receive this project's
-authority, history, or runtime code copies, and adopting the package SHALL NOT change that
-repository's authority or its runner bindings.
+When separately governed, the project MAY distribute its reusable runtime as an immutable,
+integrity-pinned package. Ordinary installation or managed refresh does not rewrite established
+consumer authority. ADR-007/SPC-008 additionally allow an explicitly confirmed initial bootstrap
+when no project authority exists, one bounded legacy bridge into the 1.4.0 self-update baseline,
+and later governed model-assisted migrations from a currently active source session. A consumer
+never receives this producer project's authority or history.
 
 The project SHALL NOT duplicate the adopted DEV FOUNDRY release into project
 prompts, Skills, summaries, or local OPS/DAT copies as a parallel methodology
@@ -82,7 +83,22 @@ The approved direction is to:
 - preserve role separation and explicit Operator authorization;
 - keep provider authentication, credentials, enterprise routing, and private
   launcher configuration outside reusable methodology and project SoT unless a
-  concrete non-secret contract requires them.
+  concrete non-secret contract requires them;
+- make the consumer experience self-explaining so a developer can install,
+  configure, start, inspect, upgrade and diagnose the adapter without first
+  learning internal DEV FOUNDRY artifact taxonomy;
+- make the packaged telemetry launcher reachable through the normal consumer
+  command surface rather than requiring launcher-script knowledge;
+- make a normal Git repository bootstrapable into the minimum DEV FOUNDRY
+  project state through explicit human confirmation without manual governance
+  artifact construction;
+- make adapter 1.4.0 the one-time legacy bridge destination and first
+  self-update-capable baseline;
+- preserve real legacy consumer history/evidence instead of proving migration by
+  reset/reinstall;
+- let later semantic upgrades be assessed from the currently governed Claude
+  session while the target release is staged side-by-side, then require a fresh
+  session after authorized cutover.
 
 ## 4. Current Non-Goals
 
@@ -126,8 +142,14 @@ Claude Code remains the target runtime of the adapter and of any consumer that
 explicitly adopts a release. Root `CLAUDE.md`, `.mcp.json`, `.claude/**`, the
 Claude Capability Profiles and package templates remain as product,
 distribution and test surface and bind no producer role. Adapter version 1.1.0
-(TSK-012) is the initial consumer baseline; SPC-005 (PLANNED) records the future
-release and upgrade contract, whose implementation is not yet authorized.
+(TSK-012) is the initial consumer baseline; SPC-005 is active and TSK-020 is formally closed after adapter 1.3.0 established
+the public GitHub Release channel and compatible-upgrade baseline. ADR-006,
+SPC-007 and TSK-021 govern the beginner-first consumer product surface,
+including guided setup/status/upgrade/doctor/help and telemetry-aware Claude
+startup. ADR-007 and SPC-008 now define initial zero-to-governed bootstrap, the
+one-time pre-self-update legacy bridge, side-by-side target staging, governed
+model-assisted self-update, and mandatory post-cutover restart. Adapter 1.4.0 is
+the first self-update-capable baseline.
 Canonical DEV FOUNDRY 2.1.0 remains the selected reusable methodology; the local
 Project Operating Profile and Authority Index bind that release to
 `dev-foundry-claude`.
@@ -138,7 +160,9 @@ architecture. SPC-001 and DAT-001 close the resolver behavior and tool contract.
 SPC-002 owns the Claude-native binding target and consumer-cutover model, not
 the active producer bindings, which the POP owns. SPC-003 owns the
 role-isolation and token-economics contract. SPC-004 owns the operational
-telemetry and empirical tokenomics evidence contract.
+telemetry and empirical tokenomics evidence contract. SPC-005 owns release
+identity/pin mechanics, SPC-007 owns guided consumer UX, and SPC-008 owns
+bootstrap/legacy/self-update migration behavior under ADR-007.
 
 The active POP binds Governance Author, Governance Auditor and Evidence
 Custodian to `operator-assisted-dev-foundry-copilot` on `chatgpt-project` through

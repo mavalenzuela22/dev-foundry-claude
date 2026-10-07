@@ -1,0 +1,111 @@
+{
+  "format": "dev-foundry.migration-release.v1",
+  "frameworkVersion": "2.1.0",
+  "legacy": [
+    {
+      "allowedPaths": [
+        ".claude/agents/dev-foundry-auditor.md",
+        ".claude/agents/dev-foundry-executor.md",
+        ".mcp.json",
+        "CLAUDE.md"
+      ],
+      "configuredAuthorityTransforms": [],
+      "id": "legacy-1.2.2-managed-surface",
+      "preserveForeignRuntime": true,
+      "previousPackageRequired": true,
+      "proof": {
+        "evidence": ".dev-foundry/executions/TSK-018/launcher-lf-package-corrective/executor-output.log",
+        "tarballSha256": "35e54884f435f2bd65b656ddb997e28712b8348b8755e7fafccfceb14ce4afc5"
+      },
+      "source": "1.2.2:sha256:5fc99b36727228c14864f27d220b429fe36ae053df1b12116ef3aa39648e20e2"
+    },
+    {
+      "allowedPaths": [
+        ".claude/agents/dev-foundry-auditor.md",
+        ".claude/agents/dev-foundry-executor.md",
+        ".mcp.json",
+        "CLAUDE.md"
+      ],
+      "configuredAuthorityTransforms": [],
+      "id": "legacy-1.2.2-windows-candidate-managed-surface",
+      "preserveForeignRuntime": true,
+      "previousPackageRequired": true,
+      "proof": {
+        "gitCommit": "bf5f590b609e7aed972ad25be12e17ea984a6da8",
+        "evidence": "docs/70-tasks/70 [TSK-018-CLOSURE] PROJECT - Canonicalize Adapter Launcher for Windows Package Stability Closure.md",
+        "evidenceCommit": "f0ebac6e2f8bd6d217f3cff577faa986df00941a",
+        "reproduction": "Two byte-identical npm pack builds from independent clean checkouts of gitCommit with core.autocrlf=true and its historical launcher eol=lf attribute; root and dashboard npm ci --offline --ignore-scripts from their historical locks; unmodified historical prepack/dashboard/payload-manifest scripts; Node 20.19.5, npm 10.8.2, macOS. Both extracted packages verify 1213 files and the exact source self-pin. LF checkout reproduces the separately supported 5fc99b build. tarballSha256 identifies these reproduced tarballs, not the Windows archive recorded in the closure.",
+        "tarballSha256": "1f32b627b4534cb1f1cb3abf6ddf6b66610e979851cbeee7c34d9d32bbca5fe8"
+      },
+      "source": "1.2.2:sha256:c2beefd78db3417c20d313cf7e189152c134d1f6abc11c14555630e2036462c2"
+    },
+    {
+      "allowedPaths": [
+        ".claude/agents/dev-foundry-auditor.md",
+        ".claude/agents/dev-foundry-executor.md",
+        ".mcp.json",
+        "CLAUDE.md"
+      ],
+      "configuredAuthorityTransforms": [],
+      "id": "legacy-1.3.0-validation-artifact-managed-surface",
+      "preserveForeignRuntime": true,
+      "previousPackageRequired": true,
+      "proof": {
+        "evidence": ".dev-foundry/executions/TSK-020/windows-release-builder-corrective-v002/validation-report.md",
+        "tarballSha256": "1a7d3ef43071fa6f4e56e353c833d5ea4ee3af7bbe1a4f5686497aaaaff395e4"
+      },
+      "source": "1.3.0:sha256:5022c5f018c4888160a83048f966c0e308ae48eb23eaa8980b0ccd0269e437b4"
+    },
+    {
+      "allowedPaths": [
+        ".claude/agents/dev-foundry-auditor.md",
+        ".claude/agents/dev-foundry-executor.md",
+        ".mcp.json",
+        "CLAUDE.md"
+      ],
+      "configuredAuthorityTransforms": [],
+      "id": "legacy-1.3.0-public-tag-managed-surface",
+      "preserveForeignRuntime": true,
+      "previousPackageRequired": true,
+      "proof": {
+        "gitCommit": "730680744aca480ba576221f492e81d892a0358f",
+        "gitTag": "v1.3.0",
+        "reproduction": "two byte-identical canonical npm pack builds from the exact tag; prior release artifact file-set/dependencies/assets unchanged; only tag README differs",
+        "tarballSha256": "16e4b228184a65b2c4624e98c45c01eb6fa089d19bbcecfec5bc83ba7ace0631"
+      },
+      "source": "1.3.0:sha256:6d868c18ce3c43f00ddb2458858f1d6a05efb2c1cd51f765a301d2eb02f47b30"
+    }
+  ],
+  "selfUpdate": {
+    "configuredAuthorityTransforms": [],
+    "cutover": "bounded-exact-plan-apply",
+    "mandatoryRestart": true,
+    "mode": "deterministic-managed-surface",
+    "operatorConfirmationRequired": true,
+    "preservedPaths": [
+      "product/**",
+      "project-authority/**",
+      "historical-evidence/**",
+      "CLAUDE.md outside managed block",
+      "other MCP entries"
+    ],
+    "requiresGovernedReconciliation": false,
+    "semanticMigration": "current-governed-Claude-session-under-source-authority",
+    "sourceMinimum": "1.4.0",
+    "staging": "isolated-package-outside-project-and-source-runtime",
+    "targetContracts": {
+      "bootstrap": "dev-foundry.platform-bootstrap.v2",
+      "capability": "dev-foundry.capability-profile.v1",
+      "pop": "dev-foundry.project-operating-profile.v2"
+    },
+    "validationPredicates": [
+      "verified-source-and-target",
+      "exact-plan-and-hash",
+      "unchanged-preconditions",
+      "active-source-authority",
+      "bounded-owned-paths"
+    ]
+  },
+  "selfUpdateBaseline": "1.4.0",
+  "targetVersion": "1.4.0"
+}

@@ -33,6 +33,7 @@ export async function runLauncher({
   signalTarget = process,
   stderr = (message) => console.error(message),
   killTimeoutMs = 5000,
+  onReady = () => {},
 } = {}) {
   let plan;
   let runtime;
@@ -57,6 +58,7 @@ export async function runLauncher({
       telemetryRunId,
     });
     const childEnv = buildTelemetryEnvironment({ telemetryDir, telemetryRunId, port: collector.port, baseEnv: env, launchMode: runtime });
+    onReady({ runtime, port: collector.port, telemetryDir });
     const child = spawn(plan.executable, plan.args, { stdio: 'inherit', cwd: projectRoot, env: childEnv, shell: false });
     let killTimer;
     const forwardSignal = (signal) => {

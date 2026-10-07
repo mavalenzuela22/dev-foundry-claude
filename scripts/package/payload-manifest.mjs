@@ -38,7 +38,7 @@ function checkLock(files) {
 
 function generate() {
   const files = npmPackList();
-  for (const file of ['src/dashboard/command.js', ...['http', 'evidence', 'claude-otel', 'launch'].map((name) => `tools/dashboard/server/${name}.mjs`), 'tools/dashboard/dist/index.html', 'tools/dashboard/dist/logo.svg']) {
+  for (const file of ['framework/dev-foundry-2.1.0.bundle.json', 'migrations/release.json', 'src/consumer/help.js', 'src/dashboard/command.js', ...['http', 'evidence', 'claude-otel', 'launch'].map((name) => `tools/dashboard/server/${name}.mjs`), 'tools/dashboard/dist/index.html', 'tools/dashboard/dist/logo.svg']) {
     if (!files.includes(file)) fail(`required dashboard payload missing: ${file}`);
   }
   for (const extension of ['js', 'css']) {

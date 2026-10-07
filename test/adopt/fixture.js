@@ -151,3 +151,12 @@ export async function applyProposal(root, proposal) {
     await writeFile(target, add.content);
   }
 }
+
+// Presentation-only unit tests inject their adapter identity. Keep the dashboard
+// availability fact stable while independent producer packing rebuilds dist.
+export async function makePresentationPackage() {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'consumer-presentation-'));
+  await mkdir(path.join(root, 'tools/dashboard/dist'), { recursive: true });
+  await writeFile(path.join(root, 'tools/dashboard/dist/index.html'), '<!doctype html><title>Availability fixture</title>');
+  return { root, cleanup: () => rm(root, { recursive: true, force: true }) };
+}

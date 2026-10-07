@@ -41,7 +41,7 @@ test('release builder produces reproducible normal-package assets, exact identit
   t.after(() => rm(scratch, { recursive: true, force: true }));
   const out = path.join(scratch, 'first');
   const info = await buildReleaseAssets(out);
-  assert.equal(info.version, '1.3.0');
+  assert.equal(info.version, '1.4.0');
   assert.deepEqual((await readdir(out)).sort(), [...info.files].sort());
   const versioned = await readFile(path.join(out, info.files[0]));
   assert.deepEqual(await readFile(path.join(out, info.files[1])), versioned);

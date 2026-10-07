@@ -5,7 +5,7 @@ artifact:
   type: OVR
   title: Documentation Map and Artifact Taxonomy
   status: ACTIVE
-artifactVersion: "2.1.0-local.30"
+artifactVersion: "2.1.0-local.32"
 authorityScope: dev-foundry-claude-project-routing
 ownerRole: governance-author
 canonical: false
@@ -129,7 +129,7 @@ The current project authority is:
 - TSK-012 for the completed reusable package and brownfield adoption task;
 - ADR-004 for producer/consumer operational separation and the adapter release
   lifecycle;
-- SPC-005 for the PLANNED adapter release and consumer upgrade contract;
+- SPC-005 for the active adapter release and consumer upgrade contract;
 - TSK-013 for the producer-maintenance cutover task;
 - SPC-006 for the local producer operations dashboard parity contract;
 - TSK-014 for the completed and formally closed Foundry Runner dashboard parity
@@ -150,7 +150,17 @@ The current project authority is:
 - TSK-017 for the Windows installed-payload verification corrective and 1.2.1 lineage.
 - TSK-018 for the completed and formally closed launcher LF/package-stability corrective and 1.2.2 Windows consumer proof;
 - TSK-018-CLOSURE for its terminal disposition.
-- TSK-019 for the active CRLF managed-block idempotence corrective and adapter 1.2.3 Windows consumer proof.
+- TSK-019 and TSK-019-CLOSURE for the completed CRLF managed-block idempotence corrective and adapter 1.2.3 Windows consumer proof;
+- ADR-006 for the beginner-first self-explaining consumer experience;
+- ADR-007 for the accepted initial-bootstrap, legacy-bridge, side-by-side staging,
+  governed self-update, stale-session and mandatory-restart boundary;
+- SPC-007 for the guided consumer CLI/help contract;
+- SPC-008 for the active initial consumer bootstrap, legacy bridge, migration
+  package, model-assisted self-update and stale-session contract;
+- TSK-020 and TSK-020-CLOSURE for the completed public GitHub Release and compatible-upgrade baseline;
+- TSK-021 for the active 1.4.0 self-explaining consumer UX, zero-to-governed
+  bootstrap, legacy bridge, guided telemetry start, canonical help, managed
+  refresh and self-update foundation implementation.
 
 No MTP is active.
 `dev-foundry-executor` and `dev-foundry-auditor` remain Claude adapter product
@@ -158,6 +168,10 @@ surface under SPC-003 and are not bound in the producer POP.
 TSK-008 established the local telemetry path for empirical review using real
 Claude-native work and TSK-010 added the `direct`, `dial` and `codemie` launch
 modes; actual telemetry arrival is verified in real launcher-started sessions.
+ADR-007/SPC-008 establish adapter 1.4.0 as the first self-update-capable baseline:
+supported older consumers cross one legacy bridge, while later semantic upgrades
+are performed from the currently governed source session and require a fresh
+session after cutover.
 The active producer platform is `chatgpt-project`; Claude Code is the adapter's target runtime. Hooks, Skills, agent teams, model selection,
 and additional subagents remain unauthorized unless separately governed.
 

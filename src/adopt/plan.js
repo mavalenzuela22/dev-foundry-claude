@@ -1,3 +1,4 @@
+import { createBootstrapPlan } from './bootstrap.js';
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -39,7 +40,7 @@ async function actorProfileId(root, profilePath) {
   return data && typeof data.id === 'string' ? data.id : path.posix.basename(profilePath).replace(/\.yaml$/, '');
 }
 
-export async function createPlan({ root: rootArgument, project, idPrefix, remove = false, adapter }) {
+export async function createPlan({ root: rootArgument, project, idPrefix, remove = false, adapter, templatesRoot, managedRefreshHashes = {}, initialBootstrap = false, classification, operator }) {
   const facts = await inspect(rootArgument, { project, idPrefix });
   const plan = {
     planFormat: PLAN_FORMAT,
@@ -59,6 +60,7 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
     const bytes = Buffer.from(canonicalJson(plan), 'utf8');
     return { plan, bytes, hash: sha256(bytes), ops };
   };
+  if (!facts.governed && initialBootstrap && !remove) return createBootstrapPlan({ facts, adapter, project, classification, operator });
   if (!facts.governed) {
     if (!facts.blockers.length || facts.root !== null) plan.status = 'not-governed';
     return finish();
@@ -79,11 +81,11 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
     project: facts.project, prefix, executorProfileId, auditorProfileId, expect: adapter.expect,
     authorProfile: facts.actorProfiles['governance-author'], custodianProfile: facts.actorProfiles['evidence-custodian'],
   });
-  const agents = renderAgents(params);
-  const profiles = renderProfiles(params);
-  const bootstrap = renderBootstrap(params);
-  const block = renderClaudeBlock(params);
-  const entry = renderMcpEntry(params);
+  const agents = renderAgents(params, templatesRoot);
+  const profiles = renderProfiles(params, templatesRoot);
+  const bootstrap = renderBootstrap(params, templatesRoot);
+  const block = renderClaudeBlock(params, templatesRoot);
+  const entry = renderMcpEntry(params, templatesRoot);
   const touched = [];
   const pre = { [POP_PATH]: shaOrAbsent(facts.popBytes), [INDEX_PATH]: shaOrAbsent(facts.indexBytes) };
   for (const bootstrapEntry of facts.bootstraps) pre[bootstrapEntry.path] = shaOrAbsent(bootstrapEntry.bytes);
@@ -102,6 +104,7 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
     if (!remove) {
       if (existing === null) addCreate(filePath, content);
       else if (existing.toString('utf8') === content) plan.noop.push(filePath);
+      else if (managedRefreshHashes[filePath] === sha256(existing)) addMerge(filePath, existing.toString('utf8'), content);
       else plan.blockers.push(blocker('agent-file-collision', 'An agent file exists and is not byte-identical to the rendered output.'));
     } else if (existing === null) plan.noop.push(filePath);
     else if (existing.toString('utf8') === content) addDelete(filePath, existing);
@@ -113,7 +116,7 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
   const md = text(mdBytes);
   pre[CLAUDE_MD] = shaOrAbsent(mdBytes);
   const span = md === null ? null : blockSpan(md);
-  if (span && span.end < 0) plan.blockers.push(blocker('managed-block-modified', 'The managed CLAUDE.md block is malformed.'));
+  if (span && (span.end < 0 || md.indexOf(BLOCK_BEGIN, span.start + BLOCK_BEGIN.length) >= 0 || md.indexOf(BLOCK_END, span.end) >= 0)) plan.blockers.push(blocker('managed-block-modified', 'The managed CLAUDE.md block is malformed.'));
   else {
     const outside = md === null ? '' : span ? md.slice(0, span.start) + md.slice(span.end) : md;
     if (outside.includes('resolve_governed_operation')) plan.blockers.push(blocker('claude-md-conflict', 'CLAUDE.md carries governance instructions outside the managed block.'));
@@ -121,6 +124,7 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
       if (md === null) addCreate(CLAUDE_MD, block);
       else if (span) {
         if (md.slice(span.start, span.end) === block) plan.noop.push(CLAUDE_MD);
+        else if (managedRefreshHashes[CLAUDE_MD] === sha256(mdBytes)) addMerge(CLAUDE_MD, md, md.slice(0, span.start) + block + md.slice(span.end));
         else plan.blockers.push(blocker('managed-block-modified', 'The managed CLAUDE.md block was modified.'));
       } else addMerge(CLAUDE_MD, md, `${md}${md.endsWith('\n') ? '' : '\n'}\n${block}`);
     } else if (!span) plan.noop.push(CLAUDE_MD);
@@ -201,7 +205,7 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
     } catch { /* no capability profile directory */ }
     for (const existingBootstrap of facts.bootstraps) {
       if (existingBootstrap.data && newIds.includes(existingBootstrap.data.id) && existingBootstrap.path !== BOOTSTRAP_PATH) plan.blockers.push(blocker('id-collision', 'A proposed artifact id collides with an existing different artifact.'));
-      if (existingBootstrap.key === BOOTSTRAP_KEY) plan.blockers.push(blocker('id-collision', 'A proposed bootstrap key collides with an existing entry.'));
+      if (existingBootstrap.key === BOOTSTRAP_KEY && !(activation.overall === 'active' && existingBootstrap.path === BOOTSTRAP_PATH)) plan.blockers.push(blocker('id-collision', 'A proposed bootstrap key collides with an existing entry.'));
     }
     for (const item of [...(facts.index.routes ?? []), ...(Array.isArray(facts.index.bindings) ? facts.index.bindings : [])]) {
       if (isObject(item) && Object.values(indexBindingIds).includes(item.id) && !newPaths.has(item.path)) plan.blockers.push(blocker('id-collision', 'A proposed Authority Index id collides with an existing entry.'));

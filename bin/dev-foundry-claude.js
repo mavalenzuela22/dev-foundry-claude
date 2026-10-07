@@ -23,12 +23,21 @@ function flags(argv, allowed) {
 const [command, ...rest] = process.argv.slice(2);
 const packageVersion = () => JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8')).version;
 
-if (command === '--version') {
+if (!command || ['setup', 'start', 'status', 'doctor', 'help', '--help'].includes(command) || (command === 'upgrade' && !['status', 'plan', 'apply'].includes(rest[0]))) {
+  const { consumerCommand } = await import('../src/consumer/command.js');
+  try { process.exitCode = await consumerCommand({ command: !command || command === '--help' ? 'help' : command, argv: rest, packageRoot }); }
+  catch (error) { fail(`The operation could not complete safely. No application files were changed. ${error.exitCode === 2 ? error.message : `Next: dev-foundry-claude doctor. Use --verbose for technical diagnostics.${rest.includes('--verbose') ? ` Detail: ${error.code ?? error.message}` : ''}`}`, error.exitCode ?? 1); }
+} else if (command === 'migration') {
+  if (rest.length) fail('Usage: dev-foundry-claude migration', 2);
+  const { inspectMigrationRelease } = await import('../src/adopt/migration.js');
+  try { console.log(JSON.stringify(await inspectMigrationRelease(packageRoot), null, 2)); } catch { verificationFailure(); }
+} else if (command === '--version') {
   console.log(packageVersion());
 } else if (command === 'mcp') {
   if (rest.length !== 2 || rest[0] !== '--expect') verificationFailure();
   try { verifyPayload(packageRoot, rest[1]); } catch { verificationFailure(); }
   globalThis[Symbol.for('dev-foundry-claude.consumer-mode-guard')] = true;
+  globalThis[Symbol.for('dev-foundry-claude.consumer-runtime-pin')] = rest[1];
   await import(pathToFileURL(path.join(packageRoot, 'src/governance-mcp/server.js')).href);
 } else if (command === 'dashboard') {
   const { dashboardCommand } = await import('../src/dashboard/command.js');
@@ -51,7 +60,7 @@ if (command === '--version') {
 } else if (command === 'upgrade') {
   const [action, ...args] = rest;
   if (!['status', 'plan', 'apply'].includes(action)) fail('Usage: dev-foundry-claude upgrade <status|plan|apply> --root <repo>', 2);
-  const allowed = { '--root': 'value', ...(action === 'plan' ? { '--out': 'value' } : action === 'apply' ? { '--plan': 'value', '--plan-sha256': 'value' } : {}) };
+  const allowed = { '--root': 'value', ...(action === 'plan' ? { '--out': 'value', '--from-package': 'value' } : action === 'apply' ? { '--plan': 'value', '--plan-sha256': 'value' } : { '--from-package': 'value' }) };
   const options = flags(args, allowed);
   if (!options['--root']) fail('upgrade requires --root.', 2);
   let adapter;
@@ -69,11 +78,11 @@ if (command === '--version') {
         planBytes: readFileSync(path.resolve(options['--plan'])), planSha256: options['--plan-sha256'] })));
     } catch (error) { fail(`upgrade apply refused: ${error.code ?? 'error'}`); }
   } else if (action === 'status') {
-    const result = await upgradeStatus({ root, adapter });
+    const result = await upgradeStatus({ root, adapter, currentPackageRoot: options['--from-package'] });
     console.log(JSON.stringify(result, null, 2));
     process.exitCode = result.status === 'blocked' ? 2 : 0;
   } else {
-    const result = await createUpgradePlan({ root, adapter });
+    const result = await createUpgradePlan({ root, adapter, currentPackageRoot: options['--from-package'] });
     if (options['--out']) {
       // Plan artifacts must stay outside the consumer, and never overwrite files.
       const out = path.resolve(options['--out']);
@@ -124,5 +133,5 @@ if (command === '--version') {
     }
   } else fail('Usage: dev-foundry-claude adopt <plan|apply|status>', 2);
 } else {
-  fail('Usage: dev-foundry-claude <adopt|upgrade|mcp|run|dashboard|--version>', 2);
+  fail('Unknown command. Next: dev-foundry-claude help', 2);
 }

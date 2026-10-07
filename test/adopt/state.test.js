@@ -100,7 +100,7 @@ test('7 8 prepared state and every partial or mixed state fail closed with BINDI
     await mutate(state);
     const check = await evaluateActivation(state.root);
     assert.equal(check.overall, 'partial', name);
-    for (const role of ROLES) assert.equal((await live.call(ask(role))).errorCode, 'BINDING_INACTIVE', name);
+    for (const role of ROLES) assert.equal((await live.call(ask(role))).errorCode, name === 'profiles not routed by the Index' ? 'BINDING_INACTIVE' : 'STALE_SESSION', name);
   }
 });
 
