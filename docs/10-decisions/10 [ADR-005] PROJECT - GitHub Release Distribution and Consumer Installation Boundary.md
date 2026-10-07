@@ -5,7 +5,7 @@ artifact:
   type: ADR
   title: GitHub Release Distribution and Consumer Installation Boundary
   status: ACCEPTED
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: claude-adapter-github-release-distribution
 ownerRole: governance-author
 canonical: true
@@ -69,10 +69,21 @@ to install the Claude adapter.
    remains an explicit planned/applied operation governed by SPC-005.
 7. Release publication happens only after producer validation and promotion. A
    GitHub Release is not created from an unpromoted working tree or task branch.
+8. The anonymous no-checkout installation URL in this decision requires the
+   producer repository and its GitHub Release assets to be publicly readable.
+   Repository visibility is therefore an operational precondition of this
+   distribution baseline, not an adapter capability.
+9. A private repository MAY use an authenticated GitHub acquisition flow, but
+   that flow is outside this baseline and MUST NOT be represented as equivalent
+   to the anonymous public installation UX.
 
 ## 3. Consequences
 
-- End users no longer need the producer repository.
+- End users no longer need the producer repository checkout.
+- The baseline public install command requires no GitHub credentials because the
+  producer repository and release assets are publicly readable.
+- Making the producer repository private changes the acquisition boundary and
+  requires a separately documented authenticated flow.
 - Installation is the same command shape on Windows, macOS and Linux where Node
   and npm are available.
 - Package build/release engineering remains a producer responsibility.
