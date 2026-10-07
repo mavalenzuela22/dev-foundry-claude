@@ -4,8 +4,8 @@ artifact:
   id: TSK-020
   type: TSK
   title: Establish GitHub Release Installation and Compatible Consumer Upgrade
-  status: IN_PROGRESS
-artifactVersion: "2"
+  status: CLOSED
+artifactVersion: "3"
 authorityScope: tsk-020-github-release-install-upgrade
 ownerRole: governance-author
 canonical: true
@@ -40,9 +40,11 @@ authority:
 traceability:
   derivedFrom:
     - TSK-019
+  closureArtifact: TSK-020-CLOSURE
 lifecycle:
-  phase: in-progress
+  phase: closed
   blockedBy: []
+  closureArtifact: TSK-020-CLOSURE
   promotionRequired: true
 portability: project-specific
 ---
@@ -156,3 +158,17 @@ Post-publication consumer observations:
   prefix on `PATH`; adding that already-selected npm prefix to the process
   `PATH` made the bare `dev-foundry-claude --version` command return
   `1.3.0`. This is an environment PATH condition, not a package defect.
+
+
+## 7. Terminal disposition
+
+TSK-020 is CLOSED after producer validation PASS, exact Windows compatible-upgrade
+proof PASS, promotion of adapter 1.3.0, publication of GitHub Release `v1.3.0`,
+anonymous public-release installation proof on macOS and Windows, reconciliation
+of the repository-public-readability precondition, public-exposure sanity
+validation PASS, promotion/reconciliation/cleanup of that corrective, and formal
+closure through TSK-020-CLOSURE.
+
+Authenticated acquisition from a private producer repository, public npm/GitHub
+Packages publication, arbitrary cross-version template migration, and mutation of
+the real Pago Electronico repository remain outside TSK-020.
