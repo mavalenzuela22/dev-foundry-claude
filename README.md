@@ -43,12 +43,12 @@ dev-foundry-claude setup --yes
 ```
 
 Preparation supplies Claude integration files: managed agents, a marked block
-in `CLAUDE.md`, an MCP connection with an exact adapter selection, supporting
-profiles/bootstrap files, and an ignore rule for local telemetry.
+in `CLAUDE.md`, a local connection between Claude and the installed adapter,
+DEV FOUNDRY integration files, and an ignore rule for local telemetry.
 
 Setup and upgrade refreshes **do not change your application code**. Setup
 preserves existing project rules and responsibility assignments; it does not
-approve or silently rewrite project authority. Upgrade stays within verified
+approve or silently rewrite approved project rules. Upgrade stays within verified
 DEV FOUNDRY-owned integration files. Local edits or unclear ownership can prevent
 these operations from proceeding.
 
@@ -57,8 +57,9 @@ framework through the project's decision process first. `setup` explains this
 remaining step; installing the adapter does not create approved project rules.
 
 If files are prepared but Claude is not active, the owner must review and
-approve the activation proposal through that same process. `setup --json`
-includes the proposal; setup never applies it. Once activation is complete:
+approve Claude's project responsibilities through that same process.
+`setup --json` includes a technical activation proposal for that review;
+setup never applies it. Once activation is complete:
 
 ```sh
 dev-foundry-claude status
@@ -285,7 +286,7 @@ automate a supported workflow. These terms are not prerequisites for trying
 | Source of Truth (SoT) | The authoritative home for a project's approved rule or decision. |
 | Authority Index | Routes each concern to its authoritative document and scope. |
 | Project Operating Profile (POP) | Records project identity, selected framework, role assignments and local policies. |
-| Task (TSK) / Material Task Plan (MTP) | A bounded outcome / a bounded implementation plan for that work. |
+| Task (TSK) / Micro-Task Plan (MTP) | A bounded outcome / a bounded implementation plan for that work. |
 | Governance Author / Governance Auditor | Responsibilities for governing decisions / independently reviewing conformance when required. |
 | Implementation Executor / Mechanical Validator / Evidence Custodian | Responsibilities for implementing bounded work / running checks / preserving its records. |
 | Actor Profile / Capability Profile | A role's responsibilities and limits / a particular implementation's abilities and limits. |
