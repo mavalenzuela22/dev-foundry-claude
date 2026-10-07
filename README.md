@@ -1,503 +1,504 @@
 # dev-foundry-claude
 
-A user guide to **DEV FOUNDRY 2.1.0**, followed by instructions for its
-**Claude Code adapter 1.3.0** (`@dev-foundry/claude-adapter`).
+An AI assistant can help you get a demo working quickly. After a few months of
+using it on a real project, you may find that yesterday's decision has been
+forgotten, a small request changes unrelated code, or a fix breaks something
+that worked yesterday. A confident “done” can turn out to mean “I haven't
+checked.” Starting a new session can feel like starting the project explanation
+again.
 
-If you know Git and normal software development but are new to structured AI
-work, start here. You do not need to choose between Claude, Codex, Cursor or a
-provider before understanding the methodology. The first part explains how a
-project keeps decisions, responsibilities and proof durable. Installation comes
-after that foundation. If the dashboard and token visibility brought you here,
-this foundation explains what those work records and measurements mean.
+DEV FOUNDRY gives those decisions, work limits and checks a durable place in the
+project. This README first explains **DEV FOUNDRY 2.1.0**, then shows how to use
+its **Claude Code adapter 1.3.0**, `dev-foundry-claude`
+(`@dev-foundry/claude-adapter`). You can understand the approach before choosing
+or installing a tool.
 
-**This README is orientation, not authority.** It explains the already-adopted
-methodology; the selected official methodology release (the **canonical release**)
-and your project's approved documents and configuration govern actual work. Examples below are fictional, not project
-requirements or authorization.
+The invoice-export story and **acme-billing** project below are fictional teaching
+examples. They define no real project's requirements or permissions. This README
+explains the method; it does not approve real work or replace project rules. The
+project's explicitly adopted methodology release and approved project documents
+govern actual work.
 
 ## 1. What is DEV FOUNDRY?
 
-DEV FOUNDRY is a provider-neutral software-delivery methodology. It describes how
-to turn a human's desired outcome into a reviewable change with explicit scope
-and limits (a **bounded change**): establish
-what is required, record decisions, assign responsibilities, implement within
-scope, validate the result, keep evidence, and control promotion and closure.
+DEV FOUNDRY is a way to organize software work so that someone can answer:
+**What are we changing, why, what must stay unchanged, and how will we know it
+worked?** It keeps those answers in project records that people and tools can
+find, review and use again.
 
-It is not an AI model, IDE, CLI, Git workflow or agent product. Those are possible
-tools used to carry out the work. Claude, Codex, a human, a service or another
-agent can participate when the project assigns an appropriate responsibility to
-that implementation.
+For example, “add invoice export” becomes a clear agreement: users can download
+only invoices they already have permission to see; the file has an agreed format;
+billing calculations stay unchanged; checks must demonstrate both the export
+and the access restriction. The assistant gets a resolved change to implement,
+and the next session can find the same agreement.
 
-The project repository holds the durable knowledge needed to resume work later:
-what the project has decided, what a change must do, who may act, what was
-observed and what remains unfinished. Chat history and model memory are not the
-source of truth. A new session retrieves the relevant repository knowledge
-rather than depending on yesterday's conversation.
+The formal description is a **software-delivery methodology**: a set of concepts
+and rules for defining, carrying out, checking and accepting changes. It is
+**provider-neutral**, meaning those responsibilities have the same meaning
+whether a human, Claude, Codex or another eligible tool performs them. A project
+explicitly chooses who does each part and which methodology version it follows.
 
-This structure makes boundaries and claims inspectable. It does not make a model
-infallible or guarantee safety automatically; the required decisions, checks and
-authorizations still have to be performed.
+DEV FOUNDRY is not an AI model, IDE, coding agent, CLI or Git workflow engine.
+Those tools can help carry out its method. It also does not make AI infallible:
+requirements can be wrong, checks can miss defects, and reviews still need
+judgment. Its purpose is to make decisions and completion claims inspectable
+and work easier to resume.
+
+You will see the word **governance** in the full documents. Here it means keeping
+clear rules about who may decide or act, within which limits, and what must be
+checked before work moves forward.
 
 ## 2. The problem it solves
 
-Unstructured AI work can leave useful decisions and uncertain claims mixed into
-a conversation. DEV FOUNDRY gives each kind of information a place and an owner.
+A conversation can mix a request, a proposed design, an accepted decision and an
+untested claim into the same thread. Later, it can be hard to tell them apart.
+DEV FOUNDRY gives each a place and a responsibility.
 
-| Familiar situation | How the methodology addresses it |
+| Familiar situation | What changes in the way you work |
 | --- | --- |
-| “I told the AI something yesterday and today it forgot.” | Approved decisions and requirements live in repository documents that the next session can retrieve. |
-| “The AI changed more than I asked.” | Work has an explicit outcome, scope, exclusions and stop conditions. A broader capability needs authority; access to files is not permission to change them. |
-| “I don't know whether tests actually passed or the assistant just said they did.” | Implementation claims are separated from validation results tied to an identified, observable project state, with evidence and limitations. Missing proof cannot become PASS. |
-| “I changed from Claude to another tool and lost context.” | Responsibilities and authoritative project knowledge are independent of the provider. A tool change requires compatible project bindings, rather than making the old chat the new tool's authority. |
-| “I spent tokens rediscovering decisions.” | Each decision has an authoritative home and a route to find it, so work can retrieve the needed context. This is a structural response to repeated discovery, not a promise of token savings. |
-| “I don't know what is done, what is only proposed, or what was actually merged.” | Documents have explicit lifecycle state, and implementation, validation, review, integration and closure are recorded as separate facts. |
+| “The assistant forgot what we decided.” | Accepted decisions live in project documents that a new session retrieves. |
+| “It changed much more than I asked.” | Each change states its outcome, limits, exclusions and reasons to stop. File access alone is not permission to edit. |
+| “The fix broke something that worked yesterday.” | Checks target the promised behavior and affected existing behavior; their results identify the state checked. |
+| “It says done, but I don't know what ran.” | Keep the implementation claim separate from recorded checks, results and remaining gaps. |
+| “I can't resume this with another tool.” | Project records explain the work independently of the old chat or provider. The new tool still needs a valid assignment and sufficient abilities. |
+| “Was this tested, approved, merged or released?” | Record those as separate facts instead of one “done” label. |
 
-The methodology does not require every change to produce a large stack of new
-files. It requires enough explicit authority and proof for the actual boundary.
+The aim is enough structure for the change at hand. A small correction should
+not require a stack of documents that own no useful decision or rule.
 
 ## 3. The mental model
 
+Use this fictional request throughout: **“Let users download their visible
+invoices as a CSV file, without changing billing calculations.”**
+
 ### Start with human intent
 
-Someone states an outcome and its limits: “Let invoice users download a CSV of
-the invoices they can already see; do not change billing calculations.” This is
-intent. Before implementation, the project determines why it is needed, which
-existing decisions apply and whether anything remains unresolved.
+Begin with the useful outcome and its limits, rather than an open-ended “improve
+billing.” This is **intent**. Before coding, resolve questions such as which
+invoices “visible” includes and what columns the file needs. Existing project
+rules may already answer them.
 
 ### Keep project knowledge durable
 
-The project records accepted decisions, architecture, required behavior,
-information contracts, work boundaries and operating rules in repository files.
-By **authority**, this guide means the applicable approved definitions and
-permissions that determine what work may do. A convenient summary or an observed
-code path does not silently replace an approved definition.
+Write accepted decisions and requirements where the project can keep them and
+later sessions can find them. In this guide, **authority** means the applicable
+approved definitions and permissions that determine what the work must do and
+may do. A proposal is not an accepted rule merely because it appears in a chat.
+
+**Chat history and model memory are context, not project authority.** They can
+help locate unfinished work, but a new session must retrieve the relevant
+project records and observe the current state. If the code, a summary and an
+approved requirement disagree, do not silently choose whichever is convenient.
+Resolve the disagreement through the project's decision process.
 
 ### Give each concept one authoritative home: Source of Truth (SoT)
 
-For any bounded concept, one selected document or stable section owns its
-normative definition: what must be true. DEV FOUNDRY calls that home the
-**Source of Truth (SoT)**. For example, a CSV contract might own column order,
-while a behavior specification owns who may export invoices.
+Put each rule in one selected place that owns its meaning. For invoice export,
+one document might define who may export, while another defines the CSV columns.
+DEV FOUNDRY calls the selected home for a particular concept its **Source of
+Truth (SoT)**. It can be a document or a stable section of one.
 
-SoT is scoped to the concept and version it owns. It is not one magical file
-containing every rule. Within that scope, the authoritative home prevails over
-summaries, copies, historical material, chat, evidence and implementation
-behavior. If code disagrees with a requirement, the code's existence does not
-make it the new requirement.
+SoT does not mean one enormous file containing everything. Each home has a
+specified scope and version. Within that scope, its definition takes precedence
+over copies, summaries, historical material, chat, test results and existing
+code. A test passing does not rewrite the requirement it was meant to check.
 
 ### Route to those homes: Authority Index
 
-The project keeps a table of contents that points each concern to its
-corresponding authoritative home. DEV FOUNDRY calls this the **Authority Index**.
-“Invoice export format” can route to the CSV contract; “who may export” can route
-to the behavior specification.
+Keep a directory of where the project's current rules live. “Who may export?”
+should lead to the export behavior; “what columns?” should lead to the CSV
+contract. This directory is the **Authority Index**.
 
-The index is a router. It does not own all the rules it points to. Routes must
-resolve, and one concern must have one active authoritative home within the same
-scope. A filename alone does not establish authority: status, scope, version and
-applicable higher authority also matter.
+The index points to rules; it does not replace them. A route must lead to the
+right active document or section for that concern, scope and version. A familiar
+filename alone does not prove that its contents govern today's work.
 
 ### Bound one coherent outcome: a Task (TSK)
 
-One necessary, coherent, independently demonstrable outcome is a **capability**.
-The governed work document for delivering one such capability is a **Task**, whose
-canonical document token is **TSK**. “Add invoice CSV export” can be one TSK;
-“improve the whole billing system” is not a suitably bounded task.
+Describe one useful change clearly enough to implement and demonstrate. DEV
+FOUNDRY calls one coherent, independently demonstrable outcome a **capability**.
+Its delivery record is a **Task**, abbreviated **TSK**.
 
-A TSK states its purpose, applicable authority, scope, exclusions, acceptance,
-dependencies, evidence expectations and completion policy. It delivers behavior
-already governed by applicable authority; it cannot leave an unresolved product
-decision for the implementer to invent.
+The invoice-export task records why it is needed, which rules apply, what may
+change, what is excluded, what it depends on, what checks must show, and how it
+can be accepted and concluded. “Export visible invoices” is one outcome;
+“improve billing” leaves too many decisions open. A task delivers approved
+behavior; it does not ask the implementer to invent missing product decisions.
 
 ### Separate responsibilities from tools: roles
 
-Defining what should happen, implementing it, checking deterministic facts,
-evaluating governance and preserving records are different responsibilities.
-DEV FOUNDRY calls them **roles**. The role describes responsibility and its
-boundary; the implementation is the human, tool, model or service assigned to it.
-The next sections explain the assignments and their limits.
+Deciding what should happen, implementing it, checking it and preserving its
+records are different jobs. Those responsibilities and their limits are called
+**roles**. A role is assigned to a concrete person, model, agent or service—the
+**implementation** of that role. The assignment is a **binding**.
+
+An assistant's ability to edit a file does not give it permission to approve a
+requirement or merge its own work. [Who does what](#5-who-does-what) explains the
+roles through the same export example.
 
 ### Keep proof separate from requirements: evidence
 
-A test result, observed file state or recorded decision can establish what
-happened. That verifiable information is **evidence**. A sentence saying “done”
-is a claim until observable proof supports it.
+Keep verifiable information about what actually happened: which checks ran,
+against which state, their results, and what was not checked. This is
+**evidence**. “All tests passed” without observable support remains a claim.
 
-Evidence does not create requirements. A passing test proves its declared facts
-about the tested state; it cannot authorize a new feature or a merge.
+For example, a recorded check showing that one user cannot export another user's
+invoices supports that access rule. It does not authorize a new export feature,
+prove every possible case or give permission to merge.
 
 ### Keep lifecycle stages distinct
 
-Work moves through separate stages, with the applicable checks and authorization
-at each boundary. A simple view is:
+Finishing the code, checking it, accepting it and releasing it are separate
+steps. Their sequence is the work's **lifecycle**. A required checkpoint before
+moving forward is a **gate**: for example, required access checks must be
+complete before the project considers integration.
 
-```text
-human intent -> project authority -> task -> implementation -> proof
-             -> review when needed -> promotion -> closure
-```
+Moving eligible work through an authorized boundary, such as merging into the
+main branch, is **promotion**. Recording how the work concluded, with delivered
+scope, supporting proof and remaining limits, is **closure**. A closed task does
+not by itself mean the product was deployed; a merge does not by itself close
+the task.
 
-**Promotion** means moving eligible work through an authorized boundary, such as
-integration into the main branch. **Closure** records its accepted terminal
-disposition: what was delivered, what evidence supports it, and any limits or
-deferrals. Neither implies the other.
+**Tests and evidence do not themselves authorize promotion.** Required checks
+and reviews establish readiness; the applicable project authorization permits
+the next action. Not every change needs every possible stage or review.
 
-Not every task uses every stage. A documentation-only operation need not
-manufacture code implementation; a validation-only operation need not reopen
-implementation; independent audit is required only when triggered. Where a stage
-applies, completing the previous stage does not automatically complete or
-authorize it.
+### Connect the rules to a project and a working session
+
+Rules also need a project setup that says where they apply and who carries them
+out. Four names describe that setup:
+
+| Everyday idea | Formal name | What it records |
+| --- | --- | --- |
+| This project's settings and responsibility assignments | **Project Operating Profile (POP)** | Project identity, adopted methodology version, final decision authority, role assignments, applicable profiles, startup configuration, local policies and approved deviations. |
+| The job description for a responsibility | **Actor Profile** | A role's allowed and prohibited actions, required inputs, outputs, handoffs and reasons to stop. It is independent of the provider. |
+| What a particular person or tool can actually do | **Capability Profile** | Supported actions, environment limits and proof abilities. For an implementer, its specialized form is also called an Executor Profile. It constrains work; it grants no permission. |
+| Directions a session needs to find the project rules | **Platform Bootstrap** | Project identity, POP and Authority Index locations, role selection and essential startup constraints. It does not copy the full methodology. |
+
+For example, the POP can assign export implementation to an eligible tool. The
+Actor Profile describes the implementer's responsibility. The Capability
+Profile records whether that tool can run the needed tests. The Platform
+Bootstrap tells a new session how to find and verify those assignments.
 
 ## The Ponytail philosophy: do the smallest safe complete thing
 
-**Ponytail** is the human/project shorthand we use to explain the discipline
-already defined in DEV FOUNDRY 2.1.0's **OPS-007, “Minimal Sufficient Change and
-Sufficiency Review.”** The canonical release does not define the word
-“Ponytail.” This name adds no normative rule and does not replace OPS-007 or
-change the immutable 2.1.0 release.
+For invoice export, first ask whether the existing invoice query and access
+rules can be reused. Add the CSV behavior needed now. Do not build a reporting
+framework, plugin system and future PDF exporter merely because they might be
+useful someday.
 
-Ponytail does not mean “do less at all costs.” It means implement the **smallest
-safe complete change** that fully satisfies the governed intent: the approved
-outcome and its limits. **Safe** means preserving required safety, security,
-integrity and compatibility. **Complete** means meeting the whole authorized
-outcome, including required validation, evidence and acceptance. Those two words
-are as important as **smallest**. Cutting a required check or leaving part of
-the outcome unfinished is not Ponytail.
+This is **minimal sufficient change**: the **smallest safe complete change** that
+meets the approved outcome. “Smallest” limits unrelated work. “Safe” preserves
+required safety, security, integrity and compatibility. “Complete” includes the whole
+outcome and its required checks and proof.
+
+We use **Ponytail** as shorthand for that discipline. The adopted methodology
+defines the discipline in **OPS-007, “Minimal Sufficient Change and Sufficiency
+Review.”** The word “Ponytail” itself is this project's shorthand, rather than
+a term or additional rule defined by the official 2.1.0 release.
 
 ### Reuse before creating
 
-Before adding anything, ask in this order, with investigation proportional to
-the change:
+Consider these options in order, with investigation proportional to the change:
 
-1. Can **no change** satisfy the outcome?
-2. Can we **reuse existing authority or behavior**?
-3. Can we **compose existing pieces**?
-4. Can the **standard platform capability** solve it?
-5. Can an **already-approved dependency** solve it?
-6. Can **one bounded local change** solve it?
-7. Only then, is a **new abstraction, dependency, component, document or
-   lifecycle concept** necessary?
-
-Moving past an earlier option needs a concrete reason. A current requirement,
-risk or observed evidence must justify the addition. Without that justification,
-Ponytail rejects speculative abstractions, generic infrastructure, broad
-repository archaeology (exploring unrelated files and history), unrelated
-cleanup, premature extensibility, unnecessary documents, arbitrary test
-expansion, repeated proof that is still valid, and future capability implemented
-“just in case.”
-
-Valid proof can be reused only while it still applies to the state and boundary
-being checked. Repeat or broaden it when the change could invalidate it, a new
-risk requires it, or applicable authority requires fresh evidence. Minimality
-never excuses skipping required validation or audit.
+1. Make no change, if the outcome is already satisfied.
+2. Reuse existing rules or behavior.
+3. Combine existing pieces.
+4. Use a standard ability of the platform.
+5. Use an already-approved dependency.
+6. Make one local change with clear limits.
+7. Add a new abstraction, dependency, component, document or process concept
+   only when the earlier options are insufficient for a concrete reason.
 
 ### Apply it to the whole work, not just the code
 
-Ponytail applies to documentation, prompts and execution packs, authority
-retrieval and model context, the number of steps, validation depth, audits,
-artifacts, dependencies and architecture. Ask what each addition contributes to
-the current authorized outcome. Use enough context, steps and proof to preserve
-the required boundaries; do not add them merely to make the process look bigger.
+The same discipline applies to documents, model context, instructions, checks
+and reviews. Retrieve the rules needed for this change; create a document only
+when it has something meaningful to own; run checks that resolve uncertainty
+about acceptance or a real risk.
 
-For AI-assisted work, this discipline aims to give the model less irrelevant
-context and leave fewer ambiguous decisions to the executor. It reduces the need
-to spend tokens rediscovering decisions or exploring unrelated surfaces, favors
-shorter and more deterministic execution paths, and leaves less opportunity for
-scope creep. A small, explicit delta is also easier to review. These are reasons
-for the discipline, not guarantees of token savings or correctness.
+Reuse proof only while it still applies to the current state and change. Repeat
+or broaden it when a change invalidates it, a concrete risk calls for it, or the
+project requires fresh proof. Saving steps never excuses skipping required
+validation or audit. Focused work may reduce repeated discovery, but it promises
+neither token savings nor correctness.
 
 ### Give the executor a resolved, bounded change
 
-The executor implements an already-resolved change with clear limits. Resolve
-ambiguous product decisions before implementation. When the relevant authority
-can be compressed into focused instructions and direct references, do not send
-the executor to “figure out the whole system.” A summary helps it find and apply
-authority; it does not replace that authority.
+Tell the implementer the outcome, applicable rules, permitted changes,
+exclusions, checks and conditions that require stopping. “Implement this export”
+should not become permission to redesign billing.
 
-Focused checks may uncover a regression or consistency fix directly caused by
-the change. The executor may handle it only when it is necessary for the approved
-outcome, remains inside the already-authorized capability, is the smallest
-sufficient correction, and needs no new decision. It must introduce no new
-capability, public behavior or dependency, cross no hard exclusion or protected
-surface, and have observable evidence of the affected relationship. If it needs
-new authority or a new decision, stop and return it for governance resolution.
+A directly caused regression may be corrected within the same approved change
+only when it is necessary, is the smallest sufficient correction, crosses no
+hard exclusion, introduces no new capability, public behavior or dependency,
+and requires no new security, integrity, infrastructure or other material
+decision. Report the unexpected change and its causal proof for reconciliation.
+If it needs new authority, stop and return it to the project's decision process.
 
 ### Tiny example: invoice CSV export
 
-| Approach | What the change does |
+| Choice | What it means here |
 | --- | --- |
-| **Bad: build for imagined future needs** | Create a generic reporting framework, plugin architecture, abstraction layers and future export formats for a request that only needs invoice CSV. |
-| **Ponytail** | Reuse the existing invoice query and authorization rules. Add only the CSV behavior and contract required now, test the affected boundary, and record what observed requirement or evidence would justify evolution later. |
+| Add structure for imagined future needs | Build a generic reporting framework and several export formats for a CSV request. |
+| Apply Ponytail | Reuse the authorized invoice query, add the agreed CSV output, check the affected behavior and record the limits. |
 
-For example, record that scheduled exports remain outside this change and that
-an observed, approved need for scheduling would justify reconsidering the design.
-Record the trigger without implementing scheduling now.
-
-In everyday language: **Don't build more than the current governed problem
-needs, but don't cut required safety or proof either. Reuse before creating,
-keep execution bounded, and evolve later when evidence justifies it.**
+Scheduled exports can remain explicitly outside scope. Record an observed,
+approved need for scheduling as a reason to reconsider later; do not implement
+scheduling before that need exists.
 
 ## 4. What are all these files?
 
 ### Ten document types, ten responsibilities
 
-A governed document is a durable record with a defined responsibility, explicit
-identity, scope, version and lifecycle state. The prefix tells you its kind, not
-whether its contents are currently authoritative. These are the ten canonical
-governed document types:
+Documents separate questions that otherwise get mixed together in a chat. You
+will see the following prefixes in DEV FOUNDRY repositories. They name a
+responsibility; a prefix alone does not make a document approved or current.
 
-| Type and name | Plain-language purpose | Question it answers | Tiny fictional example |
-| --- | --- | --- | --- |
-| **OVR — Overview** | Maps the project, context and scope; summarizes authority owned elsewhere. | “What is this project, and where do I find things?” | A billing overview links to invoice behavior and export contracts. |
-| **ADR — Architecture Decision Record** | Records a material accepted decision, alternatives, consequences and boundaries. | “What did we decide, and why?” | Use the existing authorization model for exports rather than create a second one. |
-| **ARC — Architecture** | Describes components, interactions and trust or ownership boundaries within accepted decisions. | “How is the system structured?” | The invoice endpoint calls the existing invoice query service and a CSV serializer. |
-| **SPC — Specification** | Defines required behavior, constraints and acceptance criteria. | “What must the product do?” | Export only invoices the current user is permitted to read. |
-| **DAT — Data Contract** | Defines exact schemas, fields, states, invariants, errors and interchange contracts. | “What exactly does this information mean?” | CSV columns are invoice number, date and total, with a defined date format. |
-| **TSK — Task** | Bounds delivery of one necessary coherent capability and its acceptance. | “What change are we delivering?” | Add invoice CSV export; exclude billing calculation changes. |
-| **MTP — Micro-Task Plan** | Optionally decomposes one TSK into materially useful bounded slices. | “Does this task need separate implementation boundaries?” | Separate export service and UI slices because they need distinct proof. |
-| **OPS — Operations** | Defines how work is operated: roles, gates, validation, evidence, authorization, adoption and handoffs. | “How do we perform and control the work?” | State which checks and authorization are required before integration. |
-| **AUDIT — Governance Audit** | Records read-only evaluation, evidence, findings, verdict and limitations. | “Does this observed boundary conform to its authority?” | Evaluate export scope and evidence; record a finding if it bypasses authorization. |
-| **CLOSURE — Closure** | Records verified terminal disposition, delivered scope, evidence, known limits and deferrals. | “What was actually concluded?” | Export delivered and accepted; scheduled exports remain explicitly deferred. |
+| Everyday question | Document type | Fictional export example |
+| --- | --- | --- |
+| What is this project, and where do I find things? | **OVR — Overview** | A billing overview links to its decisions and behavior. |
+| What did we decide, and why? | **ADR — Architecture Decision Record** | Reuse the existing authorization model; record alternatives and consequences. |
+| How are the parts organized? | **ARC — Architecture** | Show the invoice query, export endpoint and serializer, with their boundaries. |
+| What must the product do? | **SPC — Specification** | Export only invoices the user may read; state acceptance criteria. |
+| What exactly does this information mean? | **DAT — Data Contract** | Define CSV column order, date format and error information. |
+| What change are we delivering now? | **TSK — Task** | Deliver CSV export; exclude billing calculations and scheduling. |
+| Does this task need separately controlled pieces? | **MTP — Micro-Task Plan** | Split service and UI work only if distinct boundaries or proof justify it. |
+| How do we operate and control the work? | **OPS — Operations** | Define applicable checks, role limits and integration permissions. |
+| Does the observed work follow its rules? | **AUDIT — Governance Audit** | Record a read-only evaluation, findings, verdict and limits. |
+| What was accepted as concluded? | **CLOSURE — Closure** | Record delivered export, supporting results and explicit deferrals. |
 
-The normal direction of **product authority** is:
+The usual direction of product rules is:
 
 ```text
 ADR (decisions) -> ARC (structure) -> SPC (required behavior)
                -> DAT (exact contracts) -> TSK (bounded delivery)
 ```
 
-An architecture realizes accepted decisions; behavior stays within that
-architecture; information contracts support the accepted behavior; a task
-delivers the authorized capability. Lower documents must not contradict, weaken
-or silently reinterpret higher authority.
+A task delivers behavior within existing decisions and constraints; it cannot
+overrule them. OVR maps the project, OPS controls how work is performed, MTP
+splits a task, AUDIT evaluates, and CLOSURE records the conclusion. Referencing
+a product rule does not make one of these documents its new owner.
 
-OVR maps and summarizes. OPS defines how work is operated across the chain. MTP
-decomposes an already-authorized TSK. AUDIT evaluates. CLOSURE records terminal
-disposition. Referencing a product rule does not let these documents replace it.
+**You do not create all ten types for every change.** Reuse existing documents
+and add only what is materially needed. Skipping a document is appropriate when
+there is no new decision, structure, behavior or contract for it to own. It is
+not appropriate when the omission forces the assistant to guess a missing rule.
 
-**Not every capability needs every artifact.** Reuse existing authority. Skip an
-intermediate artifact when there is no material decision, structure, behavior or
-contract for it to own. Skipping is invalid if the task, prompt or implementer
-would have to invent the missing higher authority.
+A piece of an MTP is a **Micro-Task (MT)**, not an eleventh document type. A task
+that can be delivered as one clear change does not need an MTP.
 
-A slice inside an MTP is a **Micro-Task (MT)**. MT is a planning unit, not an
-eleventh document type. A task that is already atomic does not need an MTP or
-synthetic MTs just to produce more documents.
+Documents also identify their owner, scope, version and current status. A
+proposal, an accepted rule, a retired decision and a completed work record
+must be distinguishable. Those details are stored as **metadata**, often in a
+small structured header called **frontmatter**. Its format is in the advanced
+reference; you do not need to memorize it to understand the method.
 
 ### Configuration and working records are a separate category
 
-The project also needs assignments, startup instructions and working proof.
-These are operational or configured artifacts, **not additional document-prefix
-types**:
+The POP, Actor Profiles, Capability Profiles and Platform Bootstrap introduced
+in the mental model connect the rules to this project and its working tools.
 
-| Human concept first | Technical name | Purpose and small example |
-| --- | --- | --- |
-| The project's methodology configuration | **Project Operating Profile (POP)** | Says which immutable framework version is adopted, who holds final authority and who performs each role. Example: bind implementation to an eligible tool while keeping an independent auditor. |
-| The reusable behavior contract for a responsibility | **Actor Profile** | Defines a role's responsibilities, allowed and prohibited actions, inputs, handoffs and stop conditions without choosing a provider. Example: an auditor evaluates read-only. |
-| The abilities and limits of a particular implementation | **Capability Profile** | Records supported actions, environment limits and available proof. Example: an executor can run local tests but cannot deploy. The executor-specific form is also called an Executor Profile. |
-| The minimum directions needed at session startup | **Platform Bootstrap** | Identifies the project, POP and Authority Index, and how to resolve a role. Example: direct a session to retrieve repository authority and stop if identity cannot be established. It does not duplicate the methodology. |
-| Instructions for this one operation | **Prompt / bounded instruction** | Derives an objective, boundaries and checks from existing authority. Example: implement this export without changing invoice calculations. It cannot invent authority. |
-| A mechanically checkable execution boundary, when a product uses one | **Execution Contract** | Represents bounded execution authorization using a product-specific format. Example: identify the target repository, allowed change and required proof. It cannot create authority. |
-| Facts automatically observed during work | **Runtime Evidence** | Descriptive proof such as command outcomes or runtime status. Example: a test command exited successfully against a recorded state. |
-| Verified facts curated for durable review | **Governed Evidence** | Separates claims, observations, validation results, audit judgments and decisions. Example: preserve the export acceptance results and their known limits. It does not define product requirements. |
-| Temporary continuity notes | **Session handoff / scratchpad** | Helps the next session find unfinished work. Example: note the pending validation and link its task. It remains non-authoritative context. |
-
-These distinctions help a new session ask “where is the rule?” separately from
-“where is the proof?” and “what was someone still working on?”
+These are configured or operational records, rather than additional document
+prefixes. So are an instruction for one operation (**prompt**), a product's
+mechanically checkable execution boundary (**Execution Contract**), automatically
+observed facts (**Runtime Evidence**), curated verified facts (**Governed
+Evidence**) and temporary continuation notes (**session handoff / scratchpad**).
+Instructions derive from authority; evidence describes facts; continuation notes
+help the next session find the relevant authority. None can invent a new rule
+or permission.
 
 ## 5. Who does what?
 
-The project explicitly identifies its final decision authority, the **Operator**,
-and binds the five methodology roles needed for its work. A **binding** is a
-recorded assignment of a role to an implementation.
+A project identifies who holds its final decision authority at reserved
+boundaries: the **Operator**. Often that is the human responsible for the
+project. The project explicitly records it; an AI does not become the Operator
+because it controls a tool.
 
-| Responsibility | One-sentence responsibility | Fictional example |
+Five roles divide the work that supports those decisions:
+
+| Responsibility | Role name | Fictional export example |
 | --- | --- | --- |
-| **Operator** | Holds final human or project authority at boundaries reserved to it, including applicable scope, exceptions, adoption and acceptance decisions. | Authorize invoice export and its permitted integration boundary. |
-| **Governance Author** | Makes applicable authority and the smallest safe complete work boundary clear and coherent, and prepares the necessary documents and handoffs. | Resolve export requirements and author the bounded TSK. |
-| **Implementation Executor** | Completes only the approved implementation boundary, performs focused self-verification and reports unexpected state or missing authority. | Implement the serializer and export button within approved scope. |
-| **Mechanical Validator** | Checks deterministic facts against the declared resulting state without repairing it or deciding semantic authority. | Execute the required tests and record their outcomes and the exact state checked. |
-| **Governance Auditor** | Evaluates the declared boundary read-only against authority and evidence, meeting independence requirements when applicable. | Check whether the delivered export preserves the required authorization boundary. |
-| **Evidence Custodian** | Preserves verified facts and established verdicts while distinguishing claims, results, decisions, limits and deferrals. | Record which checks passed and which acceptance decision was made. |
+| Make the rules and change limits clear | **Governance Author** | Resolve export requirements and prepare the TSK and focused instructions. |
+| Carry out the approved change | **Implementation Executor** | Add the export within scope, check its own work and report unexpected changes. |
+| Check observable facts without repairing the work | **Mechanical Validator** | Run the required checks against the identified resulting state and record results and limitations. |
+| Evaluate conformity to rules, read-only | **Governance Auditor** | Examine the export and its proof against applicable authority; provide independent review when required. |
+| Preserve established results and decisions accurately | **Evidence Custodian** | Keep implementation claims, check results, audit verdicts, acceptance decisions and gaps distinguishable. |
 
-**Role != tool.** Claude, Codex, a human, a service or another implementation may
-perform a role if the project binds it and it fits the required capability. The
-Operator is explicitly identified; an AI does not acquire Operator authority by
-default.
+A role is a responsibility, not a tool or a requirement to hire five people.
+An eligible implementation may hold several assignments when the POP and
+separation rules allow it, but it selects exactly one role and profile for each
+operation. Before switching, it ends that operation and re-establishes the new
+role's rules, permissions and current project state.
 
-One implementation can sometimes be bound to several roles. It must select
-exactly one eligible role/profile for each bounded operation, keep that role
-fixed until the operation ends, then re-establish authority and state before
-switching. A continuing conversation does not combine permissions.
+Required independent review must come from an actor who did not materially
+author or change the boundary being reviewed. Opening another chat alone does
+not establish independence. A different provider is not automatically required;
+applicable project or methodology rules determine any further separation.
 
-Independence concerns actual prior participation. Someone who materially
-authored or mutated the audited boundary cannot satisfy its required independent
-audit. A different provider, tool or session is not automatically required, and
-merely opening a new session does not establish independence. Applicable project
-or framework rules can impose further separation.
-
-**Capability does not grant authority.** Being able to edit files, run tests,
-access a repository or merge a branch does not mean that the current role and
-operation permit those actions. Each side effect needs applicable authorization.
+Being able to edit, test or merge is different from being authorized to do so.
+Role assignments and tool abilities do not grant permission for every task or
+side effect.
 
 ## 6. How one change moves through DEV FOUNDRY
 
-Consider a fictional request: **“Add CSV export to invoices.”** The following is
-one possible path; the actual project's authority determines the needed stages.
+Return to the fictional invoice export. This is one possible path, with the
+actual project's rules determining which stages apply:
 
-1. **Intent.** The Operator states the useful outcome and limits: export the
-   currently visible invoice set, preserve existing access rules, and exclude
-   billing changes and scheduled exports.
-2. **Authority.** The Governance Author reads existing decisions, architecture,
-   behavior and contracts. If those already cover export, reuse them. If a
-   material decision is missing, resolve it in an ADR; update ARC only for needed
-   structural authority, SPC for new required behavior, and DAT for an exact CSV
-   contract where needed. Do not create all four by habit or leave open decisions
-   for implementation.
-3. **Task.** One TSK defines the export capability, its authorized scope,
-   exclusions, dependencies and acceptance. For example, proof must demonstrate
-   the permitted invoice set and the agreed CSV format.
-4. **Optional decomposition.** Use an MTP only if materially distinct boundaries
-   benefit from separate authorization, ownership, risk, reversibility or proof.
-   A small export change may remain one atomic TSK.
-5. **Bounded preparation.** Supply the current objective, preconditions,
-   applicable authority, implementation boundary, hard exclusions, acceptance,
-   required proof, implementation profile and stop conditions. Include expected
-   change paths when useful, or explicitly state that no path projection is
-   supplied. Missing authority, a broader capability or an unapproved side
-   effect stops preparation.
-6. **Implementation and self-verification.** The eligible executor implements
-   only the authorized export and runs focused checks before handoff. These
-   checks support its implementation claim; they are not governed mechanical
-   validation. Unexpected changes are reported. A directly necessary change
-   beyond predicted paths requires the methodology's boundary reconciliation;
-   it cannot cross a hard exclusion or authorize unrelated cleanup.
-7. **Mechanical validation.** After executor mutation authority closes, the
-   validator independently executes or re-executes the required proof against
-   the identified resulting project state, after any required reconciliation.
-   Tying proof to that state is its **state binding**: checks of an earlier state
-   cannot silently prove a changed one. It reports what the checks establish
-   and their limitations. It does not repair the
-   implementation as part of validation.
-8. **Review when required.** The Governance Author performs applicable
-   self-assessment. Independent audit occurs only if the adopted framework,
-   project authority/task/risk policy, separation of duties or Operator triggers
-   it. A self-assessment is not an independent audit. An auditor evaluates
-   read-only and records its verdict and findings; required corrective work
-   remains bounded to those findings and directly necessary effects.
-9. **Evidence.** Preserve the observed state, implementation claim, validation
-   results, any audit verdict, decisions, exclusions and limits. Evidence is
-   produced along the way and curated for the next boundary; it is not a new
-   requirement source.
-10. **Promotion / merge.** Integrate the eligible change only under applicable
-    authorization. Passing checks or audit does not authorize merge, publication
-    or deployment. A valid standing authorization can cover several phases,
-    provided its invariants are rechecked before each side effect.
-11. **Closure.** Record the accepted terminal disposition under the task's
-    completion policy and required Operator decision or other project authority:
-    delivered export, supporting evidence, limits and explicit deferrals.
-    Closure does not retroactively authorize earlier work or imply deployment.
+1. **Agree on the outcome.** Export the user's visible invoices. Preserve access
+   rules and calculations. Exclude scheduled exports.
+2. **Find or resolve the rules.** Read the existing decisions, architecture,
+   behavior and contracts through the Authority Index. Reuse them; resolve
+   missing decisions before implementation. Create only the documents needed
+   to own genuinely new rules.
+3. **Define the task.** Record the approved change, dependencies, exclusions,
+   acceptance and required proof in a TSK. Split it through an MTP only if
+   separate work boundaries are useful.
+4. **Prepare the implementer.** Supply the applicable rules, permitted changes,
+   required checks, eligible role/profile and stop conditions. State expected
+   paths or explicitly say that no path prediction is supplied. A prediction
+   does not expand permission; an explicit file exclusion remains binding.
+5. **Implement and self-check.** The executor changes only the approved scope,
+   runs focused checks and hands off its claim, results and unexpected changes.
+   Its self-checks support implementation; they do not count as governed
+   mechanical validation. Required reconciliation resolves whether unexpected
+   changes remain within the already-approved scope.
+6. **Validate the resulting state.** After implementation mutation authority
+   ends and any required reconciliation is complete, the validator executes or
+   re-executes the required proof. Results identify exactly which state was
+   checked—their **state binding**. Checks from before a later change cannot
+   silently prove that changed state. Validation reports facts without fixing
+   the implementation.
+7. **Review where required.** The author performs applicable self-assessment.
+   Independent audit is required when the methodology, project/task rules,
+   separation of duties or Operator triggers it. The auditor records findings
+   and a verdict without editing the work. Required corrections get their own
+   bounded work and review; self-assessment is not independent audit.
+8. **Preserve the proof and decisions.** Evidence is produced throughout the
+   work. Keep results, verdicts, exclusions, gaps and decisions available for
+   the next checkpoint.
+9. **Promote only with authorization.** When required proof and review are
+   complete, integrate only under applicable project permission. Passing tests
+   or audit does not authorize merge, publication or deployment. An existing
+   authorization may cover several steps while its conditions still hold;
+   recheck those conditions before each covered action.
+10. **Record the conclusion.** Close according to the task's completion policy
+    and required acceptance decision. Record delivered scope, supporting proof,
+    limits and deferrals. Closure does not imply deployment or retroactively
+    authorize earlier work.
+
+This is not a requirement to run every stage for every operation. Documentation
+work need not manufacture a code executor, validation-only work need not reopen
+implementation, and independent audit is triggered rather than universal.
 
 ### Read results without collapsing them into “done”
 
-Mechanical validation distinguishes these outcomes:
+A check needs an honest result, including when it cannot prove enough:
 
-| Result | What it means |
+| Validation result | What it means |
 | --- | --- |
-| **PASS** | Complete required deterministic proof holds for the declared boundary and state. |
-| **FAIL** | Complete proof establishes that the delivered boundary does not conform. |
-| **BLOCKED** | A required precondition prevents a valid verdict, such as unavailable required authority or a dependency. |
+| **PASS** | Complete required deterministic proof holds for the declared scope and state. |
+| **FAIL** | Complete proof shows that the delivered work does not conform. |
+| **BLOCKED** | A required precondition is missing, preventing a valid verdict. |
 | **ERROR** | The validator, harness, command, cleanup or evidence mechanism malfunctioned. |
-| **INCOMPLETE** | The available evidence cannot establish complete required proof. |
+| **INCOMPLETE** | Available evidence cannot establish the complete required proof. |
 
-A broken harness is not automatically a product defect. Missing, contradictory
-or unverifiable required evidence cannot be reported as PASS. Governance audit
-has its own verdicts: **AUDIT PASS**, **AUDIT FAIL** and **AUDIT BLOCKED**; ERROR
-and INCOMPLETE above are validation outcomes, not extra audit verdicts.
+A broken test harness is not automatically a product defect. Missing or
+unverifiable required evidence cannot become PASS. Audit has separate verdicts:
+**AUDIT PASS**, **AUDIT FAIL** and **AUDIT BLOCKED**.
 
-The export can be implemented while validation is still incomplete. It can have
-validation PASS while required audit is pending. It can have audit PASS while
-merge is unauthorized. It can be merged while closure is pending. **Implementation
-completion, validation PASS, audit PASS, merge and closure are different states.**
+You might read: “Export is implemented; access checks pass; independent review
+is pending; merge is not authorized.” That is more useful than “done.”
+Implementation, validation, audit, integration and closure remain separate facts.
 
 ## 7. How a project adopts DEV FOUNDRY
 
-Adoption means explicitly selecting an immutable methodology release and setting
-up truthful local authority and responsibility assignments. Installing an adapter
-is a later tool integration; it cannot decide the project's requirements,
-Operator, existing architecture or permissions for it.
+Adoption means choosing a fixed methodology release and establishing the
+project's own rules, settings and responsibility assignments. “Fixed,” or
+**immutable**, means the selected release does not change underneath the project.
+For this adapter, the required methodology version is **2.1.0**, with adoption
+complete and active.
+
+Installing a coding tool cannot decide your product requirements, choose your
+Operator or approve those assignments for you. The adoption work uses the
+methodology's process, defined in **OPS-005** and the profile contracts. Use the
+[official 2.1.0 reading reference](#canonical-210-reading-reference) for the full
+requirements when preparing actual project configuration.
 
 ### A new project: greenfield adoption
 
-For a repository starting its governed work, establish only what its first
-capability needs. This is **greenfield adoption**. Normally this includes the
-project configuration (POP), Authority Index, profiles for roles in use, startup
-configuration (Platform Bootstrap) when required, an overview/documentation map,
-and valid metadata support for governed documents. Add only materially necessary
-product decisions, structure, behavior and contracts, plus one TSK. Add an MTP
-only when useful; bind an eligible executor and Capability Profile when
-implementation is required.
+If the project is starting without existing software or project history, this
+is **greenfield adoption**. Establish its purpose and only the rules needed for
+the first useful change.
 
-Do not copy another project's old tasks, audits, closures or evidence as your
-current authority. A new project needs its own purpose and decisions.
+Normally that includes a POP, Authority Index, profiles for the roles in use,
+Platform Bootstrap when the platform needs it, an overview/documentation map,
+and valid document metadata. Add only necessary decisions, architecture,
+behavior and contracts, then one TSK. Use an MTP only when needed; assign an
+eligible executor with its Capability Profile when implementation is required.
+
+For fictional acme-billing, start with its own invoice rules and first task.
+Copying another project's old decisions, tasks or test results would not define
+what acme-billing needs or prove its behavior.
 
 ### An existing product: brownfield adoption
 
-For a repository that already has software and history, first establish what it
-actually does and how it is delivered. This is **brownfield adoption**. Inventory
-verified behavior, architecture, interfaces, existing governance, authority
-conflicts, document metadata and runtime dependencies. Separate observed facts
-from assumptions, preserve product history, and reconcile the setup with the
-selected methodology.
+If there is already software and history to preserve, this is **brownfield
+adoption**. First establish what the product actually does: its behavior,
+architecture, interfaces, delivery process, existing rules, conflicting authority,
+document metadata and runtime dependencies. Separate verified facts from
+assumptions, then reconcile the project setup with the selected methodology.
 
-This does not require rewriting historical evidence for consistency. The project
-can migrate metadata as documents are touched when incomplete historical coverage
-does not block safe current work, or establish a complete baseline when an
-approved concrete need requires it.
+For an existing billing app, observe its real access rules before writing a
+specification that claims to describe them. Resolve conflicts explicitly;
+neither old code nor a newly generated document wins merely by existing.
+
+Historical evidence need not be rewritten for consistency. Metadata can be
+migrated as documents are touched when that is sufficient for safe current
+work, or through a complete baseline when a concrete approved need requires it.
 
 ### An existing DEV FOUNDRY project: version adoption or migration
 
-A project records one explicitly adopted immutable framework release. It does
-not inherit newer versions automatically. Moving to 2.1.0 requires reviewing
-impact on active authority and work, metadata/schema compatibility, role and
-Capability Profiles, POP and Platform Bootstrap, with explicit project
-authorization and migration or deviation records where required. Historical
-evidence retains the versions under which it was produced.
+If the project already uses DEV FOUNDRY, verify its selected version and current
+configuration. A complete, active 2.1.0 setup can proceed to adapter preparation.
+An unfinished adoption needs reconciliation first.
+
+An older methodology version does not become 2.1.0 by installing this package.
+Review the impact on active rules and work, document formats, roles and
+Capability Profiles, POP and Platform Bootstrap. Obtain the applicable project
+authorization and record required migration or deviations. Historical evidence
+retains the version under which it was produced.
+
+A framework-version change and an adapter-package upgrade are separate actions.
 
 ### What must be ready before governed work?
 
-For the capability being operated, the project needs:
+For the current change, check that the project has:
 
-- one adopted framework version and its authority entry point;
+- one explicitly adopted methodology version and its authority entry point;
 - an Authority Index and a truthful POP identifying the project and Operator;
-- profiles and eligible bindings for roles actually required;
-- valid metadata for the active authoritative documents needed by the capability;
-- applicable product authority and one approved TSK;
-- an MTP only when required;
+- profiles and eligible assignments for the roles actually needed;
+- valid metadata for the active documents needed to govern the change;
+- applicable product rules and one approved TSK, with an MTP only if required;
 - an eligible executor and Capability Profile when implementation is required;
-- enough validation capability or procedure to prove the acceptance boundary.
+- enough validation capability or procedure to demonstrate acceptance.
 
-The POP joins these pieces: selected version, adoption status, role assignments,
-applicable profiles, startup bindings, metadata policy, additional audit triggers,
-promotion rules and approved deviations. A role assignment says who performs a
-responsibility; it does not grant unbounded task authority.
+The POP connects the configuration. The Platform Bootstrap lets a session find
+it, retrieve the relevant authority and select a role. If project identity,
+authority, profile or required capability cannot be established, work stops.
+A documentation-only governance operation does not need a code executor.
 
-The Platform Bootstrap gives a session just enough information to locate that
-configuration and its Authority Index and resolve an eligible role. If project
-identity, authority, profile or required capability cannot be established, the
-operation stops. A documentation-only governance operation does not need a code
-executor just to satisfy a symmetrical role chain.
-
-Without this setup, the Claude adapter has no authoritative project configuration
-to resolve. It cannot know which rules apply or which responsibility Claude is
-permitted to perform. **This adapter requires DEV FOUNDRY 2.1.0 adoption to be
-complete and active.** There is no adapter CLI command to perform framework
-adoption or version migration. Establish and review the project setup described
-here under the methodology's adoption process before continuing to installation.
+**The adapter does not perform framework adoption or version migration.** There
+is no adapter CLI command that creates or accepts this foundation. Establish
+and review it through the project's methodology adoption process, then continue
+when DEV FOUNDRY 2.1.0 is complete and active.
 
 ## 8. Where dev-foundry-claude fits
 
-DEV FOUNDRY is the methodology. **dev-foundry-claude is one adapter for using
-Claude Code with that methodology.** It does not define or change DEV FOUNDRY.
+With that foundation in place, a tool can help Claude use it.
+**dev-foundry-claude is the Claude adapter/product for DEV FOUNDRY.** It supplies
+the Claude Code integration; it does not define or change the provider-neutral
+methodology or install other providers' integrations.
 
 ```text
 DEV FOUNDRY methodology
@@ -506,22 +507,21 @@ DEV FOUNDRY methodology
       -> Claude runtime/session
 ```
 
-This package prepares Claude-specific project instructions, a governance tool
-connection, specialized implementation and audit agents, telemetry launch support
-and a packaged local dashboard. Its local tool connection uses the **Model
-Context Protocol (MCP)** to let Claude resolve the project's governing context.
-That connection does not itself approve a task.
+The package prepares Claude-specific project instructions, a local connection
+to governance tools, specialized implementation and audit agents, a launcher
+that supports usage measurements, and a local dashboard. The tool connection
+uses the **Model Context Protocol (MCP)** so Claude can resolve the project's
+applicable rules and role. Connecting those tools does not approve a task.
 
-Because roles are provider-neutral, a project can conceptually bind another
-eligible provider or implementation without changing the meaning of the roles.
-This adapter supplies the Claude integration specifically; it does not install
-Codex or Cursor integrations or choose your provider credentials.
+Keep the two setup steps distinct. First the project adopts DEV FOUNDRY. Then
+the adapter prepares Claude files and proposes switching the project's role
+assignments and startup configuration to Claude. The approved switch is
+**activation**, also called **cutover** in technical records. Prepared files
+are not active assignments.
 
-There are two setup boundaries to keep separate. First, the project adopts DEV
-FOUNDRY. Then the adapter prepares Claude files and proposes changing the
-project's role bindings and startup configuration to Claude. The approved switch
-is **activation**, also called **cutover** in technical records. Prepared files
-are not active role assignments.
+The practical section below covers installation, preparation, activation,
+upgrades, the dashboard and launch. Package installation acquires a tool;
+project authorization determines what that tool may do.
 
 ## 9. Install and use the Claude adapter
 
