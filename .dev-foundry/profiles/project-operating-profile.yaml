@@ -3,7 +3,7 @@ id: DFC-PROJECT-OPERATING-PROFILE
 title: dev-foundry-claude Project Operating Profile
 kind: project-operating-profile
 status: active
-artifact_version: "2.1.0-local.6"
+artifact_version: "2.1.0-local.7"
 canonical: false
 
 repository:
@@ -28,7 +28,8 @@ actor_bindings:
       kind: agent
       identity: operator-assisted-dev-foundry-copilot
       platform: chatgpt-project
-    capability_profiles: []
+    capability_profiles:
+      - .dev-foundry/profiles/capability-profiles/governance-author-tsk021-candidate-branch-publication-v1.yaml
     status: active
   governance-auditor:
     profile: .dev-foundry/releases/2.1.0/actor-profiles/governance-auditor-v2.yaml

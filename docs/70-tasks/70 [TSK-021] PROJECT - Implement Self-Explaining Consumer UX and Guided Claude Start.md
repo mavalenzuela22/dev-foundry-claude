@@ -5,7 +5,7 @@ artifact:
   type: TSK
   title: Implement Self-Explaining Consumer UX and Guided Claude Start
   status: IN_PROGRESS
-artifactVersion: "2"
+artifactVersion: "3"
 authorityScope: tsk-021-self-explaining-consumer-ux
 ownerRole: governance-author
 canonical: true
@@ -20,6 +20,7 @@ scope:
     - legacy-bridge-to-self-update-baseline
     - governed-self-update-foundation
     - stale-session-enforcement
+    - candidate-branch-publication-for-pago-dogfood
     - adapter-minor-release-1.4.0
   appliesTo:
     components:
@@ -279,3 +280,29 @@ Do not let a post-cutover stale source session continue governed work.
 
 Historical evidence and completed authority/work retain the semantics applicable
 when they were produced.
+
+
+## 9. Pago dogfood candidate publication boundary
+
+The Operator explicitly authorizes one bounded remote-publication side effect
+needed by the real PagoElectronico dogfood:
+
+- publish the local `task/tsk-021-self-explaining-consumer-ux` branch to the
+  same-named remote branch so the exact candidate commit
+  `49b9269551aabcc7f0f39d88b253553ddab70208` becomes remotely reachable;
+- the remote branch HEAD MAY include this later governance-only authorization
+  checkpoint, but PagoElectronico MUST checkout and reconstruct the exact
+  `49b9269551aabcc7f0f39d88b253553ddab70208` commit rather than treating the
+  remote branch HEAD as the product candidate;
+- the sole purpose is to let the Windows PagoElectronico environment independently
+  clone, reconstruct and verify the exact 1.4.0 candidate used by the legacy bridge;
+- no force push, PR, merge, tag, GitHub Release, package-registry publication or
+  other branch mutation is authorized by this boundary;
+- publication is not promotion to main and does not satisfy TSK-021 closure;
+- the capability expires once the same-named remote branch is verified to make
+  the exact candidate commit reachable, or if that candidate is no longer an
+  ancestor of the local branch.
+
+OPS-008 direct Operator authorization is the authorization source for this
+remote-publication boundary. Capability only makes the bounded side effect
+executable; it does not grant broader promotion authority.
