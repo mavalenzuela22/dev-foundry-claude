@@ -187,11 +187,11 @@ test('runner V3 binds the producer Executor to the ChatGPT-governed process-boun
   ]) assert.ok(profile.prohibited_actions.includes(action), action);
 });
 
-test('ADR-004 is routed and ACCEPTED, SPC-005 is routed and PLANNED', async () => {
+test('ADR-004 is routed and ACCEPTED, SPC-005 is routed and ACTIVE', async () => {
   const index = await readYaml('.dev-foundry/authority-index.yaml');
   for (const [prefix, id, status] of [
     ['docs/10-decisions/10 [ADR-004] ', 'ADR-004', 'ACCEPTED'],
-    ['docs/40-specifications/40 [SPC-005] ', 'SPC-005', 'PLANNED'],
+    ['docs/40-specifications/40 [SPC-005] ', 'SPC-005', 'ACTIVE'],
   ]) {
     const routes = index.routes.filter((route) => route.path.startsWith(prefix));
     assert.equal(routes.length, 1, `${id} must have exactly one authority route`);

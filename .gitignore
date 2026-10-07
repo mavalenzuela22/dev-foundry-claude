@@ -434,3 +434,7 @@ docs/codemie/analytics/
 .claude/settings.local.json
 
 /payload-manifest.json
+
+# Producer release tooling is source, not build output.
+!/scripts/release/
+!/scripts/release/**

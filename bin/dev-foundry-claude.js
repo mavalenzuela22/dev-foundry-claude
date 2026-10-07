@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { selfPin, verifyPayload } from '../src/adopt/pin.js';
@@ -48,6 +48,46 @@ if (command === '--version') {
   } catch { verificationFailure(); }
   const { runLauncher } = await import('../src/telemetry/launch.js');
   process.exitCode = await runLauncher({ argv: ['--runtime', runtime, '--', ...claudeArgs], projectRoot: root });
+} else if (command === 'upgrade') {
+  const [action, ...args] = rest;
+  if (!['status', 'plan', 'apply'].includes(action)) fail('Usage: dev-foundry-claude upgrade <status|plan|apply> --root <repo>', 2);
+  const allowed = { '--root': 'value', ...(action === 'plan' ? { '--out': 'value' } : action === 'apply' ? { '--plan': 'value', '--plan-sha256': 'value' } : {}) };
+  const options = flags(args, allowed);
+  if (!options['--root']) fail('upgrade requires --root.', 2);
+  let adapter;
+  try {
+    const pin = selfPin(packageRoot);
+    adapter = { version: pin.version, payloadRoot: pin.root, expect: pin.expect };
+  } catch { verificationFailure(); }
+  const root = path.resolve(options['--root']);
+  const { createUpgradePlan, upgradeStatus } = await import('../src/adopt/upgrade.js');
+  if (action === 'apply') {
+    if (!options['--plan'] || !options['--plan-sha256']) fail('apply requires --plan and --plan-sha256.', 2);
+    const { applyPlan } = await import('../src/adopt/apply.js');
+    try {
+      console.log(JSON.stringify(await applyPlan({ root, adapter, upgrade: true,
+        planBytes: readFileSync(path.resolve(options['--plan'])), planSha256: options['--plan-sha256'] })));
+    } catch (error) { fail(`upgrade apply refused: ${error.code ?? 'error'}`); }
+  } else if (action === 'status') {
+    const result = await upgradeStatus({ root, adapter });
+    console.log(JSON.stringify(result, null, 2));
+    process.exitCode = result.status === 'blocked' ? 2 : 0;
+  } else {
+    const result = await createUpgradePlan({ root, adapter });
+    if (options['--out']) {
+      // Plan artifacts must stay outside the consumer, and never overwrite files.
+      const out = path.resolve(options['--out']);
+      const destination = path.join(realpathSync(path.dirname(out)), path.basename(out));
+      const relative = path.relative(realpathSync(root), destination);
+      if (relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))) fail('--out must be outside the consumer repository.', 2);
+      writeFileSync(out, result.bytes, { flag: 'wx' });
+      console.log(JSON.stringify({ planSha256: result.hash, status: result.plan.status, current: result.plan.current, target: result.plan.target, blockers: result.plan.blockers.map((item) => item.code) }));
+    } else {
+      process.stdout.write(result.bytes);
+      console.error(`plan-sha256: ${result.hash}`);
+    }
+    process.exitCode = ['ready', 'noop'].includes(result.plan.status) ? 0 : 2;
+  }
 } else if (command === 'adopt') {
   const [action, ...args] = rest;
   const { evaluateActivation } = await import('../src/adopt/activation.js');
@@ -84,5 +124,5 @@ if (command === '--version') {
     }
   } else fail('Usage: dev-foundry-claude adopt <plan|apply|status>', 2);
 } else {
-  fail('Usage: dev-foundry-claude <adopt|mcp|run|dashboard|--version>', 2);
+  fail('Usage: dev-foundry-claude <adopt|upgrade|mcp|run|dashboard|--version>', 2);
 }
