@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
 import { resolveGovernedOperation } from './resolver.js';
 import { writeOperationMarker } from '../telemetry/telemetry.js';
+import { helpTopics, helpUri, renderHelp } from '../consumer/help.js';
 
 const projectRoot = process.env.CLAUDE_PROJECT_DIR;
 // Opt-in consumer-mode activation guard (SPC-001 section 13). Only the packaged `mcp` entry sets this
@@ -15,6 +16,14 @@ const server = new McpServer({
   version: '1.0.0',
   instructions: 'Use this server to resolve one bounded DEV FOUNDRY operation and its current authority references.',
 });
+
+for (const topic of Object.keys(helpTopics)) {
+  const uri = helpUri(topic);
+  server.registerResource(`help-${topic}`, uri, {
+    title: `DEV FOUNDRY help: ${topic}`, mimeType: 'text/plain',
+    description: 'Read-only explanatory product help; not repository or methodology authority.',
+  }, async () => ({ contents: [{ uri, mimeType: 'text/plain', text: renderHelp(topic) }] }));
+}
 
 server.registerTool('resolve_governed_operation', {
   title: 'Resolve governed operation',

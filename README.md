@@ -1,5 +1,54 @@
 # dev-foundry-claude
 
+Connect Claude to your project's decisions, work limits and checks with the
+**DEV FOUNDRY Claude adapter 1.4.0**. Requires Node.js 20+, Git and your chosen
+Claude runtime installed separately.
+
+```sh
+npm install -g https://github.com/mavalenzuela22/dev-foundry-claude/releases/latest/download/dev-foundry-claude-adapter.tgz
+cd <project>
+dev-foundry-claude setup
+dev-foundry-claude start
+```
+
+`setup` first inspects your project and tells you what to do next. Review its
+managed-file changes, then use `dev-foundry-claude setup --yes` to prepare the
+integration. Application code is not changed. If the project needs DEV FOUNDRY
+adoption or approval to activate Claude, setup explains the remaining owner
+step. Preparation alone does not approve Claude to work.
+
+`start` checks readiness and launches Claude with local telemetry. The default
+is direct Claude; choose `--runtime dial` or `--runtime codemie`, and pass Claude
+arguments after `--`. Runtime installation and sign-in stay with you.
+
+| Command | What it answers |
+| --- | --- |
+| `setup` | What this project needs and which managed files will be prepared |
+| `start` | Launch Claude with telemetry after readiness checks |
+| `status` | Whether you are ready to work and the next action |
+| `upgrade` | Review a pin upgrade or a managed DEV FOUNDRY refresh; apply with `--yes` |
+| `doctor` | Read-only diagnostics and one recovery command |
+| `help <topic>` | Installed-version help, also available to Claude through MCP |
+
+Try `dev-foundry-claude help getting-started` at any time. Use `status --json` or
+`doctor --verbose` for support details. For managed refreshes, retain the exact
+previous package and use `upgrade --from-package <previous-package-directory>`;
+modified or ambiguous managed files are refused. Review before adding `--yes`.
+The adapter does not change your application or project rules.
+
+To see local activity in another terminal:
+
+```sh
+dev-foundry-claude dashboard --port 4319
+```
+
+Open the URL printed by that command. If the port is occupied, select another
+explicit local port. Telemetry and dashboard listeners use only `127.0.0.1`.
+
+The explanation below introduces the method and advanced operation. Normal
+adapter use starts with the installed `help`, `setup` and `start` commands.
+
+
 An AI assistant can help you get a demo working quickly. After a few months of
 using it on a real project, you may find that yesterday's decision has been
 forgotten, a small request changes unrelated code, or a fix breaks something
@@ -9,7 +58,7 @@ again.
 
 DEV FOUNDRY gives those decisions, work limits and checks a durable place in the
 project. This README first explains **DEV FOUNDRY 2.1.0**, then shows how to use
-its **Claude Code adapter 1.3.0**, `dev-foundry-claude`
+its **Claude Code adapter 1.4.0**, `dev-foundry-claude`
 (`@dev-foundry/claude-adapter`). You can understand the approach before choosing
 or installing a tool.
 

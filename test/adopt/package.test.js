@@ -476,9 +476,10 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
   assert.equal(lock.name, pkg.name);
   assert.equal(lock.version, pkg.version);
   assert.equal(lock.packages[''].version, pkg.version);
-  assert.equal(pkg.version, '1.3.0');
+  assert.equal(pkg.version, '1.4.0');
   const readme = await readFile(path.join(repoRoot, 'README.md'), 'utf8');
-  assert.match(readme, /\*\*Claude Code adapter 1\.3\.0\*\*/);
+  assert.match(readme, /\*\*Claude Code adapter 1\.4\.0\*\*/);
+  assert.match(readme.split('## 1. What is DEV FOUNDRY?')[0], /npm install -g[\s\S]*cd <project>[\s\S]*dev-foundry-claude setup[\s\S]*dev-foundry-claude start/);
   assert.ok(!readme.includes('1.2.0') && !readme.includes('1.2.1'));
   const ignoreText = await readFile(path.join(repoRoot, '.gitignore'), 'utf8');
   assert.ok(ignoreText.split('\n').includes('/payload-manifest.json'));
@@ -488,7 +489,7 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
 // adoption/MCP/run regression tests. Its temporary producer tree is deleted.
 test('TSK-016 package ships only dashboard runtime/assets and pins every dashboard byte', async () => {
   const base = await baseline();
-  assert.equal(base.manifest.version, '1.3.0', 'TSK-020 preserves the TSK-016 dashboard payload contract');
+  assert.equal(base.manifest.version, '1.4.0', 'TSK-021 preserves the TSK-016 dashboard payload contract');
   await assert.rejects(lstat(base.tree), /ENOENT/);
   const files = base.info.files.map((file) => file.path);
   for (const name of ['http', 'evidence', 'claude-otel', 'launch']) assert.ok(files.includes(`tools/dashboard/server/${name}.mjs`));
@@ -731,4 +732,103 @@ test('TSK-020 installed CLI explicitly plans/applies compatible upgrade with exa
   assert.equal(replan.status, 0, replan.stderr);
   assert.equal(JSON.parse(replan.stdout).status, 'noop');
   assert.equal(JSON.parse(replan.stdout).activation.overall, 'prepared');
+});
+
+test('TSK-021 isolated installed package guides fresh and brownfield setup, status, doctor, help and start recovery', async (t) => {
+  const base = await baseline();
+  assert.equal(base.manifest.version, '1.4.0');
+  for (const file of ['src/consumer/help.js', 'src/consumer/command.js', 'src/telemetry/launch.js']) assert.ok(base.manifest.files.some((entry) => entry.path === file));
+  const fresh = await makeConsumer({ governed: false }); t.after(fresh.cleanup);
+  const freshBefore = await listTree(fresh.root);
+  const freshResult = cli(base.installed, ['setup', '--yes'], { cwd: fresh.root });
+  assert.equal(freshResult.status, 2); assert.match(freshResult.stdout, /owner/);
+  assert.deepEqual(diffTrees(freshBefore, await listTree(fresh.root)), []);
+  const c = await makeConsumer(); t.after(c.cleanup);
+  const invoke = (command, args = [], env = {}) => cli(base.installed, [command, ...args], { cwd: c.root, env });
+  for (const topic of ['getting-started', 'setup', 'start', 'status', 'upgrade', 'doctor', 'concepts']) {
+    const help = invoke('help', [topic]); assert.equal(help.status, 0); assert.match(help.stdout, /1\.4\.0/);
+  }
+  const before = await listTree(c.root); const authority = await readSetSnapshot(c.root);
+  const setup = invoke('setup'); assert.equal(setup.status, 0); assert.match(setup.stdout, /setup --yes/);
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  const prepared = invoke('setup', ['--yes', '--json']); assert.equal(prepared.status, 0, prepared.stderr);
+  const data = JSON.parse(prepared.stdout); assert.equal(data.integration, 'prepared'); assert.ok(data.plan.cutover_proposal);
+  assert.deepEqual(await readSetSnapshot(c.root), authority);
+  c.commit();
+  const blocked = invoke('start'); assert.equal(blocked.status, 2); assert.match(blocked.stdout, /owner.*approve/);
+  assert.equal(JSON.parse(invoke('status', ['--json']).stdout).readyToWork, false);
+  assert.match(invoke('doctor').stdout, /Read-only diagnosis: attention needed/);
+  await applyProposal(c.root, data.plan.cutover_proposal); c.commit();
+  const stubDir = await scratch('guided-claude');
+  const stub = path.join(stubDir, 'claude');
+  const marker = path.join(stubDir, 'guided-marker.json');
+  await writeFile(stub, `#!${process.execPath}\nrequire('node:fs').writeFileSync(process.env.MARKER_FILE, JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd(), telemetry: process.env.CLAUDE_CODE_ENABLE_TELEMETRY, endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT }));\n`);
+  await chmod(stub, 0o755);
+  const env = { PATH: `${stubDir}${path.delimiter}${path.dirname(process.execPath)}${path.delimiter}/usr/bin${path.delimiter}/bin`, MARKER_FILE: marker };
+  const ready = invoke('status', ['--json'], env); assert.equal(ready.status, 0, ready.stderr); assert.equal(JSON.parse(ready.stdout).readyToWork, true);
+  const doctor = invoke('doctor', ['--json'], env); assert.equal(doctor.status, 0); assert.ok(Object.values(JSON.parse(doctor.stdout).checks).every(Boolean));
+  assert.match(invoke('upgrade', [], env).stdout, /already selects/);
+  const healthyTree = await listTree(c.root);
+  const tampered = await copyInstalled(base); await bump(path.join(tampered, 'src/consumer/help.js'));
+  const refused = cli(tampered, ['start'], { cwd: c.root, env }); assert.equal(refused.status, 1); assert.match(refused.stdout, /could not be verified/);
+  await assert.rejects(readFile(marker), /ENOENT/);
+  assert.deepEqual(diffTrees(healthyTree, await listTree(c.root)), []);
+  const client = new Client({ name: 'packaged-help-parity', version: '1.0.0' });
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(base.installed, 'bin/dev-foundry-claude.js'), 'mcp', '--expect', base.pin], env: { CLAUDE_PROJECT_DIR: c.root }, cwd: os.tmpdir() }));
+  t.after(() => client.close());
+  const listed = await client.listResources(); assert.equal(listed.resources.length, 7);
+  for (const resource of listed.resources) {
+    const text = (await client.readResource({ uri: resource.uri })).contents[0].text;
+    assert.equal(text, invoke('help', [resource.uri.split('/').at(-1)]).stdout);
+  }
+  // This subtest reports any host socket restriction separately from the
+  // completed installed CLI checks above. No provider is invoked by the stub.
+  await t.test('packaged canonical launcher live loopback smoke', async (t) => {
+    if (process.platform === 'win32') { t.skip('POSIX executable stub unavailable; native Windows smoke remains unverified'); return; }
+    if (await freeDashboardPort() === null) { t.skip('Host prohibits loopback sockets; live packaged start remains unverified'); return; }
+    const start = invoke('start', ['--', '--resume', 'a b', '--'], env);
+    assert.equal(start.status, 0, start.stderr); assert.match(start.stdout, /Local telemetry is ready/); assert.match(start.stdout, /dashboard --port 4319/);
+    const recorded = JSON.parse(await readFile(marker, 'utf8'));
+    assert.deepEqual(recorded.args, ['--resume', 'a b', '--']); assert.equal(await realpath(recorded.cwd), await realpath(c.root));
+    assert.equal(recorded.telemetry, '1'); assert.match(recorded.endpoint, /^http:\/\/127\.0\.0\.1:\d+$/);
+    assert.deepEqual(diffTrees(healthyTree, await listTree(c.root)).filter((file) => !file.startsWith('.dev-foundry/telemetry/local/')), []);
+  });
+});
+
+test('TSK-021 installed 1.4.0 upgrades a verified isolated 1.2.2-shaped package with differing managed bytes', async (t) => {
+  const base = await baseline();
+  const oldBuild = await build(async (tree) => {
+    for (const file of ['package.json', 'package-lock.json']) {
+      const absolute = path.join(tree, file); const data = JSON.parse(await readFile(absolute, 'utf8'));
+      data.version = '1.2.2'; if (data.packages) data.packages[''].version = '1.2.2';
+      await writeFile(absolute, JSON.stringify(data, null, 2) + '\n');
+    }
+    for (const file of ['agents/dev-foundry-executor.md.tmpl', 'agents/dev-foundry-auditor.md.tmpl', 'claude-md-block.md.tmpl']) {
+      const absolute = path.join(tree, 'templates', file); const text = await readFile(absolute, 'utf8');
+      await writeFile(absolute, file.startsWith('agents/') ? `${text}\n<!-- Adapter 1.2.2 managed agent -->\n` : text.replace(/DEV FOUNDRY/g, 'DEV FOUNDRY 1.2.2 integration'));
+    }
+  });
+  const oldPackage = await extract(oldBuild.tarball);
+  const c = await makeConsumer(); t.after(c.cleanup);
+  const setup = cli(oldPackage, ['setup', '--yes', '--json'], { cwd: c.root });
+  assert.equal(setup.status, 0, setup.stderr); c.commit();
+  const before = await listTree(c.root); const authority = await readSetSnapshot(c.root);
+  const invoke = (args) => cli(base.installed, ['upgrade', ...args], { cwd: c.root });
+  const without = invoke([]); assert.equal(without.status, 2); assert.match(without.stdout, /managed files need to be refreshed/);
+  const planned = invoke(['--from-package', oldPackage, '--json']); assert.equal(planned.status, 0, planned.stderr);
+  const data = JSON.parse(planned.stdout); assert.equal(data.plan.upgradeKind, 'managed-refresh');
+  assert.equal(data.plan.current.expect, selfPin(oldPackage).expect); assert.equal(data.plan.target.expect, base.pin);
+  assert.equal(data.plan.merge.length, 4); assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  const planFile = path.join(await scratch('managed-plan'), 'plan.json');
+  const exact = cli(base.installed, ['upgrade', 'plan', '--root', c.root, '--from-package', oldPackage, '--out', planFile]);
+  assert.equal(exact.status, 0, exact.stderr);
+  const hash = JSON.parse(exact.stdout).planSha256;
+  const denied = cli(base.installed, ['upgrade', 'apply', '--root', c.root, '--plan', planFile, '--plan-sha256', '0'.repeat(64)]);
+  assert.equal(denied.status, 1); assert.match(denied.stderr, /plan-hash-mismatch/);
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  const applied = cli(base.installed, ['upgrade', 'apply', '--root', c.root, '--plan', planFile, '--plan-sha256', hash]);
+  assert.equal(applied.status, 0, applied.stderr); assert.deepEqual(JSON.parse(applied.stdout), { written: 4, deleted: 0 });
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md']);
+  assert.deepEqual(await readSetSnapshot(c.root), authority);
+  c.commit(); assert.equal(JSON.parse(cli(base.installed, ['adopt', 'plan', '--root', c.root]).stdout).status, 'noop');
 });
