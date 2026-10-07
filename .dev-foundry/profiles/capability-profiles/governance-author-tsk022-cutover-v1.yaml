@@ -43,4 +43,4 @@ stop_conditions:
   - changed_scope_or_unknown_paths
   - unresolved_product_semantics
   - unauthorized_release_or_consumer_cutover
-portability: project-specific
+portability: configure
