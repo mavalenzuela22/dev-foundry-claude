@@ -5,7 +5,7 @@ artifact:
   type: TSK
   title: Implement Self-Explaining Consumer UX and Guided Claude Start
   status: IN_PROGRESS
-artifactVersion: "3"
+artifactVersion: "4"
 authorityScope: tsk-021-self-explaining-consumer-ux
 ownerRole: governance-author
 canonical: true
@@ -306,3 +306,67 @@ needed by the real PagoElectronico dogfood:
 OPS-008 direct Operator authorization is the authorization source for this
 remote-publication boundary. Capability only makes the bounded side effect
 executable; it does not grant broader promotion authority.
+
+
+## 10. Operator-authorized release lifecycle continuation (2026-10-07)
+
+This section begins a **new bounded release-completion authorization** and does not
+reinterpret the earlier branch-only permission in section 9. The earlier
+candidate-branch-publication capability has expired on successful remote
+publication and is retained as history. The currently selected Governance Author
+Capability Profile for this continuation is
+`.dev-foundry/profiles/capability-profiles/governance-author-tsk021-release-lifecycle-v1.yaml`.
+
+The Operator explicitly authorizes five **separately gated** outcomes:
+1. reconcile the separately governed real PagoElectronico legacy-bridge dogfood;
+2. complete proportionate final self-assessment and validation/audit disposition;
+3. promote this exact bounded 1.4.0 product candidate through review and
+   integration into producer `main`;
+4. publish GitHub Release `v1.4.0` using the existing main-only release workflow,
+   then verify the immutable package identity;
+5. formally reconcile, close and clean up TSK-021 only after all prior gates hold.
+
+**Identity boundary.** The already validated candidate is commit
+`49b9269551aabcc7f0f39d88b253553ddab70208`. The later governance-only
+branch checkpoint `33b8d4acc9ffcd04d161160bbbb508d452b2c0ee` is
+not a different product candidate. Release assets must have package self-pin
+`1.4.0:sha256:da37df3d9a26328b6ad1de37f6100a8aae736d219e786e65fc63b6de79bdde98`.
+A mismatch stops publication/reconciliation; no alternate build is silently
+substituted.
+
+**Consumer evidence boundary.** The separate consumer-governance operation
+reported real PagoElectronico V055 legacy-bridge apply PASS
+(request `valreq_ad4efad0af95e6c43987cbd1732671c8`) and V057 read-only
+stable post-bridge PASS (request
+`valreq_0dcd40c9b8c5ee8f6d4edd3dac5a6ad6`), with exact 1.4.0 self-pin,
+`upgrade status = current`, fresh `upgrade plan = noop`, zero product-code
+changes, and original ChatGPT/runner governance bindings preserved. These
+identifiers are **consumer evidence references**, not producer authority, and
+must not be substituted for PagoElectronico's own evidence custody or used to
+mutate/inspect that repository from the producer. Any required external proof
+not available through a valid custody route remains a known limit; do not
+fabricate an independent producer observation.
+
+**Release gates.** Reuse the independently completed producer candidate V008
+PASS (root regression `npm test`, `npm pack --dry-run --json`, and
+`git diff --check`), the successful Windows source-recipe and exact-candidate
+proof reported by consumer governance, and validated current branch state.
+Re-run only checks invalidated by a material delta. The active project POP
+declares no automatic independent-audit trigger; re-evaluate actual triggers
+before promotion and do not self-issue an independent-audit verdict.
+Before each side effect verify OPS-008 state bindings, provider capability,
+and any required transaction authorization package. No force push, unrelated
+repository change, consumer mutation, methodology change, product extension,
+public npm publication, or unpromoted release.
+
+**Publication mechanics.** ADR-005 requires an integrated `main` release
+commit. Existing `.github/workflows/release.yml` supports explicit
+`workflow_dispatch` from `main`, builds both tarball names and SHA256SUMS,
+then tags/releases that exact commit. Release is not proven merely because the
+workflow was requested: observed tag, release assets, checksums and exact
+self-pin are required.
+
+**Closure** remains deferred until review/merge/integration, public asset
+verification, producer reconciliation, cleanup and the required CLOSURE artifact
+are demonstrably complete. Each phase remains distinct despite this standing
+Operator authorization.

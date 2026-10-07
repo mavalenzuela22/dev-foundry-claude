@@ -1,0 +1,59 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-GOVERNANCE-AUTHOR-TSK021-RELEASE-LIFECYCLE-V1
+status: active
+implementation_class: operator-assisted-dev-foundry-copilot
+supported_actions:
+  - reconcile_consumer_dogfood_acceptance_evidence_without_consumer_repository_access
+  - author_tsk021_bounded_promotion_and_release_governance
+  - prepare_and_verify_exact_tsk021_promotion_evidence
+  - request_governed_task_branch_commit_push_and_pull_request
+  - request_governed_pr_merge_integration_reconciliation_and_cleanup
+  - trigger_existing_main_only_release_workflow_after_verified_promotion
+  - observe_release_assets_and_verify_exact_published_payload_identity
+  - author_final_tsk021_disposition_after_release_proof
+prohibited_actions:
+  - act_as_consumer_governance_or_mutate_consumer_repository
+  - rewrite_product_candidate_or_producer_main_outside_governed_promotion
+  - bypass_mechanical_validation_or_required_independent_audit
+  - invent_consumer_evidence_or_claim_unverified_external_state
+  - publish_unpromoted_working_tree_or_task_branch_as_release
+  - create_or_move_release_tag_outside_existing_exact_commit_release_workflow
+  - publish_npm_or_github_packages_artifact
+  - force_push
+  - mutate_canonical_framework_release
+  - broaden_task_scope_or_add_product_features
+limits:
+  repository: dev-foundry-claude
+  task_id: TSK-021
+  source_branch: task/tsk-021-self-explaining-consumer-ux
+  exact_product_candidate: 49b9269551aabcc7f0f39d88b253553ddab70208
+  producer_branch_before_lifecycle: 33b8d4acc9ffcd04d161160bbbb508d452b2c0ee
+  target_base_branch: main
+  release_version: 1.4.0
+  expected_consumer_payload_pin: 1.4.0:sha256:da37df3d9a26328b6ad1de37f6100a8aae736d219e786e65fc63b6de79bdde98
+  release_mechanism: .github/workflows/release.yml workflow_dispatch on main
+  side_effect_authorization: explicit_operator_2026-10-07_five_stage_tsk021_completion
+  promotion: requires_still_valid_evidence_and_preflight
+  closure: requires_promoted_release_asset_identity_reconciliation
+proof_capabilities:
+  - producer_repo_bound_state_and_authority_reobservation
+  - reused_producer_validation_and_canonical_evidence
+  - reviewer_and_audit_trigger_semantic_assessment
+  - runner_transaction_state_and_integrated_head_evidence
+  - verified_github_release_tag_assets_and_sha256sums
+  - repository_terminal_clean_state_and_closure_evidence
+environment_constraints:
+  - process_bound_repository_must_be_dev_foundry_claude
+  - repository_and_authority_must_match_current_project_bindings
+  - worktree_must_match_each_bound_side_effect_manifest
+  - use_only_existing_release_workflow_from_verified_main
+  - git_provider_release_capability_must_be_available_and_authenticated
+stop_conditions:
+  - evidence_missing_or_ambiguous
+  - any_required_validation_or_audit_not_passed
+  - source_branch_or_candidate_identity_drift
+  - release_assets_do_not_match_exact_payload_identity
+  - unverified_provider_side_effect
+  - promotion_or_release_capability_unavailable
+  - unexpected_repository_or_product_scope_change
+portability: project-specific
