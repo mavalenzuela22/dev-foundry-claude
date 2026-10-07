@@ -3,7 +3,7 @@ id: DFC-AUTHORITY-INDEX
 title: dev-foundry-claude Repository Authority Index
 kind: authority-index
 status: active
-artifact_version: "2.1.0-local.30"
+artifact_version: "2.1.0-local.31"
 canonical: false
 
 subject:
@@ -395,6 +395,15 @@ routes:
       - stale-session-enforcement
       - adapter-minor-release-1.4.0
     section_id: null
+  - id: TSK-022
+    path: docs/70-tasks/70 [TSK-022] PROJECT - Implement Recoverable Governed Consumer Authority Cutover.md
+    authority_class: task
+    governs:
+      - verified-consumer-authority-cutover-plan
+      - staged-and-recoverable-claude-activation
+      - fail-closed-partial-authority-recovery
+      - consumer-cutover-migration-acceptance
+    section_id: null
 
 bindings:
   - id: governance-author-capability-tsk021-candidate-branch-publication-history
@@ -404,6 +413,11 @@ bindings:
     required: false
   - id: governance-author-capability-tsk021-release-lifecycle
     path: .dev-foundry/profiles/capability-profiles/governance-author-tsk021-release-lifecycle-v1.yaml
+    kind: capability-profile
+    authority_class: configured
+    required: true
+  - id: governance-author-capability-tsk022-cutover
+    path: .dev-foundry/profiles/capability-profiles/governance-author-tsk022-cutover-v1.yaml
     kind: capability-profile
     authority_class: configured
     required: true
@@ -429,6 +443,11 @@ bindings:
     required: false
   - id: implementation-executor-capability-producer-maintenance
     path: .dev-foundry/profiles/capability-profiles/implementation-executor-runner-v3.yaml
+    kind: capability-profile
+    authority_class: configured
+    required: false
+  - id: implementation-executor-capability-tsk022-cutover
+    path: .dev-foundry/profiles/capability-profiles/implementation-executor-tsk022-cutover-v1.yaml
     kind: capability-profile
     authority_class: configured
     required: true
