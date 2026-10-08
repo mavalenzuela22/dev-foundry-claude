@@ -3,7 +3,7 @@ id: DFC-PROJECT-OPERATING-PROFILE
 title: dev-foundry-claude Project Operating Profile
 kind: project-operating-profile
 status: active
-artifact_version: "2.1.0-local.9"
+artifact_version: "2.1.0-local.10"
 canonical: false
 
 repository:
@@ -30,7 +30,7 @@ actor_bindings:
       platform: chatgpt-project
     capability_profiles:
       - .dev-foundry/profiles/capability-profiles/governance-author-tsk021-release-lifecycle-v1.yaml
-      - .dev-foundry/profiles/capability-profiles/governance-author-tsk022-cutover-v1.yaml
+      - .dev-foundry/profiles/capability-profiles/governance-author-tsk023-release-v1.yaml
     status: active
   governance-auditor:
     profile: .dev-foundry/releases/2.1.0/actor-profiles/governance-auditor-v2.yaml
@@ -47,7 +47,7 @@ actor_bindings:
       identity: process-bound-runner-code-executor
       platform: chatgpt-project
     capability_profiles:
-      - .dev-foundry/profiles/capability-profiles/implementation-executor-tsk022-cutover-v1.yaml
+      - .dev-foundry/profiles/capability-profiles/implementation-executor-tsk023-release-v1.yaml
     status: active
   mechanical-validator:
     profile: .dev-foundry/releases/2.1.0/actor-profiles/mechanical-validator-v2.yaml
