@@ -5,7 +5,7 @@ artifact:
   type: TSK
   title: Correct Governance MCP Resolver Compatibility for Brownfield Consumers
   status: IN_PROGRESS
-artifactVersion: "2"
+artifactVersion: "3"
 authorityScope: tsk-024-producer-governance-mcp-resolver-compatibility
 ownerRole: governance-author
 canonical: true
@@ -210,3 +210,57 @@ safety invariants, run focused tests, the full `npm test`, `npm pack
 package/version bump, release, or consumer changes are authorized for
 the executor. A remaining test failure must be attributed and reported
 rather than masked to satisfy PASS.
+
+## 8. V002 terminal PASS and authorized promotion (2026-10-08)
+
+Following V002, the Operator separately authorized completing TSK-024's
+validation, product commit and repository promotion, with any 1.4.2 package
+release still conditional on distinct verified gates. That later grant
+supersedes only the earlier phase prohibition on commit, push, PR and
+merge/integration; it does not change the product boundary, release/package
+version, target consumers, or immutable methodology.
+
+The governed V002 execution
+`execution_a0db0b093a7de7e4734b52d8b6a20dd68c090c17bc06034f21a45fa976c3d7b8`
+terminated **PASS**. Executor exit 0; path policy PASS; focused tests
+52/52 PASS; `npm test` 323/323 PASS; `npm pack --dry-run --json`
+PASS; `git diff --check` PASS; post-execution governed validation PASS.
+V002 changed only the two additional projected test paths, preserving
+the V001 four-path resolver candidate.
+
+Exact composite product/test delta for candidate commit:
+
+- `src/governance-mcp/resolver.js`
+- `test/adopt/state.test.js`
+- `test/bootstrap/claude-cutover-readiness.test.js`
+- `test/governance-mcp/fixture.js`
+- `test/governance-mcp/resolver.test.js`
+- `test/governance-mcp/server.test.js`
+
+**Governance Author semantic self-assessment:** The delta reuses
+existing resolver and test infrastructure; it accepts DAT-020
+`historical` routes solely as index metadata, excludes them from
+active authority resolution, discovers identities of unrelated on-touch
+v1 artifacts without promoting their schema to v2, and retains refusal
+for malformed, closed or active-but-inapplicable governing sources.
+The diff adds focused negative tests and preserves exact legacy
+fingerprint fixtures. The former HEAD-identity test is replaced with
+stronger observed guard/resolver parity tests, and bootstrap assertions
+remain bound to the active runner identity and security restrictions.
+No new dependency, public API, consumer/product feature, framework
+mutation or release version delta is introduced. The two V002 test
+paths were explicitly reconciled in §7 before executor execution.
+No material unresolved defect is currently observed.
+
+**Audit trigger disposition:** Under adopted OPS-004 §6, POP
+`audit_triggers: []`, and TSK-024's conditional audit clause, no
+independent Governance Audit is currently triggered by this bounded
+product correction. Author self-assessment does not claim an
+independent audit verdict; any later material authority/security
+expansion would require renewed trigger evaluation.
+
+Promotion is limited to a verified task-branch commit, push,
+pull request to `main`, merge/integration, and reconciliation/
+cleanup after state and approval gates. No version bump, release/tag,
+workflow dispatch, package publication, consumer repository
+mutation or claimed live PagoElectronico resolver PASS is authorized.
