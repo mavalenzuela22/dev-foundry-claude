@@ -1,0 +1,53 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-IMPLEMENTATION-EXECUTOR-TSK022-CUTOVER-V1
+status: active
+implementation_class: process-bound-runner-code-executor
+supported_actions:
+  - inspect_task_directed_producer_source
+  - implement_authorized_recoverable_consumer_cutover_mechanics
+  - create_update_delete_exact_contract_product_paths
+  - run_task_scoped_tests_and_integrity_checks
+  - report_changes_and_failure_recovery_evidence
+prohibited_actions:
+  - modify_authoritative_docs_or_project_bindings
+  - modify_canonical_framework_release
+  - mutate_real_consumer_or_foreign_repository
+  - change_existing_github_release_or_npm_global
+  - change_package_version_or_publish_package
+  - commit_push_pull_request_or_merge
+  - bypass_authorization_or_validation
+  - add_dependencies_or_unapproved_listener
+  - invoke_claude_code_as_producer_executor
+  - perform_adjacent_cleanup_or_scope_expansion
+limits:
+  repository: dev-foundry-claude
+  task_id: TSK-022
+  branch: task/tsk-022-safe-governed-consumer-cutover
+  baseline_head: 366e03510f13c6191ef845d52a2b38e3dae045ac
+  hosting_purpose: chatgpt-governed-producer-maintenance
+  execution_provider: codex-cli
+  task_binding: exact_governed_execution_contract
+  mutation_surface: contract_allowed_product_paths_only
+  authorization: operator_2026-10-07_tsk022_cutover_implementation_and_tests
+  governance_mutation: prohibited
+  promotion: prohibited
+proof_capabilities:
+  - isolated_synthetic_consumer_fixture_tests
+  - exact_path_manifest_reporting
+  - deterministic_fault_injection_and_recovery_tests
+  - full_regression_and_package_dry_run
+  - git_diff_check
+environment_constraints:
+  - process_bound_repository_must_be_dev_foundry_claude
+  - runner_and_codex_cli_must_be_available
+  - project_pop_must_bind_implementation_executor_to_this_profile
+  - task_tsk022_must_be_routed_and_authorized
+  - exact_contract_and_prompt_must_be_validated
+stop_conditions:
+  - missing_or_invalid_task_authority
+  - execution_package_ineligible
+  - unexpected_branch_or_dirty_product_path
+  - consumer_repo_or_governance_mutation_required
+  - non_approved_dependency_or_external_service_required
+  - material_scope_expansion_or_failed_contract
+portability: configure

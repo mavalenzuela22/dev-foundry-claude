@@ -1,0 +1,46 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-GOVERNANCE-AUTHOR-TSK022-CUTOVER-V1
+status: active
+implementation_class: operator-assisted-dev-foundry-copilot
+supported_actions:
+  - author_tsk022_recoverable_consumer_cutover_authority
+  - bind_exact_product_executor_contract_to_tsk022
+  - prepare_bounded_implementation_and_validation_handoffs
+  - inspect_producer_cutover_and_failure_references
+  - reconcile_validation_and_material_scope
+prohibited_actions:
+  - act_as_consumer_governance_or_mutate_consumer_repository
+  - implement_product_as_governance_author
+  - modify_immutable_framework_release
+  - publish_or_replace_release
+  - commit_push_pull_request_or_merge_without_separate_authorization
+  - broaden_scope_to_global_install_or_release_identity_repair
+  - bypass_executor_binding_or_audit_triggers
+limits:
+  repository: dev-foundry-claude
+  task_id: TSK-022
+  source_branch: task/tsk-022-safe-governed-consumer-cutover
+  baseline_head: 366e03510f13c6191ef845d52a2b38e3dae045ac
+  operator_implementation_authorization: explicit_2026-10-07_tsk022_cutover_product_and_tests
+  product_implementation: requires_existing_runner_v3_executor_and_exact_validated_contract
+  allowed_authoring_surface:
+    - docs/70-tasks/70 [TSK-022] PROJECT - Implement Recoverable Governed Consumer Authority Cutover.md
+    - .dev-foundry/authority-index.yaml
+    - .dev-foundry/profiles/project-operating-profile.yaml
+    - .dev-foundry/profiles/capability-profiles/governance-author-tsk022-cutover-v1.yaml
+proof_capabilities:
+  - producer_repository_bound_read_only_inspection
+  - four_path_authority_change_manifest
+  - task_resolution_and_change_set_validation
+  - exact_executor_contract_validation
+environment_constraints:
+  - bound_repository_must_be_dev_foundry_claude
+  - use_selected_pop_and_authority_index
+  - never_access_consumer_repository
+stop_conditions:
+  - missing_or_invalid_governed_authority
+  - missing_or_incompatible_executor
+  - changed_scope_or_unknown_paths
+  - unresolved_product_semantics
+  - unauthorized_release_or_consumer_cutover
+portability: configure

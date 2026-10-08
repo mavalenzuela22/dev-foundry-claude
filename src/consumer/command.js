@@ -5,7 +5,7 @@ import { createUpgradePlan } from '../adopt/upgrade.js';
 import { applyPlan } from '../adopt/apply.js';
 import { selfPin } from '../adopt/pin.js';
 import { git, isIgnored, PROBE_PATH } from '../adopt/ignore.js';
-import { pathHasSymlink, readContained, POP_PATH, INDEX_PATH } from '../adopt/common.js';
+import { cutoverState, pathHasSymlink, readContained, POP_PATH, INDEX_PATH } from '../adopt/common.js';
 import { runLauncher, RUNTIMES } from '../telemetry/launch.js';
 import { legacyVersion } from '../adopt/migration.js';
 import { renderHelp } from './help.js';
@@ -61,6 +61,12 @@ export async function inspectConsumer({ root: selected, packageRoot, adapter, ru
     telemetry: 'not-ready', dashboardAvailable: existsSync(path.join(packageRoot, 'tools/dashboard/dist/index.html')),
     readyToWork: false, nextAction: `${cli} help getting-started`, diagnostics: [], plan: null };
   if (!root) { result.summary = 'Open a Git project before setting up Claude.'; result.diagnostics.push('repository-unavailable'); return result; }
+  const cutover = await cutoverState(root);
+  if (cutover.blocked) {
+    result.integration = 'cutover-in-flight'; result.diagnostics.push('cutover-in-flight');
+    result.summary = 'The authority switch was interrupted or its journal needs review. Recover it before starting Claude.';
+    result.nextAction = `${cli} help cutover`; return result;
+  }
   const planned = await createPlan({ root, adapter, initialBootstrap: true, ...bootstrapInputs });
   const plan = planned.plan;
   result.plan = plan;

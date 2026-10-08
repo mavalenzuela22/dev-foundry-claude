@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { INDEX_PATH, POP_PATH, PROFILE_PATHS, ROLES, TARGETS, isObject, readYamlContained } from './common.js';
+import { INDEX_PATH, POP_PATH, PROFILE_PATHS, ROLES, TARGETS, cutoverState, isObject, pathHasSymlink, readYamlContained } from './common.js';
 
 const allUnbound = () => Object.fromEntries(ROLES.map((role) => [role, 'unbound']));
 const unavailable = (reason) => ({ overall: 'partial', roles: allUnbound(), bootstrap: { activeEntries: 0, claudeActive: false }, reasons: [reason] });
@@ -9,6 +9,8 @@ const sameList = (left, right) => Array.isArray(left) && left.length === right.l
 // the Authority Index and the profiles they reference. Adapter-owned files are never read.
 export async function evaluateActivation(root) {
   if (typeof root !== 'string' || !path.isAbsolute(root)) return unavailable('root-unavailable');
+  if ((await cutoverState(root)).blocked) return unavailable('cutover-in-flight');
+  if (await pathHasSymlink(root, POP_PATH) || await pathHasSymlink(root, INDEX_PATH)) return unavailable('unsafe-authority-path');
   const pop = await readYamlContained(root, POP_PATH);
   const index = await readYamlContained(root, INDEX_PATH);
   if (!pop || !index || pop.schema_version !== 'dev-foundry.project-operating-profile.v2' || pop.status !== 'active' ||
@@ -21,11 +23,13 @@ export async function evaluateActivation(root) {
     ...(Array.isArray(index.bindings) ? index.bindings : []),
   ].filter((item) => isObject(item) && typeof item.path === 'string').map((item) => item.path));
   const reasons = [];
+  const configuredRouteOk = (file) => [...(index.routes ?? []), ...(index.bindings ?? [])]
+    .filter((item) => item?.path === file && item.authority_class === 'configured').length === 1;
 
   const profileOk = async (profilePath, target) => {
-    if (!routed.has(profilePath)) { reasons.push('profile-not-routed'); return false; }
+    if (!routed.has(profilePath) || !configuredRouteOk(profilePath)) { reasons.push('profile-not-routed'); return false; }
     const profile = await readYamlContained(root, profilePath);
-    if (!profile || profile.status !== 'active' || !isObject(profile.limits) || profile.limits.repository !== project ||
+    if (await pathHasSymlink(root, profilePath) || !profile || profile.schema_version !== 'dev-foundry.capability-profile.v1' || profile.status !== 'active' || !isObject(profile.limits) || profile.limits.repository !== project ||
         profile.limits.platform !== target.platform || profile.limits.implementation_identity !== target.identity) {
       reasons.push('profile-invalid');
       return false;
@@ -44,6 +48,8 @@ export async function evaluateActivation(root) {
     if (!claimsClaude) { roles[role] = 'foreign-active'; continue; }
     claims += 1;
     let ok = implementation.kind === target.kind && sameList(binding.capability_profiles ?? [], target.capabilities);
+    const actor = await readYamlContained(root, binding.profile);
+    ok = ok && !(await pathHasSymlink(root, binding.profile)) && actor?.status === 'active' && actor.role === role;
     if (ok) for (const profilePath of target.capabilities) ok = (await profileOk(profilePath, target)) && ok;
     else reasons.push('binding-mismatch');
     roles[role] = ok ? 'claude-active' : 'unbound';
@@ -52,11 +58,16 @@ export async function evaluateActivation(root) {
   const entries = isObject(pop.platform_bootstraps) ? Object.values(pop.platform_bootstraps).filter(isObject) : [];
   const activeEntries = entries.filter((entry) => entry.status === 'active');
   let claudeActive = false;
-  if (activeEntries.length === 1 && typeof activeEntries[0].path === 'string' && routed.has(activeEntries[0].path)) {
+  if (activeEntries.length === 1 && typeof activeEntries[0].path === 'string' && routed.has(activeEntries[0].path) && configuredRouteOk(activeEntries[0].path)) {
     const bootstrap = await readYamlContained(root, activeEntries[0].path);
     claudeActive = Boolean(bootstrap) && bootstrap.schema_version === 'dev-foundry.platform-bootstrap.v2' && bootstrap.kind === 'platform-bootstrap' &&
       bootstrap.status === 'active' && isObject(bootstrap.platform) && bootstrap.platform.id === 'claude-code' &&
-      isObject(bootstrap.repository) && bootstrap.repository.expected_name === project;
+      isObject(bootstrap.repository) && bootstrap.repository.expected_name === project &&
+      bootstrap.repository.workspace_binding === 'repository-root' && !(await pathHasSymlink(root, activeEntries[0].path)) &&
+      bootstrap.sources?.project_operating_profile === POP_PATH && bootstrap.sources?.authority_index === INDEX_PATH &&
+      bootstrap.actor_resolution?.mode === 'governed-project-bindings' && bootstrap.actor_resolution?.default_role === 'governance-author' &&
+      bootstrap.actor_resolution?.fixed_profile === null && sameList(bootstrap.actor_resolution?.eligible_profiles,
+        [pop.actor_bindings['governance-author']?.profile, pop.actor_bindings['evidence-custodian']?.profile]);
   }
   if (activeEntries.length !== 1) reasons.push('bootstrap-count');
   else if (!claudeActive) reasons.push('bootstrap-not-claude');
@@ -72,7 +83,9 @@ export async function evaluateActivation(root) {
     if (await readYamlContained(root, profilePath)) claudeArtifacts = true;
   }
 
-  const active = ROLES.every((role) => roles[role] === 'claude-active') && claudeActive;
+  const extraActiveRoles = Object.entries(pop.actor_bindings).some(([role, binding]) => !ROLES.includes(role) && binding?.status === 'active');
+  if (extraActiveRoles) reasons.push('extra-active-role');
+  const active = !extraActiveRoles && ROLES.every((role) => roles[role] === 'claude-active') && claudeActive;
   const prepared = !active && claims === 0 && !claudeArtifacts && ROLES.every((role) => roles[role] !== 'claude-active');
   const overall = active ? 'active' : prepared ? 'prepared' : 'partial';
   return { overall, roles, bootstrap: { activeEntries: activeEntries.length, claudeActive }, reasons: [...new Set(reasons)].sort() };

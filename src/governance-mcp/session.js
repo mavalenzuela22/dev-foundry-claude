@@ -1,11 +1,14 @@
 import path from 'node:path';
-import { MCP_FILE, MCP_SERVER_NAME, POP_PATH, pathHasSymlink, readContained, readYamlContained } from '../adopt/common.js';
+import { INDEX_PATH, MCP_FILE, MCP_SERVER_NAME, POP_PATH, cutoverState, pathHasSymlink, readContained, readYamlContained } from '../adopt/common.js';
 import { canonicalJson, parseExpect, sha256 } from '../adopt/pin.js';
 
 // Only runtime bindings enter this projection. Task content/routes, policies and
 // Authority Index authoring are deliberately resolved afresh by the resolver.
 export async function sessionProjection(root) {
   if (typeof root !== 'string' || !path.isAbsolute(root)) throw new Error('Project root unavailable');
+  const cutover = await cutoverState(root);
+  if (cutover.blocked) throw new Error('Authority cutover requires recovery');
+  if (await pathHasSymlink(root, POP_PATH) || await pathHasSymlink(root, MCP_FILE)) throw new Error('Unsafe runtime authority path');
   const pop = await readYamlContained(root, POP_PATH);
   const config = JSON.parse((await readContained(root, MCP_FILE)).toString('utf8'));
   const entry = config.mcpServers?.[MCP_SERVER_NAME];
@@ -31,7 +34,12 @@ export async function sessionProjection(root) {
   }
   const bootstraps = Object.fromEntries(Object.entries(pop.platform_bootstraps).filter(([, binding]) => binding.status === 'active'));
   for (const binding of Object.values(bootstraps)) await include(binding.path);
-  return { adapterPin: entry.args[2], project: pop.repository?.name, framework, actorBindings, bootstraps, identities };
+  if (await pathHasSymlink(root, INDEX_PATH)) throw new Error('Unsafe runtime authority path');
+  const index = await readYamlContained(root, INDEX_PATH);
+  if (index?.status !== 'active') throw new Error('Runtime routes unavailable');
+  const runtimePaths = new Set([POP_PATH, ...Object.keys(identities)]);
+  const runtimeRoutes = [...(index.routes ?? []), ...(index.bindings ?? [])].filter((route) => runtimePaths.has(route.path));
+  return { adapterPin: entry.args[2], cutoverEpoch: cutover.epoch, project: pop.repository?.name, framework, actorBindings, bootstraps, runtimeRoutes, identities };
 }
 
 export async function createSessionGuard(root, expectedRuntimePin) {
