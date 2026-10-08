@@ -3,7 +3,7 @@ id: DFC-AUTHORITY-INDEX
 title: dev-foundry-claude Repository Authority Index
 kind: authority-index
 status: active
-artifact_version: "2.1.0-local.37"
+artifact_version: "2.1.0-local.38"
 canonical: false
 
 subject:
@@ -438,12 +438,33 @@ routes:
       - closed-dependency-fail-closed-regression-proof
     section_id: null
 
+  - id: TSK-025
+    path: docs/70-tasks/70 [TSK-025] PROJECT - Publish Verified Claude Adapter 1.4.2 Resolver Release.md
+    authority_class: task
+    governs:
+      - adapter-patch-release-1.4.2
+      - verified-resolver-hotfix-in-release-payload
+      - deterministic-package-identity-proof
+      - main-only-github-release-1.4.2
+      - published-release-assets-verification
+    section_id: null
+
 bindings:
+  - id: governance-author-capability-tsk025-release-v1
+    path: .dev-foundry/profiles/capability-profiles/governance-author-tsk025-release-142-v1.yaml
+    kind: capability-profile
+    authority_class: configured
+    required: true
+  - id: implementation-executor-capability-tsk025-release-v1
+    path: .dev-foundry/profiles/capability-profiles/implementation-executor-tsk025-release-142-v1.yaml
+    kind: capability-profile
+    authority_class: configured
+    required: true
   - id: governance-author-capability-tsk024-promotion-v2
     path: .dev-foundry/profiles/capability-profiles/governance-author-tsk024-promotion-v2.yaml
     kind: capability-profile
     authority_class: configured
-    required: true
+    required: false
   - id: governance-author-capability-tsk024-resolver-hotfix-v1-history
     path: .dev-foundry/profiles/capability-profiles/governance-author-tsk024-resolver-hotfix-v1.yaml
     kind: capability-profile
@@ -453,7 +474,7 @@ bindings:
     path: .dev-foundry/profiles/capability-profiles/implementation-executor-tsk024-resolver-hotfix-v2.yaml
     kind: capability-profile
     authority_class: configured
-    required: true
+    required: false
   - id: implementation-executor-capability-tsk024-resolver-hotfix-v1-history
     path: .dev-foundry/profiles/capability-profiles/implementation-executor-tsk024-resolver-hotfix-v1.yaml
     kind: capability-profile
