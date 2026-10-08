@@ -5,7 +5,7 @@ artifact:
   type: TSK
   title: Publish Verified Claude Adapter 1.4.2 Resolver Release
   status: IN_PROGRESS
-artifactVersion: "2"
+artifactVersion: "3"
 authorityScope: tsk-025-verified-adapter-1.4.2-resolver-release
 ownerRole: governance-author
 canonical: true
@@ -158,3 +158,52 @@ evidence and limitations, and applicable operator/closure authority.
 Producer TSK-024 implementation may remain separately marked
 `IN_PROGRESS` until its own documentary closure; no false inference that
 a green patch release closes a separate consumer task.
+
+## 6. V001 governed candidate PASS and Author self-assessment (2026-10-08)
+
+The exact bound V001 executor execution
+`execution_c479910a0582eb430f67b8f77d7300777d20f82f901aafb15ec6dc28ecc0c97b`
+terminated **PASS** in 1,667,159 ms. The executor exited zero,
+path policy PASS, post-execution governed validation PASS. Focused
+versioned bootstrap/package/cutover/release tests: 162/162 PASS.
+Full `npm test`: 323/323 PASS. `npm pack --dry-run --json` and
+`git diff --check`: PASS. The standalone exact changed-path
+validation also returned PASS, with zero hidden changes.
+
+Observed candidate mutation consists of **six** (of seven projected)
+paths: `package.json`, `package-lock.json`,
+`migrations/release.json`, `README.md`,
+`test/adopt/package.test.js`,
+`test/adopt/release-assets.test.js`. No change to
+`test/adopt/cutover.test.js` was necessary.
+
+**Governance Author semantic self-assessment:** Candidate package
+version, lock root version and migration target are all exactly
+1.4.2. `selfUpdateBaseline` is unchanged at 1.4.0. No dependency,
+runtime resolver, upgrade/migration implementation, release workflow,
+immutable framework or consumer file changed. Old 1.4.1 historical
+synthetic semantic-migration fixture remains pinned to 1.4.1
+rather than being rewritten; live target expectations now test
+1.4.2. README and version assertions match the new candidate.
+The existing asset-builder tests validate tarball alias equality,
+checksums, and installed payload identity, but independent
+**published** release identity remains future proof after main
+promotion. The candidate has no known unresolved product
+nonconformance within the authorized seven-path boundary.
+
+The applicable adopted OPS-004 audit trigger check finds no
+mandatory independent audit: POP `audit_triggers: []`,
+TSK-025 contains no unconditional audit requirement, and the
+release candidate changes no security boundary, dependency,
+new capability or architecture. This is Author self-assessment
+only, not an independent AUDIT PASS verdict.
+
+The Operator authorized release of 1.4.2 subject to exact
+validation and publication gates. Promotion may therefore
+proceed via the governed repository transaction after the exact
+candidate state and evidence are revalidated. Publication
+requires a subsequent clean merged-main version check,
+no existing v1.4.2 tag/release collision, authorized workflow
+dispatch, observed workflow SUCCESS, verified three release
+assets and exact installed self-pin. No consumer mutation,
+manual tag or release claim is permitted before these facts.
