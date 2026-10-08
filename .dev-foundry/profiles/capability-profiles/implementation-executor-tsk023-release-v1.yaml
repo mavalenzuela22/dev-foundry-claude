@@ -19,6 +19,7 @@ prohibited_actions:
   - add_dependencies_or_change_npm_packages
   - alter_public_release_hashes_or_repin_existing_consumer
   - bypass_authorization_or_source_identity
+  - invoke_claude_code_as_producer_executor
 limits:
   repository: dev-foundry-claude
   task_id: TSK-023
