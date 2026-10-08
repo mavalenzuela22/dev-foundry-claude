@@ -1,0 +1,60 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-GOVERNANCE-AUTHOR-TSK024-PROMOTION-V2
+status: active
+implementation_class: operator-assisted-dev-foundry-copilot
+supported_actions:
+  - inspect_exact_tsk024_candidate_and_existing_governed_evidence
+  - perform_tsk024_complete_semantic_self_assessment
+  - evaluate_and_record_tsk024_independent_audit_triggers
+  - reconcile_tsk024_six_path_product_projection
+  - author_tsk024_final_promotion_evidence_and_closure_if_ready
+  - request_governed_task_branch_commit_push_and_pull_request
+  - request_governed_pr_merge_integration_reconciliation_and_cleanup
+  - verify_integrated_main_and_preserve_release_boundary
+prohibited_actions:
+  - mutate_consumer_repository
+  - claim_real_consumer_mcp_success_without_live_verified_evidence
+  - modify_immutable_framework_release
+  - modify_product_implementation_as_governance_author
+  - bypass_independent_audit_if_triggered
+  - publish_adapter_release_or_create_release_tag
+  - change_package_version_or_published_payload_identity
+  - rewrite_existing_release_tags_or_assets
+  - authorize_unbounded_executor_scope
+  - promote_without_revalidating_bound_gates
+  - force_push
+limits:
+  repository: dev-foundry-claude
+  task_id: TSK-024
+  source_branch: task/tsk-024-governance-resolver-compatibility-hotfix
+  target_base_branch: main
+  bounded_objective: governance_mcp_resolver_compatibility_hotfix
+  baseline_release: "1.4.1"
+  future_target_release: "1.4.2"
+  promotion: requires_verified_candidate_and_state_revalidation
+  release_publication: prohibited
+  consumer_mutation: false
+  side_effect_authorization: explicit_operator_2026-10-08_tsk024_validation_commit_promotion
+proof_capabilities:
+  - producer_repo_bound_state_and_authority_reobservation
+  - executor_v002_terminal_validation_and_path_manifest
+  - full_test_package_dry_run_and_diff_check_proof
+  - semantic_self_assessment_and_audit_trigger_disposition
+  - runner_transaction_promotion_and_integration_evidence
+  - final_repository_head_and_clean_state_reconciliation
+environment_constraints:
+  - process_bound_repository_must_be_dev_foundry_claude
+  - use_runner_transaction_for_commit_push_pull_request_and_integration
+  - verify_exact_branch_head_and_changes_at_each_side_effect
+  - do_not_publish_any_adapter_version_without_separate_release_operation
+  - executor_cannot_self_authorize_commit_or_promotion
+stop_conditions:
+  - missing_or_conflicting_current_authority
+  - unexpected_branch_head_or_path_mutation
+  - new_product_or_immutable_framework_change
+  - unresolved_audit_trigger_or_required_independent_audit
+  - failed_or_stale_mechanical_validation
+  - release_publication_or_consumer_mutation_required
+  - provider_or_transaction_capability_unavailable
+  - indeterminate_external_side_effect
+portability: project-specific

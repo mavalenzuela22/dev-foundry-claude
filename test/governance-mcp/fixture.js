@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -62,4 +62,88 @@ export async function makeProject() {
     async write(relative, value) { await put(relative, value); },
     async cleanup() { await import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })); },
   };
+}
+
+// Synthetic brownfield data only; no consumer repository is consulted.
+export async function makeBrownfieldProject() {
+  const project = await makeProject();
+  const historicalPath = 'docs/tasks/70 [TSK-001] PROJECT - Previous task.md';
+  const legacyPath = 'docs/specifications/40 [SPC-LEGACY] PROJECT - Legacy requirement.md';
+  const unusedTaskPath = 'docs/tasks/70 [TSK-UNUSED] PROJECT - Unused task.md';
+  try {
+    const historical = `---
+schemaVersion: dev-foundry.sot-document.v2
+artifact:
+  id: TSK-001
+  type: TSK
+  title: Previous task
+  status: CLOSED
+artifactVersion: "1"
+authorityScope: previous-task
+ownerRole: governance-author
+canonical: false
+scope:
+  owns: [previous-task]
+  appliesTo: {}
+  excludes: []
+authority:
+  governedBy: []
+  supersedes: []
+lifecycle:
+  phase: closed
+portability: project-specific
+---
+
+# 70 [TSK-001] PROJECT - Previous task
+`;
+    const legacy = (id, type, title) => `---
+schemaVersion: dev-foundry.sot-document.v1
+artifact:
+  id: ${id}
+  type: ${type}
+  title: ${title}
+  status: ACTIVE
+scope:
+  owns: [legacy-${id}]
+  appliesTo: {}
+  excludes: []
+authority:
+  governedBy: []
+  supersedes: []
+lifecycle:
+  phase: active
+metadata:
+  retainedBy: on-touch
+---
+
+# [${id}] PROJECT - ${title}
+`;
+    await project.write(historicalPath, historical);
+    await project.write(legacyPath, legacy('SPC-LEGACY', 'SPC', 'Legacy requirement'));
+    await project.write(unusedTaskPath, legacy('TSK-UNUSED', 'TSK', 'Unused task'));
+    const task = await readFile(path.join(project.root, project.taskPath), 'utf8');
+    const activeTask = task
+      .replace('  type: TSK', '  type: TSK\n  title: Current task')
+      .replace('authority:\n', 'artifactVersion: "1"\nauthorityScope: current-task\nownerRole: governance-author\ncanonical: true\nscope:\n  owns: [task]\n  appliesTo: {}\n  excludes: []\nauthority:\n')
+      .replace('  governedBy: [ADR-001]', '  governedBy: [ADR-001]\n  supersedes: []\n  historicalReferences: [TSK-001]')
+      .replace('PRIVATE_TASK_BODY_MARKER', '# [TSK-002] PROJECT - Current task\n\nPRIVATE_TASK_BODY_MARKER');
+    await project.write(project.taskPath, activeTask);
+    const indexPath = '.dev-foundry/authority-index.yaml';
+    const index = JSON.parse(await readFile(path.join(project.root, indexPath), 'utf8'));
+    index.routes.push(
+      { id: 'previous-task-history', path: historicalPath, authority_class: 'historical', governs: ['task'], section_id: null },
+      { id: 'retained-legacy-requirement', path: legacyPath, authority_class: 'product', governs: ['legacy-requirement'], section_id: null },
+      { id: 'unused-task', path: unusedTaskPath, authority_class: 'task', governs: ['unused-task'], section_id: null },
+    );
+    await project.write(indexPath, `${JSON.stringify(index, null, 2)}\n`);
+    const popPath = '.dev-foundry/profiles/project-operating-profile.yaml';
+    const pop = JSON.parse(await readFile(path.join(project.root, popPath), 'utf8'));
+    pop.repository.classification = 'brownfield';
+    pop.policies.metadata_migration_mode = 'on-touch';
+    await project.write(popPath, `${JSON.stringify(pop, null, 2)}\n`);
+    return { ...project, historicalPath, legacyPath, unusedTaskPath };
+  } catch (error) {
+    await project.cleanup();
+    throw error;
+  }
 }

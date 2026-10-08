@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -137,20 +136,46 @@ test('9 fixture-simulated cutover activates all five roles with consumer-owned a
   assert.ok(parse(await consumer.read(BOOTSTRAP_PATH)).platform.id === 'claude-code');
 });
 
-test('10 guard scope: resolver.js is byte-identical to HEAD and guard-off server output equals the resolver', async (t) => {
-  const head = execFileSync('git', ['show', 'HEAD:src/governance-mcp/resolver.js'], { cwd: repoRoot });
-  assert.ok(head.equals(await readFile(path.join(repoRoot, 'src/governance-mcp/resolver.js'))));
+test('10 guard scope: activation gates guard-on while both modes preserve resolver authority checks and parity', async (t) => {
   const { consumer } = await prepared(t);
   const off = await connect(t, consumer.root, { guard: false });
+  const guarded = await connect(t, consumer.root, { guard: true });
   for (const role of ROLES) {
     const served = await off.call(ask(role));
     const direct = await resolveGovernedOperation(ask(role), { projectRoot: consumer.root });
     assert.equal(served.ok, true);
     assert.deepEqual(served, direct);
+    assert.deepEqual(await guarded.call(ask(role)), {
+      ok: false, errorCode: 'BINDING_INACTIVE', message: 'Claude role activation is not complete for this project.',
+    });
   }
   const active = await cutOver(t);
   const on = await connect(t, active.root, { guard: true });
-  for (const role of ROLES) assert.deepEqual(await on.call(ask(role)), await resolveGovernedOperation(ask(role), { projectRoot: active.root }));
+  const activeOff = await connect(t, active.root, { guard: false });
+  for (const role of ROLES) {
+    const direct = await resolveGovernedOperation(ask(role), { projectRoot: active.root });
+    assert.equal(direct.ok, true);
+    assert.deepEqual(await on.call(ask(role)), direct);
+    assert.deepEqual(await activeOff.call(ask(role)), direct);
+  }
+  // Disabling activation gating must not bypass the resolver's own scope,
+  // authority, role or context checks; activation must not grant them either.
+  const denied = [
+    [ask('governance-author', 'dev-foundry-claude'), 'TARGET_MISMATCH'],
+    [{ ...ask('implementation-executor'), taskId: 'TSK-UNROUTED' }, 'AUTHORITY_INVALID'],
+    [{ ...ask('implementation-executor'), requestedRole: 'governance-author' }, 'ROLE_INELIGIBLE'],
+    [{ ...ask('governance-author'), expectedContextFingerprint: '0'.repeat(64) }, 'STALE_CONTEXT'],
+    [{ ...ask('governance-author'), unauthorizedScopeBypass: true }, 'INVALID_REQUEST'],
+  ];
+  for (const [request, errorCode] of denied) {
+    for (const [state, servers] of [[consumer, [off]], [active, [on, activeOff]]]) {
+      const direct = await resolveGovernedOperation(request, { projectRoot: state.root });
+      assert.equal(direct.ok, false);
+      assert.equal(direct.errorCode, errorCode);
+      assert.equal(direct.resolution, undefined);
+      for (const server of servers) assert.deepEqual(await server.call(request), direct);
+    }
+  }
 });
 
 const actions = ['inspect', 'author', 'implement', 'validate', 'audit', 'promote', 'close'];

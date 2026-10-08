@@ -54,6 +54,7 @@ const compatibleRoles = {
   close: ['evidence-custodian'],
 };
 const authorityClasses = new Set(['methodology', 'product', 'configured', 'decision', 'task', 'profile']);
+const routeAuthorityClasses = new Set([...authorityClasses, 'historical']);
 const frameworkVersionSupported = '2.1.0';
 
 class ResolutionError extends Error {
@@ -77,11 +78,15 @@ function parseYaml(bytes) {
   return value;
 }
 
-function parseSoT(bytes) {
+function parseFrontmatter(bytes) {
   const text = bytes.toString('utf8');
   const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   if (!match) throw invalidAuthority();
-  const frontmatter = parseYaml(Buffer.from(match[1], 'utf8'));
+  return parseYaml(Buffer.from(match[1], 'utf8'));
+}
+
+function parseSoT(bytes) {
+  const frontmatter = parseFrontmatter(bytes);
   if (frontmatter.schemaVersion !== 'dev-foundry.sot-document.v2' ||
       !isObject(frontmatter.artifact) || typeof frontmatter.artifact.id !== 'string' ||
       typeof frontmatter.artifact.type !== 'string' || typeof frontmatter.artifact.status !== 'string') {
@@ -101,9 +106,11 @@ function parseAuthorityIndex(bytes) {
       !Array.isArray(index.routes) || !isObject(index.subject) || typeof index.id !== 'string') throw invalidAuthority();
   const routeIds = new Set();
   for (const route of index.routes) {
-    if (!isObject(route) || typeof route.id !== 'string' || typeof route.path !== 'string' ||
-        !authorityClasses.has(route.authority_class) || !Array.isArray(route.governs) ||
-        route.governs.some((item) => typeof item !== 'string') ||
+    if (!isObject(route) || typeof route.id !== 'string' || !route.id.trim() ||
+        typeof route.path !== 'string' || !route.path.trim() ||
+        !routeAuthorityClasses.has(route.authority_class) || !Array.isArray(route.governs) || !route.governs.length ||
+        route.governs.some((item) => typeof item !== 'string' || !item.trim()) ||
+        new Set(route.governs).size !== route.governs.length ||
         (route.section_id !== null && route.section_id !== undefined && typeof route.section_id !== 'string') ||
         routeIds.has(route.id)) throw invalidAuthority();
     routeIds.add(route.id);
@@ -124,6 +131,7 @@ class Resolver {
     this.root = path.resolve(root);
     this.sources = new Map();
     this.documentCache = new Map();
+    this.identityCache = new Map();
     this.rawCache = new Map();
   }
 
@@ -184,7 +192,7 @@ class Resolver {
       throw new ResolutionError('UNSUPPORTED_FRAMEWORK', 'The adopted framework version is not supported by this resolver.');
     }
     if (projectIndex.subject.base_version !== pop.framework.adopted_version) throw invalidAuthority('The project and POP framework versions contradict each other.');
-    const frameworkRoutes = projectIndex.routes.filter((route) => route.governs.includes('reusable-dev-foundry-methodology'));
+    const frameworkRoutes = projectIndex.routes.filter((route) => route.authority_class !== 'historical' && route.governs.includes('reusable-dev-foundry-methodology'));
     if (frameworkRoutes.length !== 1 || frameworkRoutes[0].path !== pop.framework.selected_authority_index || frameworkRoutes[0].authority_class !== 'methodology') {
       throw invalidAuthority('The project framework route contradicts the POP-selected release.');
     }
@@ -225,25 +233,36 @@ class Resolver {
     return this.loadSoT(relativePath);
   }
 
+  async loadRoutedIdentity(relativePath) {
+    if (this.identityCache.has(relativePath)) return this.identityCache.get(relativePath);
+    const bytes = await this.readBytes(relativePath);
+    // Discovery is schema-neutral: an unused on-touch v1 document is not v2
+    // authority. Only selected identities undergo loadRoutedArtifact validation.
+    // Inspect actual metadata, rather than trusting route IDs or filenames, so
+    // independently named routes and duplicate artifact identities remain safe.
+    const value = /\.ya?ml$/i.test(relativePath) ? parseYaml(bytes) : parseFrontmatter(bytes);
+    const id = value.artifact?.id ?? value.id;
+    if (typeof id !== 'string' || !id.trim()) throw invalidAuthority();
+    this.identityCache.set(relativePath, id);
+    return id;
+  }
+
   async resolveFromIndex(index, indexPath, artifactId, { authorityClass, requireUnique = true } = {}) {
     const matches = [];
     for (const route of index.routes) {
+      if (route.authority_class === 'historical') continue;
       if (authorityClass && route.authority_class !== authorityClass) continue;
+      if (await this.loadRoutedIdentity(route.path) !== artifactId) continue;
       const { frontmatter } = await this.loadRoutedArtifact(route.path);
-      if (frontmatter.artifact.id === artifactId) matches.push({ route, frontmatter });
+      if (frontmatter.artifact.id !== artifactId) throw invalidAuthority();
+      matches.push({ route, frontmatter });
     }
     if (matches.length !== 1 && requireUnique) throw invalidAuthority(matches.length ? 'Authority resolves to multiple routed artifacts.' : 'A required authority artifact has no active route.');
     return matches;
   }
 
   async resolveTask(taskId) {
-    const routes = this.projectIndex.routes.filter((route) => route.authority_class === 'task');
-    const matches = [];
-    for (const route of routes) {
-      const { frontmatter } = await this.loadRoutedArtifact(route.path);
-      if (frontmatter.artifact.type !== 'TSK') throw invalidAuthority();
-      if (frontmatter.artifact.id === taskId) matches.push({ route, frontmatter });
-    }
+    const matches = await this.resolveFromIndex(this.projectIndex, this.projectIndexPath, taskId, { authorityClass: 'task', requireUnique: false });
     if (matches.length !== 1) throw invalidAuthority(matches.length ? 'Task identity resolves through duplicate routes.' : 'The requested task has no active route.');
     const task = matches[0];
     if (task.frontmatter.artifact.type !== 'TSK') throw invalidAuthority();

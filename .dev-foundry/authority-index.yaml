@@ -3,7 +3,7 @@ id: DFC-AUTHORITY-INDEX
 title: dev-foundry-claude Repository Authority Index
 kind: authority-index
 status: active
-artifact_version: "2.1.0-local.34"
+artifact_version: "2.1.0-local.37"
 canonical: false
 
 subject:
@@ -428,7 +428,37 @@ routes:
       - published-immutable-adapter-141-distribution-identity
     section_id: null
 
+  - id: TSK-024
+    path: docs/70-tasks/70 [TSK-024] PROJECT - Correct Governance MCP Resolver Compatibility for Brownfield Consumers.md
+    authority_class: task
+    governs:
+      - governance-mcp-brownfield-authority-index-compatibility
+      - governed-resolution-historical-route-isolation
+      - on-touch-v1-document-read-compatibility
+      - closed-dependency-fail-closed-regression-proof
+    section_id: null
+
 bindings:
+  - id: governance-author-capability-tsk024-promotion-v2
+    path: .dev-foundry/profiles/capability-profiles/governance-author-tsk024-promotion-v2.yaml
+    kind: capability-profile
+    authority_class: configured
+    required: true
+  - id: governance-author-capability-tsk024-resolver-hotfix-v1-history
+    path: .dev-foundry/profiles/capability-profiles/governance-author-tsk024-resolver-hotfix-v1.yaml
+    kind: capability-profile
+    authority_class: configured
+    required: false
+  - id: implementation-executor-capability-tsk024-resolver-hotfix-v2
+    path: .dev-foundry/profiles/capability-profiles/implementation-executor-tsk024-resolver-hotfix-v2.yaml
+    kind: capability-profile
+    authority_class: configured
+    required: true
+  - id: implementation-executor-capability-tsk024-resolver-hotfix-v1-history
+    path: .dev-foundry/profiles/capability-profiles/implementation-executor-tsk024-resolver-hotfix-v1.yaml
+    kind: capability-profile
+    authority_class: configured
+    required: false
   - id: governance-author-capability-tsk021-candidate-branch-publication-history
     path: .dev-foundry/profiles/capability-profiles/governance-author-tsk021-candidate-branch-publication-v1.yaml
     kind: capability-profile
@@ -438,7 +468,7 @@ bindings:
     path: .dev-foundry/profiles/capability-profiles/governance-author-tsk021-release-lifecycle-v1.yaml
     kind: capability-profile
     authority_class: configured
-    required: true
+    required: false
   - id: governance-author-capability-tsk022-cutover
     path: .dev-foundry/profiles/capability-profiles/governance-author-tsk022-cutover-v1.yaml
     kind: capability-profile
