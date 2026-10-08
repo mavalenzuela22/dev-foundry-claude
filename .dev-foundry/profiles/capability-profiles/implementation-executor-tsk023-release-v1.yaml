@@ -1,0 +1,52 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-IMPLEMENTATION-EXECUTOR-TSK023-RELEASE-V1
+status: active
+implementation_class: process-bound-runner-code-executor
+supported_actions:
+  - inspect_bounded_release_version_candidate
+  - update_exact_package_json_and_package_lock_release_version
+  - update_release_version_consumer_guidance
+  - run_isolated_tests_package_validation_and_asset_build
+  - prove_byte_identity_and_report_exact_payload_root
+prohibited_actions:
+  - modify_project_authority_or_task_docs
+  - change_adoption_or_cutover_product_logic
+  - access_or_mutate_real_consumer_repository
+  - change_existing_github_release_or_global_npm_install
+  - tag_or_publish_release_from_executor
+  - commit_push_pull_request_or_merge
+  - modify_immutable_framework
+  - add_dependencies_or_change_npm_packages
+  - alter_public_release_hashes_or_repin_existing_consumer
+  - bypass_authorization_or_source_identity
+limits:
+  repository: dev-foundry-claude
+  task_id: TSK-023
+  branch: task/tsk-023-adapter-1.4.1-release
+  baseline_head: 0b363425aa5431521ded544574cc45123b403c47
+  hosting_purpose: chatgpt-governed-producer-maintenance
+  execution_provider: codex-cli
+  release_version: 1.4.1
+  task_binding: exact_governed_execution_contract
+  mutation_surface: contract_allowed_product_paths_only
+  authorization: operator_2026-10-07_closure_then_new_release_1.4.1
+  governance_mutation: prohibited
+  promotion: prohibited
+proof_capabilities:
+  - root_suite_and_release_assets_validation
+  - versioned_tarball_and_alias_exact_identity
+  - packed_runtime_self_pin_sha256_verification
+  - exact_path_manifest_and_git_diff_check
+environment_constraints:
+  - process_bound_repository_must_be_dev_foundry_claude
+  - runner_and_codex_cli_available
+  - project_pop_must_bind_implementation_executor_to_this_profile
+  - task_tsk023_must_be_routed_and_authorized
+  - exact_contract_and_prompt_must_be_validated
+stop_conditions:
+  - wrong_branch_or_missing_role_binding
+  - existing_v141_public_release_collision
+  - package_identity_mismatch_or_missing_compatibility_proof
+  - consumer_repo_mutation_required
+  - unexpected_changes_or_unapproved_paths
+portability: configure

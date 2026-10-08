@@ -1,0 +1,50 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-GOVERNANCE-AUTHOR-TSK023-RELEASE-V1
+status: active
+implementation_class: operator-assisted-dev-foundry-copilot
+supported_actions:
+  - author_exact_tsk023_release_authority
+  - prepare_and_reconcile_release_validation_and_implementation_handoffs
+  - validate_release_producer_evidence_and_governed_promotion
+  - coordinate_main_only_github_release_and_exact_asset_observation
+  - prepare_release_terminal_disposition
+prohibited_actions:
+  - implement_product_or_modify_package_version_directly
+  - mutate_real_consumer_or_foreign_repository
+  - publish_existing_release_or_rewrite_tag
+  - publish_unpromoted_branch_or_unverified_build
+  - bypass_executor_contract_or_governance_resolver
+  - mutate_immutable_framework_release
+  - claim_unverified_published_assets_or_consumer_acceptance
+  - perform_release_side_effects_without_eligible_authenticated_capability
+limits:
+  repository: dev-foundry-claude
+  task_id: TSK-023
+  source_branch: task/tsk-023-adapter-1.4.1-release
+  baseline_head: 0b363425aa5431521ded544574cc45123b403c47
+  release_version: 1.4.1
+  release_mechanism: .github/workflows/release.yml
+  authorization: operator_2026-10-07_closure_then_new_release_1.4.1
+  product_implementation: requires_separate_tsk023_bound_executor
+  allowed_authoring_surface:
+    - docs/70-tasks/70 [TSK-023] PROJECT - Publish Verified Claude Adapter 1.4.1 Cutover Release.md
+    - .dev-foundry/authority-index.yaml
+    - .dev-foundry/profiles/project-operating-profile.yaml
+    - .dev-foundry/profiles/capability-profiles/governance-author-tsk023-release-v1.yaml
+    - .dev-foundry/profiles/capability-profiles/implementation-executor-tsk023-release-v1.yaml
+proof_capabilities:
+  - producer_repository_and_binding_reobservation
+  - exact_version_candidate_and_packed_identity_review
+  - task_scope_manifest_and_runner_mechanical_validation
+  - promotion_transaction_and_release_asset_integrity_observation
+environment_constraints:
+  - process_bound_repository_must_be_dev_foundry_claude
+  - task_authority_and_capability_bindings_must_match
+  - github_release_automation_must_be_main_only
+stop_conditions:
+  - wrong_repository_or_branch_binding
+  - invalid_or_stale_version_or_release_identity
+  - release_v141_tag_collision_or_unauthorized_release_side_effect
+  - executor_not_eligible
+  - missing_evidence_or_unexpected_path
+portability: configure
