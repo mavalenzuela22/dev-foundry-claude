@@ -3,7 +3,7 @@ id: DFC-AUTHORITY-INDEX
 title: dev-foundry-claude Repository Authority Index
 kind: authority-index
 status: active
-artifact_version: "2.1.0-local.33"
+artifact_version: "2.1.0-local.34"
 canonical: false
 
 subject:
@@ -420,6 +420,13 @@ routes:
       - promoted-main-only-github-release
       - verified-published-release-assets
     section_id: null
+  - id: TSK-023-CLOSURE
+    path: docs/70-tasks/70 [TSK-023-CLOSURE] PROJECT - Publish Verified Claude Adapter 1.4.1 Cutover Release Closure.md
+    authority_class: task
+    governs:
+      - tsk-023-release-141-terminal-disposition
+      - published-immutable-adapter-141-distribution-identity
+    section_id: null
 
 bindings:
   - id: governance-author-capability-tsk021-candidate-branch-publication-history
@@ -441,7 +448,7 @@ bindings:
     path: .dev-foundry/profiles/capability-profiles/governance-author-tsk023-release-v1.yaml
     kind: capability-profile
     authority_class: configured
-    required: true
+    required: false
   - id: project-operating-profile
     path: .dev-foundry/profiles/project-operating-profile.yaml
     kind: project-operating-profile
@@ -476,7 +483,7 @@ bindings:
     path: .dev-foundry/profiles/capability-profiles/implementation-executor-tsk023-release-v1.yaml
     kind: capability-profile
     authority_class: configured
-    required: true
+    required: false
   - id: implementation-executor-capability-claude-consumer-target-v1-history
     path: .dev-foundry/profiles/capability-profiles/implementation-executor-claude-code-v1.yaml
     kind: capability-profile

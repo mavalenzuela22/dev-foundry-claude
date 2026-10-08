@@ -4,8 +4,8 @@ artifact:
   id: TSK-023
   type: TSK
   title: Publish Verified Claude Adapter 1.4.1 Cutover Release
-  status: IN_PROGRESS
-artifactVersion: "2"
+  status: CLOSED
+artifactVersion: "3"
 authorityScope: tsk-023-verified-adapter-1.4.1-cutover-release
 ownerRole: governance-author
 canonical: true
@@ -47,7 +47,7 @@ traceability:
   derivedFrom:
     - TSK-022
 lifecycle:
-  phase: in-progress
+  phase: closed
   blockedBy: []
   promotionRequired: true
 portability: project-specific
@@ -91,3 +91,11 @@ Hard bounds: only the seven projected release/version/test paths; no weakening `
 The prior producer staged candidate reported `1.4.0:sha256:da37df3d9a26328b6ad1de37f6100a8aae736d219e786e65fc63b6de79bdde98`; Windows globally installed public v1.4.0 reported `1.4.0:sha256:0bf9949b0f45c1b37dc0037bd48d23db0bcee5b6dcd6970592a912643d936b0c`. These distinct identities are not evidence that v1.4.1 fails; only exact verification of the new published payload and consumer-selected pin is acceptable. No silent repin.
 
 Real consumer PagoElectronico TSK-041 acceptance occurs later. This release operation MUST NOT claim completed end-to-end consumer cutover or modify Pago's two original worktree changes.
+
+## 6. Verified v1.4.1 publication and producer terminal disposition
+
+The verified TSK-023 release candidate (V003 `execution_355742095b7890325c058edd37b5b0e2b209fd01b182cc0d8be70e0bfc884a9a`, 309/309 tests PASS) was promoted by [PR #46](https://github.com/mavalenzuela22/dev-foundry-claude/pull/46) to exact published `main` commit `47f2af1971b05db68ded89c87a02f3cc1675321a`. The governed promotion transaction `TSK-023-RELEASE-CANDIDATE-PROMOTION-20261008-V001` completed through reconciliation and cleanup. GitHub workflow run `37806253109` reported SUCCESS on that commit and published immutable release `v1.4.1` with versioned tarball, alias and `SHA256SUMS`.
+
+Operator-provided authenticated terminal evidence confirmed both archive SHA-256 checks `OK`, byte-equal archives, tag/head match and installed unpacked `selfPin: 1.4.1:sha256:f914b60cb3e5bb2fe61e1c8bc22043a6eee73c54f5de0fa1680d219821fabfce`, ending `RELEASE_INTEGRITY=PASS`. That terminal output is explicitly Operator-observed, not an independent asset download by the runner. Failure histories V001/V002 are retained and not converted to PASS. Audit not triggered under the current POP.
+
+**Producer TSK-023 status: CLOSED, subject to this documentary closure bundle being integrated on clean `main`.** Terminal source and explicit limitations are recorded by `TSK-023-CLOSURE`. Public `v1.4.1` tag and assets are immutable and outside this closure change; later `main` commits must not change the release identity. Real PagoElectronico TSK-041 consumer rollout and authority cutover are separate, not claimed complete.
