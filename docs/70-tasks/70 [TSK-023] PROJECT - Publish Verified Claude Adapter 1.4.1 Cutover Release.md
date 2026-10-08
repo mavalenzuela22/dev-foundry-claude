@@ -5,7 +5,7 @@ artifact:
   type: TSK
   title: Publish Verified Claude Adapter 1.4.1 Cutover Release
   status: IN_PROGRESS
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: tsk-023-verified-adapter-1.4.1-cutover-release
 ownerRole: governance-author
 canonical: true
@@ -73,12 +73,20 @@ The Operator on 2026-10-07 explicitly authorized finishing producer TSK-022 CLOS
 
 - Product baseline: clean producer main `0b363425aa5431521ded544574cc45123b403c47`; TSK-022 implemented and producer-closed before release.
 - Existing root `package.json`, `package-lock.json` version 1.4.0; release workflow is main-only manual `workflow_dispatch`.
-- Minimal implementation path projection: `package.json`, `package-lock.json`, `migrations/release.json`, `README.md`, `test/adopt/package.test.js` and `test/adopt/release-assets.test.js` for directly affected version assertions; preserve historical 1.4.0 fixture/baseline expectations; another path requires directly necessary and separately reconciled scope under OPS-007/008.
+- Minimal implementation path projection: `package.json`, `package-lock.json`, `migrations/release.json`, `README.md`, `test/adopt/package.test.js`, `test/adopt/release-assets.test.js`, and `test/adopt/cutover.test.js` for directly affected version assertions and installed-runtime synthetic manifest consistency; preserve historical 1.4.0 fixture/baseline expectations; another path requires directly necessary and separately reconciled scope under OPS-007/008.
 - Dedicated TSK-023 Implementation Executor requires an exact contract and eligible bound Capability Profile. Author/Custodian cannot implement product changes. No consumer repository access, global npm mutation or release side effects during code implementation.
 - Publication requires observed proof after promotion; repo runner transaction supports Git promotion, not necessarily GitHub Actions dispatch. If the release dispatch capability is unavailable, fail closed with full verified handoff, not an invented published status.
 - All validation evidence, audit disposition and scope authorizations must remain truthful. Do not close TSK-023 merely because versioned files are in main.
 
-## 4. Deployment risks and explicit deferrals
+## 4. V002 validation corrective and release upgrade-boundary preservation
+
+V001's initial TSK-023 executor profile lacked an explicit Claude-as-producer-executor prohibition; a separately committed governance correction satisfied the 15/15 producer-binding/security tests before V002. V002 subsequently changed the six projected release/version/test paths only; package dry-run and git diff check passed, but full regression failed 305/309 with four version-dependent failures. Its installed-cutover synthetic fixture builds its manifest as 1.4.0 after copying the now-1.4.1 package.json, violating exact selfPin verification. The historical TSK-021 legacy-package test still assumes target 1.4.0, while this target is 1.4.1.
+
+A bounded V003 consistency corrective MAY update the seventh test path `test/adopt/cutover.test.js` to obtain the synthetic payload-manifest version from the copied package metadata (without changing strict verification), and may align `test/adopt/package.test.js` with truthful release-specific semantics while retaining 1.4.0's legacy-bridge historical evidence and proving deterministic checks, exact selected source identity, unchanged authority and no product writes. SPC-008 §3 states the bridge from supported pre-1.4.0 releases is a one-time step into **1.4.0** and need not remain directly supported by later versions. No silent assertion that 1.4.1 is the original 1.4.0 bridge or that uncontrolled old-package upgrades are safe is permitted.
+
+Hard bounds: only the seven projected release/version/test paths; no weakening `src/adopt/pin.js`, `src/adopt/upgrade.js`, `src/adopt/migration.js`, or other runtime source. If correct upgrade semantics require changing runtime/product logic, record that blocker and stop rather than adapting the assertions into a false PASS. V003 must preserve V002's valid package/release changes, run focused bootstrap/cutover/packaged-upgrade tests and the full suite, reverify package exact identity and `git diff --check`, and report failure/limitations truthfully.
+
+## 5. Deployment risks and explicit deferrals
 
 The prior producer staged candidate reported `1.4.0:sha256:da37df3d9a26328b6ad1de37f6100a8aae736d219e786e65fc63b6de79bdde98`; Windows globally installed public v1.4.0 reported `1.4.0:sha256:0bf9949b0f45c1b37dc0037bd48d23db0bcee5b6dcd6970592a912643d936b0c`. These distinct identities are not evidence that v1.4.1 fails; only exact verification of the new published payload and consumer-selected pin is acceptable. No silent repin.
 

@@ -429,7 +429,8 @@ test('installed CLI exposes plan/prepare/commit/status/recover; legacy run canno
     }
   };
   await walk(runtime);
-  await writeFile(path.join(runtime, 'payload-manifest.json'), buildManifestBytes({ version: '1.4.0', entries: files }));
+  const { version } = JSON.parse(await readFile(path.join(runtime, 'package.json'), 'utf8'));
+  await writeFile(path.join(runtime, 'payload-manifest.json'), buildManifestBytes({ version, entries: files }));
   const identity = selfPin(runtime);
   const selected = { version: identity.version, payloadRoot: identity.root, expect: identity.expect };
   const c = await makeConsumer();

@@ -479,9 +479,9 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
   assert.equal(lock.name, pkg.name);
   assert.equal(lock.version, pkg.version);
   assert.equal(lock.packages[''].version, pkg.version);
-  assert.equal(pkg.version, '1.4.0');
+  assert.equal(pkg.version, '1.4.1');
   const readme = await readFile(path.join(repoRoot, 'README.md'), 'utf8');
-  assert.match(readme, /\*\*Claude Code adapter 1\.4\.0\*\*/);
+  assert.match(readme, /\*\*Claude Code adapter 1\.4\.1\*\*/);
   assert.match(readme.split('## 1. What is DEV FOUNDRY?')[0], /npm install -g[\s\S]*cd <project>[\s\S]*dev-foundry-claude setup[\s\S]*dev-foundry-claude start/);
   assert.ok(!readme.includes('1.2.0') && !readme.includes('1.2.1'));
   const ignoreText = await readFile(path.join(repoRoot, '.gitignore'), 'utf8');
@@ -492,7 +492,7 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
 // adoption/MCP/run regression tests. Its temporary producer tree is deleted.
 test('TSK-016 package ships only dashboard runtime/assets and pins every dashboard byte', async () => {
   const base = await baseline();
-  assert.equal(base.manifest.version, '1.4.0', 'TSK-021 preserves the TSK-016 dashboard payload contract');
+  assert.equal(base.manifest.version, '1.4.1', 'TSK-021 preserves the TSK-016 dashboard payload contract');
   await assert.rejects(lstat(base.tree), /ENOENT/);
   const files = base.info.files.map((file) => file.path);
   for (const name of ['http', 'evidence', 'claude-otel', 'launch']) assert.ok(files.includes(`tools/dashboard/server/${name}.mjs`));
@@ -739,7 +739,7 @@ test('TSK-020 installed CLI explicitly plans/applies compatible upgrade with exa
 
 test('TSK-021 isolated installed package guides fresh and brownfield setup, status, doctor, help and start recovery', async (t) => {
   const base = await baseline();
-  assert.equal(base.manifest.version, '1.4.0');
+  assert.equal(base.manifest.version, '1.4.1');
   for (const file of ['src/consumer/help.js', 'src/consumer/command.js', 'src/telemetry/launch.js']) assert.ok(base.manifest.files.some((entry) => entry.path === file));
   const fresh = await makeConsumer({ governed: false }); t.after(fresh.cleanup);
   const freshBefore = await listTree(fresh.root);
@@ -749,7 +749,7 @@ test('TSK-021 isolated installed package guides fresh and brownfield setup, stat
   const c = await makeConsumer(); t.after(c.cleanup);
   const invoke = (command, args = [], env = {}) => cli(base.installed, [command, ...args], { cwd: c.root, env });
   for (const topic of ['getting-started', 'setup', 'start', 'status', 'upgrade', 'doctor', 'concepts']) {
-    const help = invoke('help', [topic]); assert.equal(help.status, 0); assert.match(help.stdout, /1\.4\.0/);
+    const help = invoke('help', [topic]); assert.equal(help.status, 0); assert.match(help.stdout, /1\.4\.1/);
   }
   const before = await listTree(c.root); const authority = await readSetSnapshot(c.root);
   const setup = invoke('setup'); assert.equal(setup.status, 0); assert.match(setup.stdout, /setup --yes/);
@@ -798,10 +798,18 @@ test('TSK-021 isolated installed package guides fresh and brownfield setup, stat
   });
 });
 
-test('TSK-021 installed 1.4.0 bridges the exact historical 1.2.2 package', async (t) => {
+test('TSK-023 installed 1.4.1 proves compatible pin upgrades and managed refresh from exact historical 1.2.2 packages', async (t) => {
   const base = await baseline();
+  assert.equal(base.manifest.version, '1.4.1');
+  assert.equal(selfPin(base.installed).expect, base.pin);
+  const material = JSON.parse(await readFile(path.join(base.installed, 'migrations/release.json'), 'utf8'));
+  assert.equal(material.selfUpdateBaseline, '1.4.0');
+  assert.equal(material.targetVersion, '1.4.1');
   for (const version of ['1.2.2', '1.2.2-windows']) await t.test(version, async (t) => {
     const { source: oldPackage } = await legacyPackage(t, version);
+    const oldPin = selfPin(oldPackage).expect;
+    assert.ok(material.legacy.some((recipe) => recipe.source === oldPin));
+    const sourceBefore = await listTree(oldPackage);
     const c = await makeConsumer(); t.after(c.cleanup);
     const oldPlanFile = path.join(await scratch('historical-plan'), 'plan.json');
     const plannedOld = cli(oldPackage, ['adopt', 'plan', '--root', c.root, '--out', oldPlanFile]); assert.equal(plannedOld.status, 0, plannedOld.stderr);
@@ -809,16 +817,65 @@ test('TSK-021 installed 1.4.0 bridges the exact historical 1.2.2 package', async
     assert.equal(setup.status, 0, setup.stderr); c.commit();
     const before = await listTree(c.root); const authority = await readSetSnapshot(c.root);
     const invoke = (args) => cli(base.installed, ['upgrade', ...args], { cwd: c.root });
-    const without = invoke([]); assert.equal(without.status, 2); assert.match(without.stdout, /managed files need to be refreshed/);
+    // SPC-008's one-time legacy bridge targets 1.4.0. This release instead
+    // compares managed bytes, requiring the exact old package only for refresh.
+    const refresh = version === '1.2.2-windows';
+    const without = invoke(['--json']); assert.equal(without.status, refresh ? 2 : 0, without.stderr);
+    const preview = JSON.parse(without.stdout);
+    assert.equal(preview.plan.status, refresh ? 'blocked' : 'ready');
+    assert.equal(preview.applied, null);
+    assert.equal(preview.applicationFilesAffected, 0);
+    assert.equal(preview.plan.upgradeKind, undefined);
+    assert.equal(preview.plan.legacyRecipe, undefined);
+    if (refresh) {
+      assert.ok(preview.plan.blockers.some((blocker) => blocker.code === 'upgrade-migration-required'));
+      assert.deepEqual(preview.plan.merge, []);
+      const wrongSource = invoke(['--from-package', base.installed, '--json']);
+      assert.equal(wrongSource.status, 2, wrongSource.stderr);
+      assert.ok(JSON.parse(wrongSource.stdout).plan.blockers.some((blocker) => blocker.code === 'upgrade-ownership-unverified'));
+      const damagedSource = await copyInstalled({ installed: oldPackage });
+      await bump(path.join(damagedSource, 'README.md'));
+      assert.throws(() => selfPin(damagedSource), /verification failed/);
+      const damaged = invoke(['--from-package', damagedSource, '--json']);
+      assert.equal(damaged.status, 2, damaged.stderr);
+      assert.ok(JSON.parse(damaged.stdout).plan.blockers.some((blocker) => blocker.code === 'upgrade-ownership-unverified'));
+      const agent = '.claude/agents/dev-foundry-executor.md';
+      const original = await c.read(agent);
+      await c.put(agent, original + '\nUnowned edit.\n'); c.commit();
+      const unowned = await listTree(c.root);
+      const collision = invoke(['--from-package', oldPackage, '--json']);
+      assert.equal(collision.status, 2, collision.stderr);
+      assert.ok(JSON.parse(collision.stdout).plan.blockers.some((blocker) => blocker.code === 'upgrade-ownership-unverified'));
+      assert.deepEqual(diffTrees(unowned, await listTree(c.root)), []);
+      await c.put(agent, original); c.commit();
+    } else {
+      assert.deepEqual(preview.plan.blockers, []);
+      assert.deepEqual(preview.plan.merge.map((entry) => entry.path), ['.mcp.json']);
+    }
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
     const planned = invoke(['--from-package', oldPackage, '--json']); assert.equal(planned.status, 0, planned.stderr);
-    const data = JSON.parse(planned.stdout); assert.equal(data.plan.upgradeKind, 'legacy-bridge');
-    assert.equal(data.plan.current.expect, selfPin(oldPackage).expect); assert.equal(data.plan.target.expect, base.pin);
+    const data = JSON.parse(planned.stdout); assert.equal(data.plan.upgradeKind, refresh ? 'managed-refresh' : undefined);
+    assert.equal(data.plan.legacyRecipe, undefined);
+    assert.equal(data.plan.status, 'ready'); assert.equal(data.applied, null); assert.equal(data.applicationFilesAffected, 0);
+    assert.equal(data.plan.current.expect, oldPin); assert.equal(data.plan.target.expect, base.pin);
+    assert.equal(data.plan.currentPackageRoot, refresh ? await realpath(oldPackage) : undefined);
     const changed = version === '1.2.2-windows' ? ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md'] : ['.mcp.json'];
     assert.equal(data.plan.merge.length, changed.length); assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
     const planFile = path.join(await scratch('managed-plan'), 'plan.json');
     const exact = cli(base.installed, ['upgrade', 'plan', '--root', c.root, '--from-package', oldPackage, '--out', planFile]);
     assert.equal(exact.status, 0, exact.stderr);
     const hash = JSON.parse(exact.stdout).planSha256;
+    const bytes = await readFile(planFile);
+    assert.equal(hash, sha256(bytes)); assert.equal(hash, data.planSha256);
+    assert.deepEqual(JSON.parse(bytes), data.plan);
+    assert.deepEqual(data.plan.merge.map((entry) => entry.path), changed);
+    assert.deepEqual(data.plan.create, []); assert.deepEqual(data.plan.delete, []); assert.deepEqual(data.plan.blockers, []);
+    const repeatedFile = path.join(path.dirname(planFile), 'repeated.json');
+    const repeated = cli(base.installed, ['upgrade', 'plan', '--root', c.root, '--from-package', oldPackage, '--out', repeatedFile]);
+    assert.equal(repeated.status, 0, repeated.stderr); assert.equal(JSON.parse(repeated.stdout).planSha256, hash);
+    assert.deepEqual(await readFile(repeatedFile), bytes);
+    const unauthorized = cli(base.installed, ['upgrade', 'apply', '--root', c.root, '--plan', planFile]);
+    assert.equal(unauthorized.status, 2); assert.match(unauthorized.stderr, /apply requires --plan and --plan-sha256/);
     const denied = cli(base.installed, ['upgrade', 'apply', '--root', c.root, '--plan', planFile, '--plan-sha256', '0'.repeat(64)]);
     assert.equal(denied.status, 1); assert.match(denied.stderr, /plan-hash-mismatch/);
     assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
@@ -826,6 +883,8 @@ test('TSK-021 installed 1.4.0 bridges the exact historical 1.2.2 package', async
     assert.equal(applied.status, 0, applied.stderr); assert.deepEqual(JSON.parse(applied.stdout), { written: changed.length, deleted: 0 });
     assert.deepEqual(diffTrees(before, await listTree(c.root)), changed);
     assert.deepEqual(await readSetSnapshot(c.root), authority);
+    assert.equal(JSON.parse(await c.read('.mcp.json')).mcpServers['dev-foundry-governance'].args[2], base.pin);
+    assert.deepEqual(diffTrees(sourceBefore, await listTree(oldPackage)), []);
     c.commit(); assert.equal(JSON.parse(cli(base.installed, ['adopt', 'plan', '--root', c.root]).stdout).status, 'noop');
   });
 });
