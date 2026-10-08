@@ -5,7 +5,7 @@ artifact:
   type: TSK
   title: Correct Governance MCP Resolver Compatibility for Brownfield Consumers
   status: IN_PROGRESS
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: tsk-024-producer-governance-mcp-resolver-compatibility
 ownerRole: governance-author
 canonical: true
@@ -160,3 +160,53 @@ evidence and cleanly separated governance and executor work is the maximal
 outcome of this authorization. Live PagoElectronico role-resolution PASS
 requires its separately authorized consumer reconciliation and exact verified
 release installation; do not claim it as achieved by synthetic tests.
+
+## 7. V001 terminal failure and proportionate V002 corrective (2026-10-08)
+
+The V001 execution `execution_2bf63eb4a46d6aa19aec2e425746b69e799e98db415fb57d9fa419221a8f0383`
+has terminal `VALIDATION_FAILED`; the executor exited 0, its four
+authorized source/test paths passed path policy, targeted resolver/server
+tests were 32/32 PASS, full `npm test` was 320/323 PASS, and
+`git diff --check` was PASS. The full suite's three failures are:
+
+- `test/adopt/state.test.js` asserts that `resolver.js` is byte-identical
+  to HEAD, a TSK-012-style no-resolver-mutation guard no longer valid for
+  this authorized resolver corrective. Preserve the guard-on/off behavior
+  proof and fail-closed behavior instead of suppressing the test.
+- `test/bootstrap/claude-cutover-readiness.test.js` rejects the temporary
+  TSK-024 executor profile because its required producer-maintenance
+  `hosting_purpose` and `execution_provider` facts are missing. Correct
+  the new profile version; retain both assertions and separation controls.
+- The same bootstrap test hardcodes the retired V3 capability ID in the
+  bootstrap text. Assert the actual active POP-bound, routed executor
+  identity instead of a retired particular version; do not substitute a
+  false legacy profile into active authority.
+
+During the executor's own exploratory `npm pack --dry-run` work, a
+`prepack` failure was reported without a proven root cause. The
+`npm test` run nonetheless succeeded at several prepack/build/asset
+subtests. V002 must explicitly run one `npm pack --dry-run --json`
+diagnostic. A reproducible failure is a new finding to diagnose; neither
+a package-build source change nor removal of a prepack safety check is
+preauthorized by this corrective.
+
+This is a directly causal **test/proof projection reconciliation within
+the same TSK-024 objective**, not authorization of an independent
+feature, consumer mutation, publication, or change to DEV FOUNDRY 2.1.0.
+The minimal expanded executor projection adds only:
+
+- `test/adopt/state.test.js`
+- `test/bootstrap/claude-cutover-readiness.test.js`
+
+to the original four source/test paths. The TSK-024 executor profile V2
+corrects the two missing implementation facts and extends the allowed
+six-path projection. The POP and Authority Index select/rout the V2
+profile, while the V1 profile remains non-required history.
+
+V002 MUST preserve the four V001 source/test changes, avoid redoing
+discovery, target precisely the three regression causes, prove relevant
+safety invariants, run focused tests, the full `npm test`, `npm pack
+--dry-run --json` and `git diff --check`. No commit, push, PR, merge,
+package/version bump, release, or consumer changes are authorized for
+the executor. A remaining test failure must be attributed and reported
+rather than masked to satisfy PASS.
