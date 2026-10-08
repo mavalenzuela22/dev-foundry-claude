@@ -186,7 +186,7 @@ test('active POP has exactly the ChatGPT-project producer-maintenance role bindi
         assert.equal(capability.limits.hosting_purpose, 'chatgpt-governed-producer-maintenance', path);
         assert.equal(capability.limits.execution_provider, 'codex-cli', path);
         assert.ok(capability.prohibited_actions.some((action) =>
-          /^invoke_claude_code_as_(?:executor_for_producer_maintenance|producer_executor)$/.test(action)), path);
+          /^invoke_claude_code_as_(?:executor_for_producer_maintenance|producer_(?:implementation_)?executor)$/.test(action)), path);
       }
     }
   }
@@ -293,10 +293,33 @@ test('active ChatGPT-project Platform Bootstrap permits Author, Auditor, and Cus
   ].map((rule) => rule.replace(/\s+/g, ' ').trim());
   const text = rules.join('\n');
   assert.match(text, /Implementation[- ]Executor[^.\n]*(?:separately )?bound[^.\n]*process-bound[- ]runner[- ]code[- ]executor/i);
-  assert.match(text, /DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V3/);
+  const pop = await readYaml(bootstrap.sources.project_operating_profile);
+  const index = await readYaml(bootstrap.sources.authority_index);
+  assertProducerCapabilityIndex(pop, index);
+  const executor = pop.actor_bindings['implementation-executor'];
+  assert.equal(executor.status, 'active');
+  assert.deepEqual(executor.implementation, {
+    kind: 'tool', identity: 'process-bound-runner-code-executor', platform: 'chatgpt-project',
+  });
+  assert.ok(!bootstrap.actor_resolution.eligible_profiles.includes(executor.profile),
+    'Governance implementation must not self-select the Executor');
+  assert.equal(executor.capability_profiles.length, 1);
+  const capabilityPath = executor.capability_profiles[0];
+  const routes = index.bindings.filter((binding) => binding.path === capabilityPath);
+  assert.equal(routes.length, 1);
+  const capability = await readYaml(routes[0].path);
+  assert.match(capability.id, /^DFC-IMPLEMENTATION-EXECUTOR-[A-Z0-9-]+$/,
+    'The active POP-bound, routed capability must identify the producer Executor');
+  assert.equal(capability.status, 'active', capability.id);
+  assert.equal(capability.implementation_class, executor.implementation.identity, capability.id);
+  assert.equal(capability.limits.implementation_identity, executor.implementation.identity, capability.id);
+  assert.equal(capability.limits.platform, bootstrap.platform.id, capability.id);
+  assert.match(text, /Implementation[- ]Executor[^.\n]*separately bound in the POP[^.\n]*through the active (?:task-specific )?Capability Profile/i);
   assert.match(text, /Implementation[- ]Executor[^.\n]*not (?:be )?self-selected|not self-selected[^.\n]*Implementation[- ]Executor/i);
   assert.match(text, /Mechanical[- ]Validator[^.\n]*(?:separately )?bound[^.\n]*process-bound[- ]runner/i);
   assert.match(text, /Claude Code[^.\n]*target runtime[^.\n]*not[^.\n]*active producer platform/i);
+  assert.match(text, /separation-of-duty and independence rules are satisfied/i);
+  assert.match(text, /repository identity authority state and required capability mismatches fail closed/i);
   assert.match(text, /capability (?:does not|never) grants? authority|capabilit[^.\n]*not grant authority|does not grant authority/i);
   for (const clause of rules.flatMap((rule) => rule.split(/[.;]\s+/))) {
     assert.doesNotMatch(clause, /Implementation[- ]Executor\s+(?:is|remains|may be)\s+(?:bound|resolved)[^.]*(?:claude-main-agent|dev-foundry-executor)/i,
