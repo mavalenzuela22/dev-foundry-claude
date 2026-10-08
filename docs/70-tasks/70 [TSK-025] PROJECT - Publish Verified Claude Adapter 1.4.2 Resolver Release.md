@@ -5,7 +5,7 @@ artifact:
   type: TSK
   title: Publish Verified Claude Adapter 1.4.2 Resolver Release
   status: IN_PROGRESS
-artifactVersion: "1"
+artifactVersion: "2"
 authorityScope: tsk-025-verified-adapter-1.4.2-resolver-release
 ownerRole: governance-author
 canonical: true
@@ -13,9 +13,9 @@ scope:
   owns:
     - adapter-patch-release-1.4.2
     - verified-resolver-hotfix-in-release-payload
-    - deterministic-package-identity-proof
+    - adapter-142-deterministic-package-identity-proof
     - main-only-github-release-1.4.2
-    - published-release-assets-verification
+    - adapter-142-published-release-assets-verification
   appliesTo:
     components:
       - claude-adapter-package
