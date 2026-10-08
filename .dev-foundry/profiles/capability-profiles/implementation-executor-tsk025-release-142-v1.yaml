@@ -1,0 +1,61 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-IMPLEMENTATION-EXECUTOR-TSK025-RELEASE-142-V1
+status: active
+implementation_class: process-bound-runner-code-executor
+supported_actions:
+  - inspect_versioned_adapter_release_source
+  - implement_bounded_patch_version_and_directly_related_fixture_updates
+  - run_focused_and_full_tests
+  - run_package_and_asset_identity_verification_without_publication
+  - preserve_source_tarball_alias_and_checksums_deterministically
+  - report_exact_path_and_package_integrity_evidence
+prohibited_actions:
+  - mutate_project_or_methodology_authority
+  - mutate_consumer_repositories_or_globals
+  - change_product_resolver_or_adopt_runtime
+  - weaken_exact_self_pin_or_integrity_checks
+  - modify_immutable_framework_release
+  - create_release_tag_or_dispatch_workflow
+  - commit_push_merge_or_create_pull_request
+  - change_existing_release_assets
+  - invoke_claude_code_as_producer_implementation_executor
+  - modify_unlisted_files
+limits:
+  repository: dev-foundry-claude
+  platform: chatgpt-project
+  hosting_purpose: chatgpt-governed-producer-maintenance
+  execution_provider: codex-cli
+  implementation_identity: process-bound-runner-code-executor
+  task_id: TSK-025
+  target_version: "1.4.2"
+  original_version: "1.4.1"
+  primary_objectives: 1
+  open_architectural_decisions: 0
+  mutation_surface:
+    - package.json
+    - package-lock.json
+    - migrations/release.json
+    - README.md
+    - test/adopt/package.test.js
+    - test/adopt/release-assets.test.js
+    - test/adopt/cutover.test.js
+  consumer_mutation: false
+  publication: false
+proof_capabilities:
+  - focused_installed_package_and_migration_tests
+  - full_npm_test
+  - npm_pack_dry_run_json
+  - versioned_release_asset_build
+  - isolated_unpacked_self_pin_verification
+  - git_diff_check
+environment_constraints:
+  - exact_runner_execution_contract_required
+  - process_bound_repository_is_dev_foundry_claude
+  - no_release_publication_or_global_package_mutation
+stop_conditions:
+  - required_change_outside_seven_explicit_paths
+  - package_integrity_or_test_failure
+  - unknown_old_version_to_new_version_migration_semantics
+  - product_source_or_release_workflow_change_needed
+  - governance_or_package_identity_mismatch
+portability: project-specific

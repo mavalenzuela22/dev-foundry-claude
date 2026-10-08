@@ -5,7 +5,7 @@ request into unrelated changes, or call work finished before it has been checked
 DEV FOUNDRY keeps project decisions, work limits and required checks in the
 repository so each session can pick up from the same agreed starting point.
 
-The **Claude Code adapter 1.4.1**, `dev-foundry-claude`, connects those project
+The **Claude Code adapter 1.4.2**, `dev-foundry-claude`, connects those project
 rules to Claude and provides guided setup, launch, diagnostics and upgrades.
 
 ## 60-second Quick Start
@@ -181,7 +181,7 @@ exact identity without changing project files. A target requiring semantic
 reconciliation routes `upgrade` to your currently governed Claude session;
 CLI code cannot make those project decisions. There are no background updates.
 
-## Upgrading to adapter 1.4.1
+## Upgrading to adapter 1.4.2
 
 Installing a release changes the tool on your machine. `upgrade` separately
 moves a configured project's selection to that installed tool. Review its
@@ -199,14 +199,14 @@ node /path/to/isolated-target/node_modules/@dev-foundry/claude-adapter/bin/dev-f
 
 `latest` is an acquisition alias: it downloads the current public release. It
 does not automatically change a project's exact adapter selection. The behavior
-described here is the 1.4.1 implementation; use installed help for your version.
+described here is the 1.4.2 implementation; use installed help for your version.
 
 ### Read the preview
 
 A **compatible upgrade** updates only the project's adapter runtime selection in
 `.mcp.json` when existing managed files already match the target templates.
 
-A **managed refresh** in 1.4.1 also deterministically updates verified
+A **managed refresh** in 1.4.2 also deterministically updates verified
 DEV FOUNDRY-owned agent files and the marked `CLAUDE.md` block when their target
 bytes differ. The preview names the managed paths and reports application files
 affected. It preserves content outside the managed block and other MCP entries.

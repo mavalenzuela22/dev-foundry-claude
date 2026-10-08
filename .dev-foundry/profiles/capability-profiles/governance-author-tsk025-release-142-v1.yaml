@@ -1,0 +1,53 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-GOVERNANCE-AUTHOR-TSK025-RELEASE-142-V1
+status: active
+implementation_class: operator-assisted-dev-foundry-copilot
+supported_actions:
+  - author_bounded_tsk025_adapter_release_governance
+  - prepare_tsk025_executor_and_evidence_contracts
+  - reconcile_exact_release_version_file_projection
+  - evaluate_test_package_integrity_and_audit_requirements
+  - authorize_runner_governed_commit_push_pr_merge_reconciliation_cleanup
+  - authorize_main_only_verified_release_workflow_dispatch_after_gates
+  - verify_published_release_assets_without_consumer_mutation
+  - author_release_disposition_and_closure_with_confirmed_evidence
+prohibited_actions:
+  - implement_package_version_or_product_code_as_governance_author
+  - mutate_real_consumer_repository
+  - change_immutable_framework_release
+  - rewrite_or_delete_existing_releases_or_tags
+  - publish_from_nonmain_branch
+  - publish_without_exact_verified_main_release_candidate
+  - bypass_required_independent_audit
+  - modify_unrelated_runtime_code
+  - claim_published_release_without_verified_provider_evidence
+  - force_push
+limits:
+  repository: dev-foundry-claude
+  task_id: TSK-025
+  release_version: "1.4.2"
+  from_version: "1.4.1"
+  target_branch: main
+  release_entrypoint: .github/workflows/release.yml
+  consumer_mutation: false
+  allowed_promotion: governed_verified_candidate_only
+proof_capabilities:
+  - producer_current_authority_and_release_source_reobservation
+  - test_and_deterministic_packaged_asset_evidence
+  - exact_commit_release_identity_and_integrity_verification
+  - audit_trigger_self_assessment
+  - runner_bound_git_transaction_verification
+  - release_workflow_and_assets_observation_when_capable
+environment_constraints:
+  - process_bound_repository_is_dev_foundry_claude
+  - no_consumer_work
+  - release_publication_only_after_all_gates
+  - release_dispatch_must_use_authenticated_permitted_capability
+stop_conditions:
+  - active_role_or_task_binding_missing
+  - unexpected_git_or_release_identity_state
+  - previous_version_tag_collision
+  - validation_audit_or_integrity_gate_failed
+  - provider_workflow_dispatch_or_asset_verification_unavailable
+  - scope_expansion
+portability: project-specific
