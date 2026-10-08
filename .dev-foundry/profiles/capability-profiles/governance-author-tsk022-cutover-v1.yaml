@@ -8,6 +8,7 @@ supported_actions:
   - prepare_bounded_implementation_and_validation_handoffs
   - inspect_producer_cutover_and_failure_references
   - reconcile_validation_and_material_scope
+  - author_tsk022_producer_closure_and_consumer_acceptance_handoff
 prohibited_actions:
   - act_as_consumer_governance_or_mutate_consumer_repository
   - implement_product_as_governance_author
@@ -19,15 +20,17 @@ prohibited_actions:
 limits:
   repository: dev-foundry-claude
   task_id: TSK-022
-  source_branch: task/tsk-022-safe-governed-consumer-cutover
-  baseline_head: 366e03510f13c6191ef845d52a2b38e3dae045ac
+  source_branch: task/tsk-022-producer-closure-before-release
+  baseline_head: b411e89fa83642ea0a274c03d84f7f9ba4dccd9e
   operator_implementation_authorization: explicit_2026-10-07_tsk022_cutover_product_and_tests
+  operator_closure_authorization: explicit_2026-10-07_producer_closure_before_release
   product_implementation: requires_existing_runner_v3_executor_and_exact_validated_contract
   allowed_authoring_surface:
     - docs/70-tasks/70 [TSK-022] PROJECT - Implement Recoverable Governed Consumer Authority Cutover.md
     - .dev-foundry/authority-index.yaml
     - .dev-foundry/profiles/project-operating-profile.yaml
     - .dev-foundry/profiles/capability-profiles/governance-author-tsk022-cutover-v1.yaml
+    - docs/70-tasks/70 [TSK-022-CLOSURE] PROJECT - Implement Recoverable Governed Consumer Authority Cutover Closure.md
 proof_capabilities:
   - producer_repository_bound_read_only_inspection
   - four_path_authority_change_manifest

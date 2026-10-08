@@ -4,8 +4,8 @@ artifact:
   id: TSK-022
   type: TSK
   title: Implement Recoverable Governed Consumer Authority Cutover
-  status: IN_PROGRESS
-artifactVersion: "1"
+  status: CLOSED
+artifactVersion: "3"
 authorityScope: tsk-022-recoverable-governed-consumer-authority-cutover
 ownerRole: governance-author
 canonical: true
@@ -14,7 +14,7 @@ scope:
     - verified-consumer-authority-cutover-plan
     - staged-and-recoverable-claude-activation
     - fail-closed-partial-authority-recovery
-    - consumer-cutover-migration-acceptance
+    - producer-cutover-mechanics-acceptance
   appliesTo:
     components:
       - claude-adapter-cli
@@ -45,8 +45,10 @@ authority:
 traceability:
   derivedFrom:
     - TSK-021
+  closureArtifact: TSK-022-CLOSURE
 lifecycle:
-  phase: in-progress
+  phase: closed
+  closureArtifact: TSK-022-CLOSURE
   blockedBy: []
   promotionRequired: true
 portability: project-specific
@@ -79,8 +81,17 @@ Operator-reported PagoElectronico TSK-041: V058 PASS preparation, V059 FAIL when
 
 Potential files: src/adopt/{cutover,activation,plan,apply,common}.js, src/consumer/{command,help}.js, bin/dev-foundry-claude.js, src/governance-mcp/session.js and focused tests under test/adopt/**. The executor must independently assess minimal necessity and declare exact paths before mutation. No new dependency, package version change or unrelated dashboard/framework mutation unless re-governed.
 
-Mechanical acceptance includes a prepared foreign-runtime fixture, successful complete cutover, no-auth/no-write refusal, exact SHA and stale plan checks, fault injection at staging and activation boundaries, persistent recovery or rollback, unchanged foreign authority before commit, Windows newline/path behavior, rejection of partial state and verified complete target, unaffected consumer product and historical evidence, correct fresh-session behavior, relevant package tests, full regression and git diff --check. A test double is not a substitute for later real PagoElectronico acceptance.
+Mechanical acceptance includes a prepared foreign-runtime fixture, successful complete cutover, no-auth/no-write refusal, exact SHA and stale plan checks, fault injection at staging and activation boundaries, persistent recovery or rollback, unchanged foreign authority before commit, Windows newline/path behavior, rejection of partial state and verified complete target, unaffected consumer product and historical evidence, correct fresh-session behavior, relevant package tests, full regression and git diff --check. The synthetic producer fixture proves producer cutover mechanics only; the real PagoElectronico acceptance remains a separately governed TSK-041 consumer acceptance gate, not a producer TSK-022 terminal prerequisite.
 
 ## 5. Gates and exclusions
 
-The active Governance Author authors only authority and handoff. Product implementation requires a separately selected implementation-executor bound to the runner v3 capability and a validated exact execution contract. Validation PASS, independent audit if triggered, commit, push, PR, merge, release, consumer activation, and terminal closure remain distinct. This operation authorizes only producer governance authoring, exact bounded implementation and local tests, **not** promotion or release. The separate 1.4.0 public artifact mismatch (Pago candidate da37df3d vs public 0bf9949b) remains a deployment gate and must be reconciled independently.
+The active Governance Author authors only authority and handoff. Product implementation requires a separately selected implementation-executor bound to the runner v3 capability and a validated exact execution contract. Validation PASS, independent audit if triggered, commit, push, PR, merge, release, consumer activation, and terminal closure remain distinct. That initial implementation operation did not authorize promotion or release; the Operator separately authorized and completed TSK-022 promotion on 2026-10-07 through PR #44. The Operator subsequently explicitly authorized the producer-only TSK-022 closure before a separately governed new-version release. **This authorization does not permit real-consumer mutation or release publication as a side effect of closure.** The separate 1.4.0 public artifact mismatch (Pago candidate da37df3d vs public 0bf9949b) remains a deployment gate and must be reconciled independently.
+
+## 6. Producer closure versus downstream release and Pago acceptance
+
+The Operator on 2026-10-07 explicitly resolved the dependency cycle by assigning TSK-022 terminal acceptance to the **implemented and promoted producer cutover mechanics** only. The cutover product implementation is validated by the independently inspectable TSK-022 V002 309/309 mechanical PASS, governed evidence envelope `tsk022-promotion-v002`, PR #44, integration/reconciliation/cleanup and clean producer main `b411e89fa83642ea0a274c03d84f7f9ba4dccd9e`. No actual Pago consumer cutover or package publication is asserted by these facts.
+
+A subsequent separately governed adapter release (new identity, not 1.4.0 overwrite) will distribute this promoted producer implementation. Release reproducibility, exact tarball/payload identity, GitHub asset publication, fresh installed-target verification and the known global/staged 1.4.0 identity discrepancy are **release gates**, not completed producer-cutover mechanics. A future PagoElectronico TSK-041 execution separately governs authorization, staged consumer conversion, live acceptance, startup and preservation of read-only external Windows runner observation. These are not waived and cannot be silently represented as PASS in this closure.
+
+The source implementation proof and applicable promotion/audit dispositions remain bound to the TSK-022 lineage; any later defect discovered during real consumer dogfooding requires a new bounded corrective rather than retroactively changing this closure.
+
