@@ -12,7 +12,7 @@ Then:
   dev-foundry-claude setup --yes
   dev-foundry-claude start
 setup inspects first and tells you the next step. Use setup --yes only after reviewing its managed-file plan. Your application code is not changed.
-Commands: setup, start, status, upgrade, doctor, help.
+Commands: setup, start, status, upgrade, doctor, cutover, help.
 Next: dev-foundry-claude setup
 Three paths: no DEV FOUNDRY -> setup preview -> setup --yes -> start. Legacy pre-1.4.0 -> one-time verified bridge -> 1.4.0 -> start. 1.4.0+ governance migration -> current governed Claude session -> target cutover -> mandatory fresh start.
 Advanced commands: adopt, upgrade status/plan/apply, migration, mcp, run, dashboard, --version.`,
@@ -21,7 +21,7 @@ Inspect the project before preparing Claude integration. Without --yes or --appl
 Preparation adds only DEV FOUNDRY-managed agents, a marked CLAUDE.md block, an MCP runtime pin and a local telemetry ignore rule. Application code is not changed.
 With no existing governance, preview the project name, greenfield/brownfield classification, human Operator, selected DEV FOUNDRY 2.1.0 and exact configured paths. Defaults come from repository files, the directory name and repository-local Git user.name. Supply explicit flags when a choice is missing. setup --yes (or --apply) confirms initial adoption and creates the minimum authority plus active Claude integration. The initial task observes a verified baseline; brownfield product work waits for that baseline. Existing incomplete authority is refused for review.
 The immutable framework is carried by the installed package; no producer checkout or network lookup is needed. Replanning successful setup makes no further changes.
-A prepared project still needs its owner to approve Claude activation through the project's existing decision process. Ask the owner to review the activation proposal from setup --json, authorize the switch from the current assistant, and apply it through that process. setup never applies that proposal.
+A prepared project still needs its owner to approve Claude activation through the project's existing decision process. Review dev-foundry-claude cutover plan, authorize its exact hash under consumer authority, then use cutover prepare and commit. setup never applies that proposal.
 After activation: dev-foundry-claude status
 When ready: dev-foundry-claude start
 Advanced proposal export: dev-foundry-claude adopt plan --root <project> --out <file-outside-project>`,
@@ -56,9 +56,24 @@ Your project's approved rules are authority. This help is explanatory product co
 Advanced vocabulary: POP = Project Operating Profile; Authority Index = routes to approved documents; Actor Profile = role responsibilities; Capability Profile = implementation limits; TSK = task; MTP = bounded material plan. These records are managed through the project's decision process, not required as manual steps for routine adapter commands.
 Next: dev-foundry-claude setup`,
 });
+// Explicit CLI guidance; the established MCP help catalog remains seven resources.
+const cutoverHelp = `Usage: dev-foundry-claude cutover plan|status|prepare|commit|recover [--root <project>] [--json]
+Switch an existing governed project from its current runner to Claude. Application files affected: 0.
+First prepare ordinary adapter integration with setup and record those changes through the project's decision process. Keep the current runner active.
+1. cutover plan --out <file-outside-project> produces a read-only exact source/target plan and SHA-256. Review every authority diff, branch/HEAD, current bootstrap, profiles and runtime identity.
+2. The consumer's governed process must approve this exact candidate, close or hand off source work, resolve choices and establish validation/audit disposition. Package installation, MCP selection, setup --yes and upgrade --yes do not authorize this switch.
+3. cutover prepare --plan <file> --plan-sha256 <hash> --authorization <approval-json> stages inert bytes in .dfc-cutover outside configured authority.
+4. cutover commit --plan-sha256 <hash> --authorization <approval-json> rechecks the full set, blocks startup and promotes independent paths with the POP activated last.
+5. Start a fresh session: dev-foundry-claude start. Old Claude/MCP sessions cannot continue governed work.
+Approval JSON format: dev-foundry.cutover-authorization.v1. Required fields: project, operator (exact POP human identity), planSha256, sourceHead, sourceBranch, targetExpect, actorBindings, bootstrap and allowedPaths (exact plan target/manifest); operatorApproved, governedApproval and decisionsResolved must be true; sourceWorkDisposition is closed or handed-off. task is {path, sha256} for the routed IN_PROGRESS consumer TSK; validation is {status: PASS, path, sha256}; audit is {status: PASS, path, sha256} or {status: not-required, reason}. These are explicit consumer attestations and hash-bound evidence, not approvals created by the adapter.
+Interrupted operation: cutover status is read-only JSON. Use cutover recover --outcome source|target --plan-sha256 <hash> --authorization <approval-json>. Recovery verifies journal, package, branch/HEAD, authority and evidence; its selected direction is durable and repeatable. Unknown or modified data stays blocked. A failed recovery is never readiness.
+This is a recoverable logical transition, not filesystem-wide atomicity. The inactive POP protects gaps between renames. Runtime journal, staged bytes and backups are retained; do not edit/delete them or commit them as authority. Directory durability depends on filesystem support, particularly on Windows. An external Windows runner may observe read-only and has no active ChatGPT role after success.
+The exact installed payload must equal the existing consumer MCP pin; cutover never repins or hides differing builds. After rollback, the foreign runner is complete and Claude remains prepared; fresh Claude startup waits for a successful authorized cutover.
+Next: dev-foundry-claude cutover plan`;
+
 export const helpUri = (topic) => `dev-foundry://help/${topic}`;
 export function renderHelp(topic = 'getting-started') {
   const key = topic === 'governance' ? 'concepts' : topic;
-  if (!Object.hasOwn(helpTopics, key)) throw new Error(`Unknown help topic. Choose: ${Object.keys(helpTopics).join(', ')}. Next: dev-foundry-claude help`);
-  return `dev-foundry-claude ${helpVersion} — ${key}\n\n${helpTopics[key]}\n`;
+  if (key !== 'cutover' && !Object.hasOwn(helpTopics, key)) throw new Error(`Unknown help topic. Choose: ${[...Object.keys(helpTopics), 'cutover'].join(', ')}. Next: dev-foundry-claude help`);
+  return `dev-foundry-claude ${helpVersion} — ${key}\n\n${key === 'cutover' ? cutoverHelp : helpTopics[key]}\n`;
 }

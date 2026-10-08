@@ -27,6 +27,53 @@ if (!command || ['setup', 'start', 'status', 'doctor', 'help', '--help'].include
   const { consumerCommand } = await import('../src/consumer/command.js');
   try { process.exitCode = await consumerCommand({ command: !command || command === '--help' ? 'help' : command, argv: rest, packageRoot }); }
   catch (error) { fail(`The operation could not complete safely. No application files were changed. ${error.exitCode === 2 ? error.message : `Next: dev-foundry-claude doctor. Use --verbose for technical diagnostics.${rest.includes('--verbose') ? ` Detail: ${error.code ?? error.message}` : ''}`}`, error.exitCode ?? 1); }
+} else if (command === 'cutover') {
+  const [action = 'help', ...args] = rest;
+  if (action === 'help') {
+    if (args.length) fail('Usage: dev-foundry-claude help cutover', 2);
+    const { renderHelp } = await import('../src/consumer/help.js');
+    process.stdout.write(renderHelp('cutover'));
+  } else {
+    if (!['plan', 'status', 'prepare', 'commit', 'recover'].includes(action)) fail('Next: dev-foundry-claude help cutover', 2);
+    const allowed = { '--root': 'value', '--json': 'boolean',
+      ...(action === 'plan' ? { '--out': 'value' } : {}),
+      ...(['prepare', 'commit', 'recover'].includes(action) ? { '--plan-sha256': 'value', '--authorization': 'value' } : {}),
+      ...(action === 'prepare' ? { '--plan': 'value' } : {}),
+      ...(action === 'recover' ? { '--outcome': 'value' } : {}) };
+    if (new Set(args.filter((value) => value.startsWith('--'))).size !== args.filter((value) => value.startsWith('--')).length) fail('Duplicate cutover option.', 2);
+    const options = flags(args, allowed);
+    const root = path.resolve(options['--root'] ?? process.cwd());
+    const api = await import('../src/adopt/cutover.js');
+    try {
+      if (action === 'status') {
+        const result = await api.diagnoseCutover({ root, packageRoot });
+        console.log(JSON.stringify(result, null, 2));
+        process.exitCode = result.blocked ? 2 : 0;
+      } else if (action === 'plan') {
+        const result = await api.createCutoverPlan({ root, packageRoot });
+        if (options['--out']) {
+          const out = path.resolve(options['--out']);
+          const destination = path.join(realpathSync(path.dirname(out)), path.basename(out));
+          const relative = path.relative(realpathSync(root), destination);
+          if (relative === '' || (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative))) fail('--out must be outside the consumer repository.', 2);
+          writeFileSync(out, result.bytes, { flag: 'wx' });
+          console.log(JSON.stringify({ status: result.plan.status, planSha256: result.hash, productFilesAffected: 0, blockers: result.plan.blockers }));
+        } else { process.stdout.write(result.bytes); console.error('plan-sha256: ' + result.hash); }
+        process.exitCode = result.plan.status === 'ready' ? 0 : 2;
+      } else {
+        if (!options['--authorization'] || !options['--plan-sha256'] || (action === 'prepare' && !options['--plan']) ||
+            (action === 'recover' && !['source', 'target'].includes(options['--outcome']))) fail('Exact plan hash, authorization and explicit recovery choice are required. Next: dev-foundry-claude help cutover', 2);
+        const input = { root, packageRoot, planSha256: options['--plan-sha256'],
+          authorization: JSON.parse(readFileSync(path.resolve(options['--authorization']), 'utf8')) };
+        const result = action === 'prepare' ? await api.prepareCutover({ ...input, planBytes: readFileSync(path.resolve(options['--plan'])) }) :
+          action === 'commit' ? await api.commitCutover(input) : await api.recoverCutover({ ...input, outcome: options['--outcome'] });
+        console.log(JSON.stringify(result, null, 2));
+      }
+    } catch (error) {
+      console.error(JSON.stringify({ status: 'blocked', code: error.code ?? 'cutover-invalid', message: error.message, nextAction: 'dev-foundry-claude help cutover' }));
+      process.exitCode = 2;
+    }
+  }
 } else if (command === 'migration') {
   if (rest.length) fail('Usage: dev-foundry-claude migration', 2);
   const { inspectMigrationRelease } = await import('../src/adopt/migration.js');
@@ -49,6 +96,8 @@ if (!command || ['setup', 'start', 'status', 'doctor', 'help', '--help'].include
   const top = spawnSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' });
   if (top.status !== 0) fail('The current directory is not inside a git repository.');
   const root = top.stdout.trim();
+  const { cutoverState } = await import('../src/adopt/common.js');
+  if ((await cutoverState(root)).blocked) fail('Authority cutover needs explicit recovery. Next: dev-foundry-claude help cutover');
   let expect;
   try {
     readFileSync(path.join(root, '.dev-foundry/profiles/project-operating-profile.yaml'));

@@ -45,6 +45,36 @@ async function assertAbsent(path) {
     `${path} must remain absent in the Claude-native topology`);
 }
 
+function assertProducerCapabilityIndex(pop, index) {
+  const activePaths = Object.values(pop.actor_bindings)
+    .filter((binding) => binding.status === 'active')
+    .flatMap((binding) => binding.capability_profiles);
+  const active = new Set(activePaths);
+  assert.equal(active.size, activePaths.length, 'Active producer capabilities must not be duplicated');
+  for (const path of [historicalClaudePath, claudePath, auditorPath]) {
+    assert.ok(!active.has(path), `Claude consumer capability must not be bound to the producer: ${path}`);
+  }
+  for (const path of active) {
+    const bindings = index.bindings.filter((binding) => binding.path === path);
+    assert.equal(bindings.length, 1, `Expected exactly one active capability binding: ${path}`);
+    assert.equal(bindings[0].kind, 'capability-profile', path);
+    assert.equal(bindings[0].authority_class, 'configured', path);
+    assert.equal(bindings[0].required, true, `Active producer capability must be required: ${path}`);
+  }
+  for (const binding of index.bindings.filter((entry) => entry.kind === 'capability-profile')) {
+    assert.equal(binding.required, active.has(binding.path),
+      `Only active POP capabilities may be required: ${binding.path}`);
+  }
+  for (const path of [runnerV1Path, runnerPath, runnerV3Path, historicalClaudePath, claudePath, auditorPath]) {
+    const bindings = index.bindings.filter((binding) => binding.path === path);
+    assert.equal(bindings.length, 1, `Expected exactly one historical/consumer capability binding: ${path}`);
+    assert.equal(bindings[0].kind, 'capability-profile', path);
+    assert.equal(bindings[0].authority_class, 'configured', path);
+    assert.equal(bindings[0].required, false, path);
+    assert.ok(!active.has(path), `Historical/consumer capability must remain unbound: ${path}`);
+  }
+}
+
 test('cutover prerequisites TSK-002, TSK-003, and TSK-004 are COMPLETE', async () => {
   const index = await readYaml('.dev-foundry/authority-index.yaml');
   for (const id of ['TSK-002', 'TSK-003', 'TSK-004']) {
@@ -126,40 +156,79 @@ test('active POP has exactly the ChatGPT-project producer-maintenance role bindi
     status: 'active',
   });
   const expected = [
-    ['governance-author', 'governance-author-v3', 'agent', 'operator-assisted-dev-foundry-copilot', []],
-    ['governance-auditor', 'governance-auditor-v2', 'agent', 'operator-assisted-dev-foundry-copilot', []],
-    ['evidence-custodian', 'evidence-custodian-v1', 'agent', 'operator-assisted-dev-foundry-copilot', []],
-    ['implementation-executor', 'implementation-executor-v2', 'tool', 'process-bound-runner-code-executor', [runnerV3Path]],
-    ['mechanical-validator', 'mechanical-validator-v2', 'tool', 'process-bound-runner', []],
+    ['governance-author', 'governance-author-v3', 'agent', 'operator-assisted-dev-foundry-copilot'],
+    ['governance-auditor', 'governance-auditor-v2', 'agent', 'operator-assisted-dev-foundry-copilot'],
+    ['evidence-custodian', 'evidence-custodian-v1', 'agent', 'operator-assisted-dev-foundry-copilot'],
+    ['implementation-executor', 'implementation-executor-v2', 'tool', 'process-bound-runner-code-executor'],
+    ['mechanical-validator', 'mechanical-validator-v2', 'tool', 'process-bound-runner'],
   ];
   assert.deepEqual(Object.keys(pop.actor_bindings).sort(), expected.map(([role]) => role).sort());
-  for (const [role, profile, kind, identity, capabilities] of expected) {
+  for (const [role, profile, kind, identity] of expected) {
     const binding = pop.actor_bindings[role];
     assert.equal(binding.status, 'active', role);
     assert.equal(binding.profile, `.dev-foundry/releases/2.1.0/actor-profiles/${profile}.yaml`, role);
     assert.deepEqual(binding.implementation, { kind, identity, platform: 'chatgpt-project' }, role);
-    assert.deepEqual(binding.capability_profiles, capabilities, role);
+    assert.ok(Array.isArray(binding.capability_profiles), role);
+    if (role === 'governance-author') {
+      assert.ok(binding.capability_profiles.length > 0, 'Author must retain governed capabilities');
+    } else if (role === 'implementation-executor') {
+      assert.equal(binding.capability_profiles.length, 1, 'Producer must have exactly one bound executor capability');
+    } else {
+      assert.deepEqual(binding.capability_profiles, [], role);
+    }
+    for (const path of binding.capability_profiles) {
+      assert.ok(path.startsWith('.dev-foundry/profiles/capability-profiles/'), path);
+      const capability = await readYaml(path);
+      assert.equal(capability.status, 'active', path);
+      assert.equal(capability.implementation_class, identity, path);
+      assert.equal(capability.limits.repository, 'dev-foundry-claude', path);
+      if (role === 'implementation-executor') {
+        assert.equal(capability.limits.hosting_purpose, 'chatgpt-governed-producer-maintenance', path);
+        assert.equal(capability.limits.execution_provider, 'codex-cli', path);
+        assert.ok(capability.prohibited_actions.some((action) =>
+          /^invoke_claude_code_as_(?:executor_for_producer_maintenance|producer_executor)$/.test(action)), path);
+      }
+    }
   }
-  for (const binding of Object.values(pop.actor_bindings)) {
-    assert.equal(binding.implementation.platform, 'chatgpt-project');
-  }
+  assertProducerCapabilityIndex(pop, await readYaml('.dev-foundry/authority-index.yaml'));
 });
 
-test('Authority Index requires only runner V3 and retains runner V1/V2 and Claude profiles as non-required', async () => {
+test('Authority Index requires exactly the active POP capabilities and retains historical/consumer profiles as non-required', async () => {
+  const pop = await readYaml('.dev-foundry/profiles/project-operating-profile.yaml');
   const index = await readYaml('.dev-foundry/authority-index.yaml');
-  for (const [path, required] of [
-    [runnerV1Path, false],
-    [runnerPath, false],
-    [runnerV3Path, true],
-    [historicalClaudePath, false],
-    [claudePath, false],
-    [auditorPath, false],
-  ]) {
-    const bindings = index.bindings.filter((binding) => binding.path === path);
-    assert.equal(bindings.length, 1, `Expected exactly one capability binding: ${path}`);
-    assert.equal(bindings[0].kind, 'capability-profile', path);
-    assert.equal(bindings[0].authority_class, 'configured', path);
-    assert.equal(bindings[0].required, required, path);
+  assertProducerCapabilityIndex(pop, index);
+});
+
+test('producer capability checks reject missing, duplicate, non-required, and unbound required profiles', async () => {
+  const pop = await readYaml('.dev-foundry/profiles/project-operating-profile.yaml');
+  const index = await readYaml('.dev-foundry/authority-index.yaml');
+  assertProducerCapabilityIndex(pop, index);
+  for (const binding of index.bindings.filter((entry) => entry.kind === 'capability-profile')) {
+    if (binding.required) {
+      const missing = structuredClone(index);
+      missing.bindings = missing.bindings.filter((entry) => entry.path !== binding.path);
+      assert.throws(() => assertProducerCapabilityIndex(pop, missing),
+        /Expected exactly one active capability binding/, `Missing: ${binding.path}`);
+      const duplicate = structuredClone(index);
+      duplicate.bindings.push(structuredClone(binding));
+      assert.throws(() => assertProducerCapabilityIndex(pop, duplicate),
+        /Expected exactly one active capability binding/, `Duplicate: ${binding.path}`);
+      const nonRequired = structuredClone(index);
+      nonRequired.bindings.find((entry) => entry.path === binding.path).required = false;
+      assert.throws(() => assertProducerCapabilityIndex(pop, nonRequired),
+        /Active producer capability must be required/, `Non-required: ${binding.path}`);
+    } else {
+      const unboundRequired = structuredClone(index);
+      unboundRequired.bindings.find((entry) => entry.path === binding.path).required = true;
+      assert.throws(() => assertProducerCapabilityIndex(pop, unboundRequired),
+        /Only active POP capabilities may be required/, `Unbound required: ${binding.path}`);
+    }
+  }
+  for (const path of [historicalClaudePath, claudePath, auditorPath]) {
+    const claudeBound = structuredClone(pop);
+    claudeBound.actor_bindings['implementation-executor'].capability_profiles = [path];
+    assert.throws(() => assertProducerCapabilityIndex(claudeBound, index),
+      /Claude consumer capability must not be bound to the producer/, path);
   }
 });
 

@@ -5,7 +5,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { evaluateActivation } from './activation.js';
 import {
   AGENT_PATHS, BOOTSTRAP_KEY, BOOTSTRAP_PATH, CLAUDE_MD, IGNORE_FILE, INDEX_PATH, MCP_FILE, MCP_SERVER_NAME, POP_PATH,
-  PROFILE_PATHS, isObject, parseYamlStrict, pathHasSymlink, readContained,
+  PROFILE_PATHS, cutoverState, isObject, parseYamlStrict, pathHasSymlink, readContained,
 } from './common.js';
 import { buildCutoverProposal } from './cutover.js';
 import { makeUnifiedDiff } from './diff.js';
@@ -60,6 +60,10 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
     const bytes = Buffer.from(canonicalJson(plan), 'utf8');
     return { plan, bytes, hash: sha256(bytes), ops };
   };
+  if (facts.root && (await cutoverState(facts.root)).blocked) {
+    plan.blockers.push(blocker('cutover-in-flight', 'Authority cutover needs explicit recovery. Next: dev-foundry-claude help cutover'));
+    return finish();
+  }
   if (!facts.governed && initialBootstrap && !remove) return createBootstrapPlan({ facts, adapter, project, classification, operator });
   if (!facts.governed) {
     if (!facts.blockers.length || facts.root !== null) plan.status = 'not-governed';
