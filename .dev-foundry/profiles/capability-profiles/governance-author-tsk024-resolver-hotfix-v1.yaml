@@ -1,0 +1,45 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-GOVERNANCE-AUTHOR-TSK024-RESOLVER-HOTFIX-V1
+status: active
+implementation_class: operator-assisted-dev-foundry-copilot
+supported_actions:
+  - author_bounded_tsk024_producer_resolver_corrective
+  - reconcile_tsk024_authority_and_execution_contract
+  - evaluate_implementation_fit_and_audit_triggers
+  - request_runner_bound_execution_and_validation
+  - review_and_reconcile_tsk024_projection_evidence
+  - record_bounded_hotfix_disposition_without_release
+prohibited_actions:
+  - mutate_consumer_repository
+  - claim_real_consumer_success_without_consumer_evidence
+  - modify_immutable_framework_release
+  - modify_product_implementation_as_governance_author
+  - bypass_independent_audit_if_triggered
+  - publish_or_promote_adapter_release
+  - rewrite_existing_release_tags_or_assets
+  - authorize_unbounded_executor_scope
+limits:
+  repository: dev-foundry-claude
+  task_id: TSK-024
+  bounded_objective: governance_mcp_resolver_compatibility_hotfix
+  baseline_release: "1.4.1"
+  target_release: "1.4.2"
+  publication: forbidden_without_separate_verified_gates
+  consumer_mutation: false
+proof_capabilities:
+  - producer_authority_reobservation
+  - task_scoped_executable_contract_authoring
+  - exact_implementation_surface_review
+  - resolver_test_and_regression_evidence_review
+  - cross_project_claims_held_pending_actual_consumer_verification
+environment_constraints:
+  - process_bound_repository_is_dev_foundry_claude
+  - operator_approval_is_limited_to_authoring_implementation_and_validation
+  - execution_uses_separately_bound_runner_executor
+stop_conditions:
+  - absent_or_conflicting_current_authority
+  - scope_expansion_to_consumer_or_release
+  - incompatibility_requires_new_product_decision
+  - failed_mechanical_validation
+  - required_independent_review_unavailable
+portability: configure

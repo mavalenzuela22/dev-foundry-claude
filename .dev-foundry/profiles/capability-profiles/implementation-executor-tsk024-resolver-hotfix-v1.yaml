@@ -1,0 +1,56 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-IMPLEMENTATION-EXECUTOR-TSK024-RESOLVER-HOTFIX-V1
+status: active
+implementation_class: process-bound-runner-code-executor
+supported_actions:
+  - inspect_task_directed_resolver_and_existing_tests
+  - modify_bounded_resolver_and_directly_necessary_resolver_tests
+  - run_task_authorized_focused_and_full_tests
+  - run_git_diff_check
+  - produce_exact_changes_and_failing_case_evidence
+prohibited_actions:
+  - modify_project_or_methodology_authority
+  - modify_canonical_framework_release
+  - mutate_real_consumer_repository
+  - modify_consumer_cli_cutover_or_upgrade_mechanics
+  - publish_release_or_change_package_version
+  - commit_push_or_create_pull_request
+  - modify_unlisted_files
+  - disable_or_relax_fail_closed_authority_gates
+  - change_resolver_success_or_error_envelope_without_authority
+  - invoke_claude_code_as_producer_implementation_executor
+  - install_new_dependencies_or_expose_services
+limits:
+  repository: dev-foundry-claude
+  platform: chatgpt-project
+  implementation_identity: process-bound-runner-code-executor
+  task_id: TSK-024
+  primary_objectives: 1
+  primary_subsystems: 1
+  open_architectural_decisions: 0
+  mutation_surface:
+    - src/governance-mcp/resolver.js
+    - test/governance-mcp/resolver.test.js
+    - test/governance-mcp/fixture.js
+    - test/governance-mcp/server.test.js
+  consumer_mutation: false
+  release_publication: false
+proof_capabilities:
+  - focused_resolver_regression_tests
+  - negative_permission_and_authority_tests
+  - full_npm_test_suite
+  - git_diff_check
+  - bounded_changed_file_report
+environment_constraints:
+  - process_bound_repository_is_dev_foundry_claude
+  - exact_governed_execution_contract_required
+  - no_access_to_pago_electronico_repository
+  - no_executable_publication_or_installation
+stop_conditions:
+  - requested_change_outside_four_path_projection
+  - historical_route_grants_active_authority
+  - closed_governedBy_reference_treated_as_active
+  - failed_test_or_missing_required_proof
+  - product_or_architecture_decision_unresolved
+  - incompatible_framework_behavior_discovered
+portability: configure

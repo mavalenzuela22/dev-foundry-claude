@@ -3,7 +3,7 @@ id: DFC-PLATFORM-BOOTSTRAP
 title: dev-foundry-claude Platform Bootstrap
 kind: platform-bootstrap
 status: active
-artifact_version: "2.1.0-local.4"
+artifact_version: "2.1.0-local.5"
 canonical: false
 methodology_authority: false
 
@@ -48,7 +48,7 @@ constraints:
   - role selection is operation-scoped
   - independent audit eligibility is established from actual prior participation and active separation-of-duty rules
   - runner runtime state and product mechanics are not reusable methodology
-  - the Implementation Executor is separately bound in the POP to the process-bound-runner-code-executor through DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V3 and is not self-selected by this governance implementation
+  - the Implementation Executor is separately bound in the POP to the process-bound-runner-code-executor through the active task-specific Capability Profile and is not self-selected by this governance implementation
   - the Mechanical Validator is separately bound in the POP to the process-bound-runner
   - Claude Code is the adapter target runtime and is not the active producer platform
   - root CLAUDE.md, .mcp.json, .claude and Claude Capability Profiles are product and distribution surface and do not bind any producer role
