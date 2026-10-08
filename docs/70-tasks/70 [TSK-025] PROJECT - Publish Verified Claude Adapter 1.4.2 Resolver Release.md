@@ -4,8 +4,8 @@ artifact:
   id: TSK-025
   type: TSK
   title: Publish Verified Claude Adapter 1.4.2 Resolver Release
-  status: IN_PROGRESS
-artifactVersion: "3"
+  status: CLOSED
+artifactVersion: "4"
 authorityScope: tsk-025-verified-adapter-1.4.2-resolver-release
 ownerRole: governance-author
 canonical: true
@@ -51,7 +51,7 @@ traceability:
     - TSK-024
     - TSK-023
 lifecycle:
-  phase: in-progress
+  phase: closed
   blockedBy: []
   promotionRequired: true
 portability: project-specific
@@ -207,3 +207,30 @@ no existing v1.4.2 tag/release collision, authorized workflow
 dispatch, observed workflow SUCCESS, verified three release
 assets and exact installed self-pin. No consumer mutation,
 manual tag or release claim is permitted before these facts.
+
+## 7. Verified publication and terminal producer disposition (2026-10-08)
+
+The governed release candidate was committed at
+`3aa5fd4915c0932f79e30a79bc9a02721ac22e71`. Repository transaction
+`TSK-025-RELEASE-CANDIDATE-20261008-V001` completed every authorized phase
+through cleanup. [PR #49](https://github.com/mavalenzuela22/dev-foundry-claude/pull/49)
+merged to `main` at `9b6340b051d32857e8b79589cd049fb81c0a196d`.
+The runner independently confirmed that exact clean `main`.
+
+The Operator's authenticated GitHub CLI verification recorded published
+`v1.4.2` tag at the exact release commit; GitHub Actions
+[run 37855084070](https://github.com/mavalenzuela22/dev-foundry-claude/actions/runs/37855084070)
+`SUCCESS`; exactly three published distribution assets; both tarballs
+byte-identical and SHA-256
+`3aa7542c41ce613c9c152e21c8e2d95d835dc00be1cb8f2e46302daa54cadaf3`;
+`SHA256SUMS` verified; and unpacked payload `selfPin`
+`1.4.2:sha256:1780711cd5661b40f7f0e1220146e87ae12f88c3bc9ba37de06f17fe69cbe79f`.
+These published-asset observations are Operator-supplied evidence, not
+independently downloaded by the runner. The prior independent-audit trigger
+disposition remains **not required**, not AUDIT PASS.
+
+**TSK-025 status: CLOSED, subject to integration of the documentation-only
+closure bundle.** `TSK-025-CLOSURE` holds the terminal release identity,
+evidence classification, scope exclusions and known limits. Immutable
+`v1.4.2` tag/assets remain unchanged. No consumer deployment, upgrade,
+repin, or cutover is implied, and TSK-024's own lifecycle remains separate.

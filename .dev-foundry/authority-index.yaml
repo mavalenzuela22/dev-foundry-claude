@@ -449,6 +449,14 @@ routes:
       - adapter-142-published-release-assets-verification
     section_id: null
 
+  - id: TSK-025-CLOSURE
+    path: docs/70-tasks/70 [TSK-025-CLOSURE] PROJECT - Publish Verified Claude Adapter 1.4.2 Resolver Release Closure.md
+    authority_class: configured
+    governs:
+      - tsk-025-release-142-terminal-disposition
+      - published-immutable-adapter-142-distribution-identity
+    section_id: null
+
 bindings:
   - id: governance-author-capability-tsk025-release-v1
     path: .dev-foundry/profiles/capability-profiles/governance-author-tsk025-release-142-v1.yaml
