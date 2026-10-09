@@ -5,7 +5,7 @@ artifact:
   type: ARC
   title: Claude Code Adapter Architecture
   status: ACTIVE
-artifactVersion: "5"
+artifactVersion: "6"
 authorityScope: dev-foundry-claude-adapter-architecture
 ownerRole: governance-author
 canonical: true
@@ -16,6 +16,7 @@ scope:
     - claude-code-context-loading-boundary
     - claude-adapter-distribution-components
     - consumer-bootstrap-and-self-update-architecture
+    - version-resolved-managed-runtime-architecture
   appliesTo:
     components:
       - dev-foundry-claude
@@ -232,3 +233,82 @@ The architecture relied on current Anthropic documentation for:
 These are observed provider mechanics, not DEV FOUNDRY methodology authority.
 A later implementation task must revalidate any material version-sensitive
 assumption before relying on it.
+
+## 10. Version-resolved runtime lifecycle (TSK-026 design)
+
+ADR-008 selects a two-layer product runtime. A small stable launcher acts as an
+entrypoint and transport/recovery shim; the full adapter remains a separately
+installable, immutable, exact-identity package. Neither may reimplement DEV
+FOUNDRY framework authority.
+
+```text
+Global first-install CLI/bootstrap
+    -> stable launcher (resolve repository, pin, package identity)
+       -> immutable runtime store
+          -> package N (CLI, governance MCP, dashboard UI/server, telemetry,
+                        templates, Skills/agents, framework bundle, migration data)
+          -> package N+1 (same coherent component set)
+       -> consumer A (.mcp.json exact self-pin N; .dev-foundry authority)
+       -> consumer B (.mcp.json exact self-pin N+1; .dev-foundry authority)
+Source-governed Claude session + deterministic Migration Engine
+    -> explicit plan/authorization -> journaled project cutover
+    -> stale old session -> fresh target session -> verified completion
+```
+
+### 10.1 Runtime Manager
+
+The launcher uses a closed set of commands, project-root discovery, immutable
+release lookup, trusted acquisition and exact payload verification. It selects
+one package per invocation using the consumer's explicit pin, never a global
+`latest` default for governed consumers. A missing runtime triggers an
+actionable recovery/acquisition path rather than executing arbitrary downloaded
+code. The manager stores every runtime by version plus payload root; cache GC
+must respect all known consumer pins and active/recovery reservations. It must
+support Windows npm shims, in-use file locks, macOS/Linux symlinks and portable
+non-public loopback-only dashboard/telemetry behavior.
+
+Package CLI, governance MCP process, dashboard server/UI and telemetry launcher
+must all originate in the same selected runtime. A stale daemon/server cannot
+silently masquerade as the new runtime. An already-running dashboard is checked
+for owner, process identity and exact package identity before any lifecycle
+action; an unrelated listener must never be terminated.
+
+### 10.2 Migration Engine and governed orchestrator
+
+Deterministic tools implement source/target verification, supported transition
+checking, path ownership proof, canonical plan/hash, lock and journal,
+conditional bounded transforms, recoverability and exact state checks. The
+model, while bound to the *source* project authority, interprets semantic
+migrations and seeks Operator decisions. The target package may supply verified
+migration requirements but does not itself become active project authority.
+One on-demand Claude Skill coordinates only the upgrade workflow; no new
+always-loaded subagent or duplicated authority resolver is necessary by default.
+
+### 10.3 Authority, Git and restart
+
+Project pin and authorized configured-authority changes form one *logical*
+recoverable transition; multiple files are not magically one atomic filesystem
+rename. The source session does pre-cutover governed authoring, validation and
+audit resolution and must not be required to perform subsequent governed Git
+promotion or closure after becoming stale. A durable handoff/journal records
+the permissible post-restart steps. The new session re-resolves current
+authority and completes only separately authorized downstream gates.
+
+The source adapter is kept available through the transition and target
+verification. Recovery is independent of whether target CLI/MCP can launch.
+Only a verified target session is allowed to claim a complete upgrade.
+
+### 10.4 Pre-launcher consumers and packaging
+
+The first target carrying this architecture must include an explicit,
+producer-verified **1.4.2-to-managed-runtime** transition. Ordinary source
+1.4.2 installations do not already understand the new launcher. The
+transition must stage a new launcher and target runtime without invalidating
+the source session or silently replacing the shared global installation.
+Actual installed-package Windows/macOS testing is required. Release selection,
+trusted artifact provenance, acquisition and package distribution must remain
+distinct from project authority adoption and framework-version adoption.
+
+SPC-008 section 11 onward owns the technical invariants, failure conditions
+and test predicates for this architecture. TSK-026 is PLANNED, and no feature
+code is authorized by this document.
