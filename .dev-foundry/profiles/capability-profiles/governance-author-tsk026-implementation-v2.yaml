@@ -26,7 +26,8 @@ limits:
   repository: dev-foundry-claude
   task_id: TSK-026
   objective: version_resolved_model_assisted_governed_self_update_implementation
-  allowed_branches: task/tsk-026-*\n  initial_preparation_branch: task/tsk-026-implementation-preparation
+  allowed_branches: task/tsk-026-*
+  initial_preparation_branch: task/tsk-026-implementation-preparation
   operator_authorization: explicit_2026-10-09_tsk026_implementation_validation_and_required_in_scope_correctives_no_publication
   execution_provider: codex-cli
   implementation_profile: tsk026_exact_bound_runner_executor

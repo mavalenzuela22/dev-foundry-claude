@@ -26,6 +26,9 @@ prohibited_actions:
 limits:
   repository: dev-foundry-claude
   task_id: TSK-026
+  implementation_identity: process-bound-runner-code-executor
+  platform: chatgpt-project
+  hosting_purpose: chatgpt-governed-producer-maintenance
   execution_provider: codex-cli
   runner_binding: process-bound-repository
   product_scope: governed_model_assisted_runtime_lifecycle

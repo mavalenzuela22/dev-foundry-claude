@@ -25,7 +25,7 @@
   "scripts": {
     "start": "node src/governance-mcp/server.js",
     "prepack": "node scripts/package/prepack.mjs",
-    "test": "node --test test/governance-mcp/*.test.js test/bootstrap/*.test.js test/adopt/*.test.js"
+    "test": "node --test test/governance-mcp/*.test.js test/bootstrap/*.test.js test/adopt/*.test.js test/runtime/*.test.js"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.2.0",
