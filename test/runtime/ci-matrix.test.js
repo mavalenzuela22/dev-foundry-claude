@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
   rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -10,7 +10,7 @@ import test from 'node:test';
 import { parse } from 'yaml';
 import { buildManifestBytes, sha256, verifyPayload } from '../../src/adopt/pin.js';
 import { candidateManifest, inspectArchive, inspectShims, installArguments, main,
-  npmCli, pendingReceipt, probeExit, tempChild, verifyCandidate } from '../../scripts/acceptance/tsk026-ci.mjs';
+  npmCli, packCandidate, packOutputDiagnostic, pendingReceipt, probeExit, tempChild, verifyCandidate } from '../../scripts/acceptance/tsk026-ci.mjs';
 
 const repo = fileURLToPath(new URL('../../', import.meta.url));
 const bound = { producerSha: '8'.repeat(40), runId: '123', runAttempt: '1' };
@@ -203,4 +203,163 @@ test('workflow transports one run-specific candidate, runs full tests and always
   assert.match(script, /npmRun\(\['test'\]/); assert.match(script, /acceptanceAuthority: false/);
   assert.match(script, /store-permissions-unsupported/); assert.match(script, /Authentic GitHub v1.4.2/);
   assert.match(script, /shell: false/); assert.doesNotMatch(script, /process\.kill|npm publish/);
+});
+
+// These exercise the real candidate orchestration and filesystem with an
+// injected subprocess result. They never npm-pack, contact GitHub or use tokens.
+function packFixture(t, { result = {}, missing = false, bytes = fixture().bytes,
+  beforeReturn = () => {}, getContext, output } = {}) {
+  const temp = scratch(t), githubOutput = output ?? path.join(temp, 'github-output');
+  const c = { root: repo, temp, expected: bound };
+  const run = (args, root, runnerTemp, timeout, logName, quiet) => {
+    assert.equal(root, repo); assert.equal(runnerTemp, temp);
+    assert.deepEqual(args, ['pack', '--json', '--pack-destination', tempChild(temp, 'tsk026-candidate')]);
+    assert.equal(timeout, 240000); assert.equal(logName, undefined); assert.equal(quiet, true);
+    const prepared = JSON.parse(readFileSync(path.join(temp, 'tsk026-pack-diagnostics/result.json')));
+    assert.equal(prepared.outcome, 'PENDING');
+    if (!missing) writeFileSync(path.join(args[3], 'synthetic.tgz'), bytes);
+    beforeReturn(c);
+    return { status: 0, signal: null, stdout: '[{"filename":"synthetic.tgz"}]', stderr: '', ...result };
+  };
+  const execute = () => packCandidate(getContext ?? (() => c), run, temp, githubOutput);
+  const diagnostic = () => {
+    const file = path.join(temp, 'tsk026-pack-diagnostics/result.json');
+    assert.ok(lstatSync(file).size <= 4096);
+    assert.equal(existsSync(path.join(temp, 'tsk026-pack-diagnostics/result.pending.json')), false);
+    return JSON.parse(readFileSync(file));
+  };
+  return { c, execute, diagnostic, githubOutput };
+}
+test('candidate success with Vite warning binds exact bytes and keeps bounded PASS diagnostics', t => {
+  const f = packFixture(t, { result: { stderr: 'built in 2.70s\npayload-manifest: 1233 files\nSome chunks are larger than 500 kB after minification. 633 kB' } });
+  assert.equal(f.execute(), 0);
+  const report = f.diagnostic();
+  assert.equal(report.outcome, 'PASS'); assert.equal(report.phase, 'complete');
+  assert.equal(report.command.exitCode, 0); assert.equal(report.command.signal, null);
+  assert.match(report.command.stderr.summary, /chunk-size-warning/);
+  assert.ok(report.command.durationMs >= 0 && report.durationMs >= report.command.durationMs);
+  const bytes = readFileSync(path.join(f.c.temp, 'tsk026-candidate/candidate.tgz'));
+  const manifestBytes = readFileSync(path.join(f.c.temp, 'tsk026-candidate/manifest.json'));
+  const manifest = JSON.parse(manifestBytes);
+  verifyCandidate(bytes, manifest, expectations(bytes, manifest));
+  assert.equal(readFileSync(f.githubOutput, 'utf8'),
+    `sha256=${sha256(bytes)}\npin=${manifest.package.selfPin}\nmanifest_sha256=${sha256(manifestBytes)}\n`);
+  assert.equal(readFileSync(path.join(f.c.temp, 'tsk026-candidate/SHA256SUMS'), 'utf8'),
+    `${sha256(bytes)}  candidate.tgz\n${sha256(manifestBytes)}  manifest.json\n`);
+});
+test('Vite build-completed/warning text never overrides an actual npm pack exit failure', t => {
+  const f = packFixture(t, { result: { status: 1, stdout: 'built in 2.70s\npayload-manifest: 1233 files',
+    stderr: 'Some chunks are larger than 500 kB after minification.' } });
+  assert.throws(f.execute, /npm-pack; exit=1; signal=none/);
+  const r = f.diagnostic();
+  assert.equal(r.outcome, 'FAIL'); assert.equal(r.phase, 'npm-pack'); assert.equal(r.command.exitCode, 1);
+  assert.equal(existsSync(f.githubOutput), false);
+});
+test('candidate retains subprocess timeout, signal, buffer and thrown-error diagnostics', t => {
+  for (const code of ['ETIMEDOUT', 'ENOBUFS', 'ENOENT']) {
+    const f = packFixture(t, { result: { status: null, signal: 'SIGTERM', error: Object.assign(Error('private subprocess text'), { code }) } });
+    assert.throws(f.execute, new RegExp(`npm-pack; exit=unavailable; signal=SIGTERM; code=${code}`));
+    assert.equal(f.diagnostic().command.errorCode, code);
+    assert.equal(f.diagnostic().outcome, 'FAIL'); assert.equal(existsSync(f.githubOutput), false);
+  }
+  const temp = scratch(t);
+  const thrown = Object.assign(Error('secret credential text'), { code: 'ETIMEDOUT', signal: 'SIGKILL', stdout: 'secret stdout' });
+  assert.throws(() => packCandidate(() => ({ root: repo, temp, expected: bound }), () => { throw thrown; }, temp), /signal=SIGKILL; code=ETIMEDOUT/);
+  const r = JSON.parse(readFileSync(path.join(temp, 'tsk026-pack-diagnostics/result.json')));
+  assert.equal(r.phase, 'npm-pack'); assert.equal(r.command.errorCode, 'ETIMEDOUT');
+  assert.doesNotMatch(JSON.stringify(r), /secret|credential/);
+});
+test('candidate pack metadata is strict and malformed JSON retains the parse failure', t => {
+  for (const stdout of ['built in 2.70s\n[]', '{bad json private data', 'null', '{}', '[]',
+    '[null]', '[{"filename":"../escape.tgz"}]', '[{"filename":"sub/archive.tgz"}]']) {
+    const f = packFixture(t, { result: { stdout } });
+    assert.throws(f.execute, /parse-pack-metadata/);
+    const r = f.diagnostic(); assert.equal(r.phase, 'parse-pack-metadata'); assert.equal(r.outcome, 'FAIL');
+    assert.equal(r.command.exitCode, 0); assert.equal(existsSync(f.githubOutput), false);
+    assert.doesNotMatch(JSON.stringify(r), /private data|escape.tgz/);
+  }
+});
+test('successful npm exit with missing archive fails discovery and retains diagnostics', t => {
+  const f = packFixture(t, { missing: true });
+  assert.throws(f.execute, /discover-tarball; code=ENOENT/);
+  assert.equal(f.diagnostic().outcome, 'FAIL'); assert.equal(f.diagnostic().phase, 'discover-tarball');
+  assert.equal(existsSync(f.githubOutput), false);
+});
+test('postpack archive digest verification failure remains failed and emits no outputs', t => {
+  const { files } = fixture(); files.set('bin/dev-foundry-claude.js', Buffer.from('corrupted'));
+  const f = packFixture(t, { bytes: tar(files) });
+  assert.throws(f.execute, /inspectArchive/);
+  assert.equal(f.diagnostic().phase, 'inspectArchive');
+  assert.equal(f.diagnostic().error.reason, 'archive payload digest mismatch');
+  assert.equal(existsSync(f.githubOutput), false);
+});
+test('manifest and hash write failures are distinguished and retained', t => {
+  for (const [file, phase] of [['manifest.json', 'write-candidate-manifest'], ['SHA256SUMS', 'write-candidate-hash']]) {
+    const f = packFixture(t, { beforeReturn: c => mkdirSync(path.join(c.temp, 'tsk026-candidate', file)) });
+    assert.throws(f.execute, new RegExp(phase));
+    assert.equal(f.diagnostic().phase, phase); assert.equal(f.diagnostic().outcome, 'FAIL');
+    assert.equal(existsSync(f.githubOutput), false);
+  }
+});
+test('GitHub output error fails after verification with retained diagnostic and no PASS', t => {
+  const f = packFixture(t, { output: path.join(scratch(t), 'missing/output') });
+  assert.throws(f.execute, /emit-github-outputs; code=ENOENT/);
+  assert.equal(f.diagnostic().phase, 'emit-github-outputs'); assert.equal(f.diagnostic().outcome, 'FAIL');
+});
+test('context and candidate preparation failures retain atomic diagnostics', t => {
+  const f = packFixture(t, { getContext: () => { throw Error('credential private context'); } });
+  assert.throws(f.execute, /at context/);
+  assert.equal(f.diagnostic().phase, 'context'); assert.doesNotMatch(JSON.stringify(f.diagnostic()), /credential|private/);
+  const g = packFixture(t); mkdirSync(path.join(g.c.temp, 'tsk026-candidate'));
+  assert.throws(g.execute, /prepare-candidate; code=EEXIST/);
+  assert.equal(g.diagnostic().phase, 'prepare-candidate'); assert.equal(g.diagnostic().command, null);
+});
+test('diagnostics contain only a tight closed projection, never credentials or arbitrary contents', t => {
+  const secrets = ['ghp_SYNTHETIC_NOT_A_REAL_TOKEN', 'Bearer SYNTHETIC_SECRET', 'password=SYNTHETIC_PASSWORD',
+    'https://user:SYNTHETIC_PASSWORD@example.test/', 'UNLABELLED_PRIVATE_CONTENT', 'ENV_VAR=SYNTHETIC_VALUE'];
+  const text = `npm error code EACCES\n${secrets.join('\n')}\n${'x'.repeat(100000)}`;
+  const f = packFixture(t, { result: { status: 1, stdout: text, stderr: text } });
+  assert.throws(f.execute, /exit=1/);
+  const r = f.diagnostic(), stored = JSON.stringify(r);
+  assert.equal(r.command.stdout.bytes, Buffer.byteLength(text)); assert.equal(r.command.stdout.truncated, true);
+  assert.equal(r.command.stderr.summary, 'npm-code:EACCES');
+  assert.ok(r.command.stdout.summary.length <= 512); assert.ok(Buffer.byteLength(stored) <= 4096);
+  for (const secret of secrets) assert.ok(!stored.includes(secret));
+  assert.deepEqual(packOutputDiagnostic('private arbitrary content'), { bytes: 25, truncated: false, summary: '' });
+});
+test('diagnostic projection refuses symlinks and never writes outside the fixed directory', t => {
+  const temp = scratch(t), outside = scratch(t), sentinel = path.join(outside, 'result.json');
+  writeFileSync(sentinel, 'unchanged');
+  symlinkSync(outside, path.join(temp, 'tsk026-pack-diagnostics'), process.platform === 'win32' ? 'junction' : 'dir');
+  let invoked = false;
+  assert.throws(() => packCandidate(() => { invoked = true; }, () => {}, temp), /prepare-diagnostics.*diagnostic persistence failed/);
+  assert.equal(invoked, false); assert.equal(readFileSync(sentinel, 'utf8'), 'unchanged');
+});
+test('candidate diagnostic upload always runs; candidate publication and native consumption still require success', () => {
+  const workflow = parse(readFileSync(path.join(repo, '.github/workflows/tsk-026-acceptance.yml'), 'utf8'));
+  const candidate = workflow.jobs.candidate, native = workflow.jobs.native;
+  const diagnostics = candidate.steps.find(s => s.name === 'Upload bounded candidate pack diagnostics');
+  assert.equal(diagnostics.uses, 'actions/upload-artifact@v4'); assert.equal(diagnostics.if, 'always()');
+  assert.equal(diagnostics.with.path, '${{ runner.temp }}/tsk026-pack-diagnostics/');
+  assert.equal(diagnostics.with['if-no-files-found'], 'warn'); assert.equal(diagnostics.with['retention-days'], 7);
+  const upload = candidate.steps.find(s => s.with?.name?.startsWith('tsk026-candidate-'));
+  assert.equal(upload.if, undefined); assert.equal(upload['continue-on-error'], undefined);
+  assert.equal(candidate.steps.find(s => s.id === 'pack')['continue-on-error'], undefined);
+  assert.equal(native.needs, 'candidate'); assert.doesNotMatch(native.if, /always|failure/);
+  assert.deepEqual(candidate.outputs, { sha256: '${{ steps.pack.outputs.sha256 }}',
+    pin: '${{ steps.pack.outputs.pin }}', 'manifest-sha256': '${{ steps.pack.outputs.manifest_sha256 }}' });
+});
+
+test('CLI candidate context failure exits nonzero and retains a safe diagnostic', t => {
+  const temp = scratch(t);
+  const result = spawnSync(process.execPath, [path.join(repo, 'scripts/acceptance/tsk026-ci.mjs'), 'candidate'],
+    { env: { RUNNER_TEMP: temp }, encoding: 'utf8', timeout: 10000, maxBuffer: 8192 });
+  assert.equal(result.status, 1); assert.equal(result.signal, null);
+  assert.match(result.stderr, /candidate pack failed at context/);
+  const diagnostic = JSON.parse(readFileSync(path.join(temp, 'tsk026-pack-diagnostics/result.json')));
+  assert.equal(diagnostic.outcome, 'FAIL'); assert.equal(diagnostic.phase, 'context');
+});
+test('bounded output projection retains terminal npm reason after a large prepack log', () => {
+  const diagnostic = packOutputDiagnostic(`built in 2.70s\n${'x'.repeat(100000)}\nnpm error code ELIFECYCLE\n`);
+  assert.equal(diagnostic.truncated, true); assert.equal(diagnostic.summary, 'build-completed; npm-code:ELIFECYCLE');
 });

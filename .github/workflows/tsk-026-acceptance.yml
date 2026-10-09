@@ -52,6 +52,15 @@ jobs:
           path: ${{ runner.temp }}/tsk026-candidate/*
           if-no-files-found: error
           retention-days: 7
+      - name: Upload bounded candidate pack diagnostics
+        uses: actions/upload-artifact@v4
+        if: always()
+        timeout-minutes: 1
+        with:
+          name: tsk026-pack-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/tsk026-pack-diagnostics/
+          if-no-files-found: warn
+          retention-days: 7
 
   native:
     needs: candidate

@@ -2,7 +2,7 @@
 // global install, consumer selection, target lifecycle execution or acceptance promotion.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { appendFileSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync,
-  readFileSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+  readFileSync, readlinkSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -199,7 +199,7 @@ export function npmCli() {
   const cli = candidates.find(existsSync);
   check(cli, 'npm CLI unavailable beside pinned Node'); return realpathSync(cli);
 }
-function npmRun(args, cwd, temp, timeout, logName) {
+function npmRun(args, cwd, temp, timeout, logName, quiet = false) {
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(npm_|NODE_OPTIONS$|GIT_|DEV_FOUNDRY_|OTEL_|CLAUDE)/i.test(k)));
   const config = tempChild(temp, 'tsk026-npmrc');
   const globalConfig = tempChild(temp, 'tsk026-global-npmrc');
@@ -210,8 +210,134 @@ function npmRun(args, cwd, temp, timeout, logName) {
   const result = spawnSync(process.execPath, [npmCli(), ...args], { cwd, env, encoding: 'utf8', timeout, maxBuffer: 32 * 1024 * 1024, shell: false });
   const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
   if (logName) writeFileSync(tempChild(temp, `tsk026-reports/${logName}`), output);
-  console.log(output);
+  if (!quiet) console.log(output);
   return { ...result, output };
+}
+// Diagnostic output is a closed projection, never raw process/error text. Even
+// an unlabelled credential or file dump cannot cross this boundary. Keep the
+// pack JSON in memory for parsing, but persist only counts and known markers.
+const DIAGNOSTIC = 'tsk026-pack-diagnostics';
+const PACK_TIMEOUT = 240000;
+const safeCode = value => typeof value === 'string' &&
+  /^(?:EACCES|EPERM|ENOENT|EEXIST|ENOTDIR|EISDIR|ENOSPC|EIO|EROFS|EINVAL|ETIMEDOUT|ENOBUFS|ERR_CHILD_PROCESS_STDIO_MAXBUFFER|ELIFECYCLE|EJSONPARSE|ENOPACKAGE|EBADENGINE|ERESOLVE|Z_DATA_ERROR|Z_BUF_ERROR)$/.test(value) ? value : null;
+const safeSignal = value => /^SIG(?:TERM|KILL|INT|ABRT|SEGV|PIPE|HUP)$/.test(value ?? '') ? value : null;
+const exitCode = value => Number.isSafeInteger(value) && value >= 0 && value <= 255 ? value : null;
+export function packOutputDiagnostic(value) {
+  const text = typeof value === 'string' ? value : Buffer.isBuffer(value) ? value.toString('utf8') : '';
+  const sample = text.length <= 4096 ? text : `${text.slice(0, 2048)}\n${text.slice(-2048)}`;
+  const markers = [];
+  if (/built in \d+(?:\.\d+)?s/.test(sample)) markers.push('build-completed');
+  if (/chunks? (?:are |is )?larger than|chunk size limit/i.test(sample)) markers.push('chunk-size-warning');
+  if (/payload-manifest: \d+ files/.test(sample)) markers.push('payload-manifest-written');
+  for (const match of sample.matchAll(/npm (?:ERR!|error) code (E[A-Z0-9_]{1,40})(?=\s|$)/g)) {
+    const code = safeCode(match[1]);
+    if (code && !markers.includes(`npm-code:${code}`)) markers.push(`npm-code:${code}`);
+  }
+  return { bytes: Buffer.byteLength(text), truncated: text.length > 4096,
+    summary: markers.join('; ').slice(0, 512) };
+}
+function writePackDiagnostic(temp, report) {
+  const bytes = Buffer.from(canonicalJson(report));
+  check(bytes.length <= 4096, 'pack diagnostic exceeds bound');
+  const result = tempChild(temp, `${DIAGNOSTIC}/result.json`);
+  const pending = tempChild(temp, `${DIAGNOSTIC}/result.pending.json`);
+  // A pre-existing link/directory or pending file is refused, never followed.
+  if (existsSync(result)) check(lstatSync(result).isFile(), 'diagnostic target not a file');
+  writeFileSync(pending, bytes, { flag: 'wx', mode: 0o600 });
+  try { renameSync(pending, result); }
+  finally { rmSync(pending, { force: true }); }
+}
+// Function injection is only an in-process synthetic test seam; CLI callers
+// cannot choose a command, output directory, archive, context or acceptance.
+export function packCandidate(getContext, run = npmRun, runnerTemp = process.env.RUNNER_TEMP,
+  githubOutput = process.env.GITHUB_OUTPUT) {
+  const started = performance.now();
+  const report = { schema: 'dev-foundry.tsk026-pack-diagnostic.v1', task: 'TSK-026',
+    boundary: 'B4C2', outcome: 'PENDING', phase: 'prepare-diagnostics',
+    durationMs: 0, errorCode: null, error: null, command: null };
+  let prepared = false;
+  const elapsed = () => Math.round(performance.now() - started);
+  try {
+    const dir = tempChild(runnerTemp, DIAGNOSTIC);
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    check(lstatSync(dir).isDirectory(), 'diagnostic directory missing');
+    prepared = true;
+    writePackDiagnostic(runnerTemp, report);
+    report.phase = 'context';
+    const c = getContext();
+    check(realpathSync(c.temp) === realpathSync(runnerTemp), 'diagnostic context mismatch');
+    report.binding = binding(c.expected);
+    report.phase = 'prepare-candidate';
+    const out = tempChild(c.temp, 'tsk026-candidate'); mkdirSync(out);
+    report.phase = 'npm-pack';
+    report.command = { executable: 'pinned-node/npm-cli.js',
+      args: ['pack', '--json', '--pack-destination', '<runner-temp>/tsk026-candidate'],
+      timeoutMs: PACK_TIMEOUT, durationMs: 0, exitCode: null, signal: null,
+      errorCode: null, stdout: packOutputDiagnostic(''), stderr: packOutputDiagnostic('') };
+    report.durationMs = elapsed(); writePackDiagnostic(runnerTemp, report);
+    const commandStarted = performance.now();
+    let packed;
+    try {
+      packed = run(['pack', '--json', '--pack-destination', out], c.root, c.temp, PACK_TIMEOUT, undefined, true);
+    } catch (error) {
+      packed = { status: error.status, signal: error.signal, error,
+        stdout: error.stdout, stderr: error.stderr };
+    }
+    Object.assign(report.command, { durationMs: Math.round(performance.now() - commandStarted),
+      exitCode: exitCode(packed.status), signal: safeSignal(packed.signal),
+      errorCode: safeCode(packed.error?.code), stdout: packOutputDiagnostic(packed.stdout),
+      stderr: packOutputDiagnostic(packed.stderr) });
+    check(!packed.error && !packed.signal && packed.status === 0, 'npm pack failed');
+    report.phase = 'parse-pack-metadata';
+    const info = JSON.parse(packed.stdout);
+    check(Array.isArray(info) && info.length === 1 && portable(info[0]?.filename) &&
+      !info[0].filename.includes('/'), 'unexpected pack filename');
+    report.phase = 'discover-tarball';
+    const original = tempChild(c.temp, `tsk026-candidate/${info[0].filename}`);
+    check(lstatSync(original).isFile(), 'pack archive missing/not a file');
+    const archive = tempChild(c.temp, 'tsk026-candidate/candidate.tgz');
+    copyFileSync(original, archive); rmSync(original);
+    report.phase = 'inspectArchive';
+    const manifest = candidateManifest(readFileSync(archive), c.expected);
+    const bytes = Buffer.from(canonicalJson(manifest));
+    report.phase = 'write-candidate-manifest';
+    writeFileSync(tempChild(c.temp, 'tsk026-candidate/manifest.json'), bytes, { flag: 'wx' });
+    report.phase = 'write-candidate-hash';
+    writeFileSync(tempChild(c.temp, 'tsk026-candidate/SHA256SUMS'),
+      `${manifest.sha256}  candidate.tgz\n${sha256(bytes)}  manifest.json\n`, { flag: 'wx' });
+    // Save the last verification state before emitting outputs. No candidate
+    // is consumed unless this function and the candidate job both succeed.
+    report.phase = 'emit-github-outputs'; report.durationMs = elapsed();
+    writePackDiagnostic(runnerTemp, report);
+    appendFileSync(githubOutput, `sha256=${manifest.sha256}\npin=${manifest.package.selfPin}\nmanifest_sha256=${sha256(bytes)}\n`);
+    report.phase = 'complete'; report.outcome = 'PASS'; report.durationMs = elapsed();
+    writePackDiagnostic(runnerTemp, report);
+    console.log(`Unreleased candidate only: ${manifest.producerSha} ${manifest.sha256} ${manifest.package.selfPin}`);
+    return 0;
+  } catch (error) {
+    report.outcome = 'FAIL'; report.durationMs = elapsed(); report.errorCode = safeCode(error.code);
+    const knownReasons = ['candidate SHA-256 mismatch', 'candidate self-pin mismatch',
+      'archive exceeds bound', 'invalid tar checksum', 'truncated tar entry',
+      'archive links/devices/extensions refused', 'unsafe archive path',
+      'payload manifest missing', 'noncanonical payload manifest',
+      'wrong source package identity/bins/bundles', 'archive file set mismatch',
+      'archive payload digest mismatch', 'wrong bundled dependency identity',
+      'unexpected pack filename', 'pack archive missing/not a file', 'npm pack failed'];
+    report.error = { type: ['Error', 'SyntaxError', 'TypeError', 'RangeError'].includes(error.name) ? error.name : 'Error',
+      reason: knownReasons.includes(error.message) ? error.message : 'stage-operation-failed' };
+    let diagnosticFailure = false;
+    try {
+      // Retry preparation for a transient initial failure; unsafe/unwritable
+      // RUNNER_TEMP still fails closed and is reported without leaking paths.
+      if (!prepared) mkdirSync(tempChild(runnerTemp, DIAGNOSTIC), { recursive: true, mode: 0o700 });
+      writePackDiagnostic(runnerTemp, report);
+    } catch { diagnosticFailure = true; }
+    const command = report.command;
+    const reason = report.phase === 'npm-pack' ?
+      `; exit=${command.exitCode ?? 'unavailable'}; signal=${command.signal ?? 'none'}; code=${command.errorCode ?? 'unavailable'}` :
+      `; code=${report.errorCode ?? 'unavailable'}`;
+    throw Error(`candidate pack failed at ${report.phase}${reason}${diagnosticFailure ? '; diagnostic persistence failed' : ''}`);
+  }
 }
 function save(temp, report) {
   const dir = tempChild(temp, 'tsk026-reports'); mkdirSync(dir, { recursive: true });
@@ -278,24 +404,10 @@ async function native(c) {
 }
 export async function main(args = process.argv.slice(2)) {
   check(args.length === 1 && ['candidate', 'init', 'native', 'verdict'].includes(args[0]), 'usage: tsk026-ci.mjs candidate|init|native|verdict (PR CI only)');
+  if (args[0] === 'candidate') return packCandidate(context);
   const c = context();
   if (args[0] === 'init') { save(c.temp, pendingReceipt(c.expected)); return 0; }
   if (args[0] === 'native') return native(c);
-  if (args[0] === 'candidate') {
-    const out = tempChild(c.temp, 'tsk026-candidate'); mkdirSync(out);
-    const packed = npmRun(['pack', '--json', '--pack-destination', out], c.root, c.temp, 240000);
-    check(!packed.error && packed.status === 0, 'normal prepack failed');
-    const info = JSON.parse(packed.stdout);
-    check(info.length === 1 && portable(info[0].filename) && !info[0].filename.includes('/'), 'unexpected pack filename');
-    const original = tempChild(c.temp, `tsk026-candidate/${info[0].filename}`);
-    const archive = tempChild(c.temp, 'tsk026-candidate/candidate.tgz'); copyFileSync(original, archive); rmSync(original);
-    const manifest = candidateManifest(readFileSync(archive), c.expected);
-    const bytes = Buffer.from(canonicalJson(manifest));
-    writeFileSync(tempChild(c.temp, 'tsk026-candidate/manifest.json'), bytes, { flag: 'wx' });
-    writeFileSync(tempChild(c.temp, 'tsk026-candidate/SHA256SUMS'), `${manifest.sha256}  candidate.tgz\n${sha256(bytes)}  manifest.json\n`, { flag: 'wx' });
-    appendFileSync(process.env.GITHUB_OUTPUT, `sha256=${manifest.sha256}\npin=${manifest.package.selfPin}\nmanifest_sha256=${sha256(bytes)}\n`);
-    console.log(`Unreleased candidate only: ${manifest.producerSha} ${manifest.sha256} ${manifest.package.selfPin}`); return 0;
-  }
   const report = JSON.parse(readFileSync(tempChild(c.temp, 'tsk026-reports/result.json')));
   check(equal(binding(report), binding(c.expected)) && report.host.os === process.platform && report.host.node === process.version &&
     report.packageSha256 === c.expected.sha256 && report.selfPin === c.expected.selfPin && report.acceptance === 'BLOCKED', 'receipt binding/acceptance mismatch');
