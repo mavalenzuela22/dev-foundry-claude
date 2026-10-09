@@ -25,6 +25,7 @@ export function managerFixture(t) {
   const { buildManifestBytes, formatExpect, rootOf, sha256 } = awaitlessPin;
   writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: '@dev-foundry/claude-adapter', version: '1.4.2', type: 'module' }));
   mkdirSync(path.join(root, 'bin'));
+  cpSync(path.join(repo, 'bin/dev-foundry-claude-launcher.js'), path.join(root, 'bin/dev-foundry-claude-launcher.js'));
   writeFileSync(path.join(root, 'bin/dev-foundry-claude.js'), 'console.log("manager-transport-only");');
   const files = [];
   const walk = dir => { for (const entry of readdirSync(dir, { withFileTypes: true })) {
