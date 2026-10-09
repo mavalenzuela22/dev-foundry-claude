@@ -1,0 +1,54 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-GOVERNANCE-AUTHOR-TSK026-DESIGN-V1
+status: active
+implementation_class: operator-assisted-dev-foundry-copilot
+supported_actions:
+  - author_bounded_tsk026_runtime_lifecycle_task_and_product_authority
+  - reconcile_existing_adrs_architecture_and_self_update_contract
+  - assess_142_upgrade_installation_and_multi_consumer_compatibility
+  - prepare_tsk026_acceptance_and_future_executor_handoff
+  - perform_documentation_self_assessment_and_request_mechanical_validation
+  - evaluate_independent_audit_triggers_and_governed_document_promotion
+prohibited_actions:
+  - modify_adapter_or_dashboard_or_telemetry_product_code
+  - execute_implementation_or_activate_implementation_executor
+  - mutate_real_consumer_or_other_repository
+  - change_immutable_framework_release
+  - publish_release_or_change_package_version
+  - create_or_replace_release_tags_or_assets
+  - bypass_required_independent_audit
+  - force_push_or_promote_without_verifiable_gates
+limits:
+  repository: dev-foundry-claude
+  task_id: TSK-026
+  bounded_objective: governed_model_assisted_runtime_lifecycle_design
+  source_branch: task/tsk-026-model-assisted-self-update-design
+  baseline_head: 588fd87fc0eb7ec1bfa0b512b929e17dbf02d391
+  consumer_mutation: false
+  product_implementation: not_authorized
+  release_publication: not_authorized
+  allowed_authoring_surface:
+    - docs/70-tasks/70 [TSK-026] PROJECT - Establish Governed Model-Assisted Adapter Runtime Lifecycle.md
+    - docs/10-decisions/10 [ADR-008] PROJECT - Version-Resolved Adapter Runtime and Managed Upgrade Architecture.md
+    - docs/20-architecture/20 [ARC-001] PROJECT - Claude Code Adapter Architecture.md
+    - docs/40-specifications/40 [SPC-008] PROJECT - Consumer Bootstrap Legacy Bridge and Governed Self-Update Contract.md
+    - .dev-foundry/authority-index.yaml
+    - .dev-foundry/profiles/project-operating-profile.yaml
+    - .dev-foundry/profiles/capability-profiles/governance-author-tsk026-design-v1.yaml
+proof_capabilities:
+  - verified_process_bound_producer_and_framework_authority
+  - exact_documentation_change_manifest_and_gate_evidence
+  - versioned_runtime_and_failure_mode_semantic_review
+  - validation_and_governed_document_transaction_observation
+environment_constraints:
+  - process_bound_repository_is_dev_foundry_claude
+  - authoring_only_before_separate_executor_authorization
+  - preserve_existing_tsk025_executor_binding_as_noneligible_history
+  - no_consumer_work
+stop_conditions:
+  - missing_or_conflicting_current_authority
+  - attempted_product_implementation_or_release_publication
+  - failed_validation_or_required_independent_review
+  - unexpected_branch_head_or_path_mutation
+  - unapproved_architecture_or_security_boundary_expansion
+portability: project-specific
