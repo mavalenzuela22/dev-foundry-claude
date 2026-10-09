@@ -1,0 +1,65 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-IMPLEMENTATION-EXECUTOR-TSK026-RUNTIME-V1
+status: active
+implementation_class: process-bound-runner-code-executor
+supported_actions:
+  - inspect_existing_adapter_142_runtime_and_package_reuse
+  - implement_tsk026_exact_bounded_runtime_manager_and_migration_components
+  - refactor_causally_necessary_product_surface_within_exact_execution_contract
+  - implement_recoverable_staging_and_source_governed_upgrade_contracts
+  - implement_claude_runtime_integration_and_dashboard_telemetry_parity
+  - run_focused_tests_and_full_package_verification_as_authorized
+  - report_exact_mutation_projection_variances_and_limits
+prohibited_actions:
+  - author_or_mutate_governance_tasks_adrs_spcs_authority_index_or_pop
+  - modify_immutable_framework_release
+  - modify_real_consumer_or_foreign_repository
+  - invoke_claude_code_as_producer_executor
+  - commit_push_pr_merge_tag_release_or_deploy
+  - change_root_package_version_or_release_target_version
+  - dispatch_release_workflow_or_mutate_global_installation
+  - run_untrusted_package_install_scripts
+  - open_public_network_listener_or_read_secrets
+  - run_tests_on_an_unrelated_windows_consumer_runner
+  - add_unapproved_new_dependency_or_arbitrary_executable
+  - treat_fixture_only_or_mac_only_proof_as_windows_or_model_proof
+limits:
+  repository: dev-foundry-claude
+  task_id: TSK-026
+  execution_provider: codex-cli
+  runner_binding: process-bound-repository
+  product_scope: governed_model_assisted_runtime_lifecycle
+  material_boundaries:
+    - B1-runtime-identity-and-store
+    - B2-governed-migration-and-recovery
+    - B3-model-workflow-dashboard-telemetry-parity
+    - B4-packaged-cross-platform-acceptance
+  mutation_surface: exact_bound_execution_contract_paths_only
+  per_execution_path_limit: 32
+  publication: false
+  real_consumer_mutation: false
+  governance_mutation: false
+  continuation: requires_new_exact_contract_for_each_material_boundary
+proof_capabilities:
+  - self_pin_and_release_provenance_validation
+  - focused_task_implementation_and_regression_tests
+  - actual_installed_package_proof_when_available
+  - full_npm_test_and_pack_dry_run
+  - git_diff_check
+  - specific_cross_platform_and_real_model_limit_reporting
+environment_constraints:
+  - active_pop_executor_binding_must_select_this_profile
+  - task_026_must_be_in_progress_and_authorized
+  - runner_codex_cli_must_be_available
+  - execution_contract_identifies_just_one_material_boundary
+  - no_cross_project_work
+stop_conditions:
+  - missing_or_stale_task_authority
+  - unapproved_architecture_or_security_trust_decision
+  - unexpected_path_or_preexisting_dirty_worktree
+  - missing_required_release_provenance_or_package_identity
+  - material_scope_expansion_beyond_TSK026
+  - new_dependency_without_prior_governance_authorization
+  - executor_need_to_modify_governance_document
+  - unsafe_or_indeterminate_consumer_cutover
+portability: project-specific

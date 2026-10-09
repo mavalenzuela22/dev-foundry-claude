@@ -1,0 +1,55 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-GOVERNANCE-AUTHOR-TSK026-IMPLEMENTATION-V2
+status: active
+implementation_class: operator-assisted-dev-foundry-copilot
+supported_actions:
+  - reconcile_tsk026_preimplementation_sufficiency_and_mandatory_design_decisions
+  - prepare_tsk026_staged_implementation_and_strict_acceptance_boundaries
+  - author_and_activate_exact_tsk026_runner_executor_capability_under_operator_authorization
+  - prepare_validate_and_dispatch_bounded_tsk026_runner_execution_contracts
+  - review_execution_results_and_reconcile_direct_implementation_projection_variances
+  - commission_independent_governed_validation_and_audit_when_triggered
+  - authorize_governed_branch_commit_push_pr_merge_only_after_exact_verified_gates
+  - record_true_evidence_and_prepare_implementation_handoff_without_release
+prohibited_actions:
+  - implement_product_as_governance_author
+  - broaden_tsk026_to_consumer_product_repositories
+  - mutate_immutable_dev_foundry_framework
+  - claim_cross_platform_or_model_semantic_pass_without_actual_evidence
+  - publish_release_or_run_release_workflow
+  - overwrite_or_remove_prior_release_tag_or_asset
+  - deploy_or_activate_real_consumer
+  - perform_unbounded_executor_or_commit_side_effects
+  - bypass_required_independent_audit_or_operator_decision
+  - force_push
+limits:
+  repository: dev-foundry-claude
+  task_id: TSK-026
+  objective: version_resolved_model_assisted_governed_self_update_implementation
+  allowed_branches: task/tsk-026-*\n  initial_preparation_branch: task/tsk-026-implementation-preparation
+  operator_authorization: explicit_2026-10-09_tsk026_implementation_validation_and_required_in_scope_correctives_no_publication
+  execution_provider: codex-cli
+  implementation_profile: tsk026_exact_bound_runner_executor
+  publication: prohibited
+  consumer_mutation: prohibited
+  promotion: only_after_observed_mechanical_gates_and_applicable_audit
+proof_capabilities:
+  - producer_source_and_authority_reobservation
+  - model_and_host_assumption_sufficiency_review
+  - contract_and_exact_mutation_surface_validation
+  - focused_and_full_installed_package_evidence
+  - retained_unverified_windows_or_model_acceptance_limits_until_proven
+  - runner_bound_git_transaction_verification
+environment_constraints:
+  - process_bound_repository_must_be_dev_foundry_claude
+  - reusable_methodology_remains_immutable
+  - executor_may_only_change_the_expressly_bound_product_and_test_paths
+  - no_implementation_executed_by_governance_author
+stop_conditions:
+  - conflicting_project_authority
+  - material_architecture_or_security_decision_unresolved
+  - required_host_or_executor_capability_unavailable
+  - product_or_package_scope_outside_tsk026
+  - unavailable_applicable_audit
+  - unexpected_worktree_state_or_indeterminate_side_effect
+portability: project-specific
