@@ -5,7 +5,7 @@ artifact:
   type: TSK
   title: Establish Governed Model-Assisted Adapter Runtime Lifecycle
   status: IN_PROGRESS
-artifactVersion: "2"
+artifactVersion: "3"
 authorityScope: tsk-026-governed-model-assisted-adapter-runtime-lifecycle
 ownerRole: governance-author
 canonical: true
@@ -258,6 +258,19 @@ A Windows isolated host or CI job against the exact candidate archive is a
 mandatory B4 acceptance source; if unavailable, mark B4 BLOCKED, do not invent
 Windows evidence. Windows locked-file and npm bin-shim behavior must be tested
 natively. No source checkout can stand in for installed-package proof.
+
+**Durable journal location.** The runtime-upgrade journal resides in a bounded
+consumer-local `.dfc-runtime-upgrade/` directory, deliberately distinct from
+`.dfc-cutover/` foreign-governance migration and all canonical
+`.dev-foundry/` authority. The project must establish and verify a
+repository-local ignore rule for this exact runtime path before any journal
+write; missing or negated ignore rules block mutation instead of dirtying the
+worktree. Journal path safety, symlink checks, owner-scoped locks and sealed
+checkpoint records are required. Active startup and old session guards must
+read this state and block on in-flight, malformed or unknown transactions,
+even if the target CLI cannot start. B2 verifies this in isolated fixtures;
+B3 extends bootstrap/doctor UX for new/legacy consumers. Runtime journal
+retention follows recovery needs, not telemetry GC.
 
 **Surface discipline.** Bounded execution contracts block `docs/`,
 `.dev-foundry/` authority, immutable framework, consumers, package
