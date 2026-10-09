@@ -38,3 +38,13 @@ test('missing ownership/entrypoints and escaped entrypoints never produce a disp
   promoteRuntime(stageRuntime({ storeRoot, candidateRoot: incomplete.root, permittedCandidateRoots: [incomplete.root], expect, attestation: attestation(expect) }));
   assert.throws(() => dispatchPlan({ cwd: c2.root, storeRoot }), /entrypoint-unowned/);
 });
+
+test('closed dispatch rejects unknown argv, root overrides and pin aliases before any process is launched', async t => {
+  const { validateInvocation } = await import('../../src/runtime/dispatch.js');
+  const r = fakeRuntime(t), c = consumer(t, r.expect), other = consumer(t, r.expect);
+  for (const argv of [['unknown'], ['mcp', '--expect', r.expect, '--extra'], ['--version', '--root', c.root], ['status', '--root', other.root], ['doctor', '--arbitrary'], ['runtime', 'update', '--yes'], ['run', 'shell', '--']]) {
+    assert.throws(() => validateInvocation(argv, c.root));
+  }
+  validateInvocation(['mcp', '--expect', r.expect], c.root);
+  validateInvocation(['runtime', 'recover', '--input', '-', '--store-root', '/external/owned/store'], c.root);
+});

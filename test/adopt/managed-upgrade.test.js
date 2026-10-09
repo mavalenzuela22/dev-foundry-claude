@@ -42,7 +42,7 @@ test('exact released legacy bridge is deterministic, exact-hash enforced, bounde
     assert.equal(result.plan.upgradeKind, 'legacy-bridge'); assert.deepEqual(result.plan.current, old);
     assert.deepEqual(result.bytes, (await plan(fixture)).bytes);
     assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
-    const changed = version === '1.2.2-windows' ? ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md'] : ['.mcp.json'];
+    const changed = version === '1.2.2-windows' ? ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md'] : ['.mcp.json', 'CLAUDE.md'];
     assert.deepEqual(result.ops.writes.map((item) => item.path).sort(), changed);
     await assert.rejects(apply(fixture, { ...result, hash: '0'.repeat(64) }), { code: 'plan-hash-mismatch' });
     const presentationPackage = await makePresentationPackage(); t.after(presentationPackage.cleanup);

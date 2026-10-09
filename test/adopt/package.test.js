@@ -470,7 +470,7 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
   const pkg = JSON.parse(await readFile(path.join(repoRoot, 'package.json'), 'utf8'));
   assert.equal(pkg.name, '@dev-foundry/claude-adapter');
   assert.equal(pkg.private, true);
-  assert.deepEqual(pkg.bin, { 'dev-foundry-claude': 'bin/dev-foundry-claude.js' });
+  assert.deepEqual(pkg.bin, { 'dev-foundry-claude': 'bin/dev-foundry-claude.js', 'dev-foundry-claude-launcher': 'bin/dev-foundry-claude-launcher.js' });
   assert.deepEqual([...pkg.bundleDependencies].sort(), Object.keys(pkg.dependencies).sort());
   assert.deepEqual(Object.keys(pkg.dependencies).sort(), ['@modelcontextprotocol/server', 'yaml', 'zod']);
   assert.ok(!pkg.files.includes('package-lock.json'));
@@ -538,6 +538,12 @@ async function startInstalledDashboard(t, base, cwd, args = []) {
     // actual CLI, root/pin checks, server and asynchronous request handler run.
     await writeFile(loader, `import assert from 'node:assert/strict';
 import { Server } from 'node:http';
+// Instrument the new ownership query at the same prohibited socket boundary;
+// production still treats EPERM/unknown listeners as blocked, never absent.
+globalThis.fetch = async (url) => {
+  assert.equal(url, 'http://127.0.0.1:43127/api/runtime/identity');
+  throw new TypeError('synthetic absent listener', { cause: { code: 'ECONNREFUSED' } });
+};
 Server.prototype.listen = function(options, ready) {
   assert.deepEqual(options, { host: '127.0.0.1', port: 43127, exclusive: true });
   this.address = () => ({ address: '127.0.0.1', port: options.port, family: 'IPv4' });
@@ -779,8 +785,8 @@ test('TSK-021 isolated installed package guides fresh and brownfield setup, stat
   const client = new Client({ name: 'packaged-help-parity', version: '1.0.0' });
   await client.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(base.installed, 'bin/dev-foundry-claude.js'), 'mcp', '--expect', base.pin], env: { CLAUDE_PROJECT_DIR: c.root }, cwd: os.tmpdir() }));
   t.after(() => client.close());
-  const listed = await client.listResources(); assert.equal(listed.resources.length, 7);
-  for (const resource of listed.resources) {
+  const listed = await client.listResources(); assert.equal(listed.resources.length, 9);
+  for (const resource of listed.resources.filter(r => r.uri.startsWith('dev-foundry://help/'))) {
     const text = (await client.readResource({ uri: resource.uri })).contents[0].text;
     assert.equal(text, invoke('help', [resource.uri.split('/').at(-1)]).stdout);
   }
@@ -819,7 +825,8 @@ test('TSK-025 installed 1.4.2 proves compatible pin upgrades and managed refresh
     const invoke = (args) => cli(base.installed, ['upgrade', ...args], { cwd: c.root });
     // SPC-008's one-time legacy bridge targets 1.4.0. This release instead
     // compares managed bytes, requiring the exact old package only for refresh.
-    const refresh = version === '1.2.2-windows';
+    // B3 adds on-demand guidance to the managed block in both historical builds.
+    const refresh = true;
     const without = invoke(['--json']); assert.equal(without.status, refresh ? 2 : 0, without.stderr);
     const preview = JSON.parse(without.stdout);
     assert.equal(preview.plan.status, refresh ? 'blocked' : 'ready');
@@ -859,7 +866,7 @@ test('TSK-025 installed 1.4.2 proves compatible pin upgrades and managed refresh
     assert.equal(data.plan.status, 'ready'); assert.equal(data.applied, null); assert.equal(data.applicationFilesAffected, 0);
     assert.equal(data.plan.current.expect, oldPin); assert.equal(data.plan.target.expect, base.pin);
     assert.equal(data.plan.currentPackageRoot, refresh ? await realpath(oldPackage) : undefined);
-    const changed = version === '1.2.2-windows' ? ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md'] : ['.mcp.json'];
+    const changed = version === '1.2.2-windows' ? ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md'] : ['.mcp.json', 'CLAUDE.md'];
     assert.equal(data.plan.merge.length, changed.length); assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
     const planFile = path.join(await scratch('managed-plan'), 'plan.json');
     const exact = cli(base.installed, ['upgrade', 'plan', '--root', c.root, '--from-package', oldPackage, '--out', planFile]);
