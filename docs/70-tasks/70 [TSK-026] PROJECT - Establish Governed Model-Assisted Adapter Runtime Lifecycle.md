@@ -295,3 +295,78 @@ focused proof suffices; full regression and installed package proof are B4 gates
 No release publication, global user installation or real consumer mutation
 is implied by any passing B boundary. The source-bound feature is considered
 implemented only after B1–B4 accepted evidence and Author final reconciliation.
+
+## 13. B1–B4B observed implementation state and exact B4C gates (2026-10-09)
+
+The following is an **Author reconciliation of runner evidence**, not an
+independent audit or native host verdict. Implementation remains `IN_PROGRESS`,
+and the Operator has **not** authorized public release publication, real
+consumer adoption or host-wide replacement.
+
+| Internal proof boundary | Local commit | Runner evidence | Boundary result |
+| --- | --- | --- | --- |
+| B1 immutable runtime/store | `02186b4` | focused 26/26, suite 349/349 | PASS for B1 only |
+| B2 journaled governed transition | `5262d50` | focused 66/66, suite 419/419 | PASS for B2 only |
+| B3 CLI/MCP/dashboard/telemetry | `76c48ef` | focused 12/12, suite 430/430 | PASS for B3 only |
+| B4A offline acceptance harness | `ef9c7ba` | focused 21/21, suite 451/451 | PASS for harness only |
+| B4B isolated one-time host bootstrap | `4f8216d` | focused 39/39, suite 483/483 | PASS for offline POSIX fixture boundary only |
+
+The initial B4 broad run `req_aa9cc392a70025f99289666e53d66009`
+was **FAIL** (`VALIDATION_FAILED`, zero product changes, missing focused
+test files); this was resolved through the narrower B4A implementation
+`req_7ecf307ebb5c4ab0b8ae4bdf142e0f01`, and its failure evidence
+remains retained. B4B run
+`req_9cbaeef9293f082cc77f1a1d86a5efd9` returned `passed` with four
+bounded code/test changes, and its 483 tests passed. Neither result proves
+published-source, Windows or real-Claude acceptance. `npm pack --dry-run`
+and `git diff --check` passed in those internal runs.
+
+### Required unresolved B4C proof — MUST NOT be inferred
+
+1. **Windows implementation and host-native verification — BLOCKED.**
+   A Windows path is intentionally rejected by
+   `src/runtime/host-bootstrap.js` (`host-permissions-unsupported`),
+   `src/runtime/store.js` (`store-permissions-unsupported`) and the
+   `src/runtime/launcher.js` POSIX ownership checks. Merely adding a
+   `windows-latest` job does not resolve these fail-closed gates. A bounded
+   Windows security design must first provide and prove native ACL/owner
+   validation, reparse/junction safety, hardlink and archive path policies,
+   locked-file rename/recovery behavior, Windows Node 20/22 installer shims
+   and durable journal/storage semantics. Do not replace OS-specific checks
+   with unconditional bypasses or misleading `chmod` equivalence.
+   The available connected Windows runner is bound to another consumer
+   repository and is **not** authorized to mutate or execute this producer.
+   Use a separately governed, isolated Windows job/runner for exact
+   candidate evidence.
+2. **Authentic published source 1.4.2 bridge — PENDING.** Verify official
+   `mavalenzuela22/dev-foundry-claude` release tag `v1.4.2`, exact
+   release asset and observed provenance, package-installed source and
+   unchanged source bytes/session. B4A and B4B used isolated offline
+   fixtures and cannot stand in for this. The source package must not
+   acquire imaginary manager awareness.
+3. **Same-commit, same-bytes native matrix — PENDING.** A separate
+   non-publishing CI workflow may run macOS/Windows jobs only when
+   their exact source commit, unreleased candidate digest, allowlisted
+   asset provenance and raw machine evidence can be correlated. A
+   workflow file alone or green Mac tests are not Windows PASS. Do not
+   dispatch the release workflow, create a GitHub release or bump package
+   version during this acceptance task.
+4. **Actual source-governed Claude semantic/Operator gate — PENDING.**
+   A real Claude session operating under current consumer source
+   authority must generate and reconcile any semantic migration, and the
+   human Operator must approve exact reserved decisions. Model mocks,
+   fixture authorizations and this chat are not native acceptance. Verify
+   fresh target session and independently evaluate any OPS-004 audit trigger.
+5. **Final product boundary — NOT COMPLETE.** Obtain all preceding
+   evidence, cross-check rollback/forward-recovery and source/consumer
+   preservation, and only then reconcile implementation and consider
+   governed promotion. Even an eventual implementation PASS does not
+   authorize distribution, updating real users or a release workflow.
+
+**Next valid execution** under this *same* TSK: prepare a narrowly projected,
+native-Windows capability/security implementation and non-publishing
+acceptance harness, with an isolated Windows execution route. Do not start
+another costly producer implementation run that can only generate Mac
+fixtures and would falsely be counted as B4C acceptance. A missing native
+route remains an explicit BLOCKED gate, not a new TSK or a license to
+reuse the Windows consumer runner.
