@@ -51,6 +51,22 @@ function fixture({ name = '@dev-foundry/claude-adapter', version = '1.4.2', scri
 }
 const expectations = (bytes, manifest) => ({ ...bound, sha256: sha256(bytes), selfPin: manifest.package.selfPin });
 
+test('producer stable launcher exists, matches the package bin and is selected for Git tracking', () => {
+  const launcher = 'bin/dev-foundry-claude-launcher.js';
+  const pkg = JSON.parse(readFileSync(path.join(repo, 'package.json'), 'utf8'));
+  assert.equal(pkg.bin['dev-foundry-claude-launcher'], launcher);
+  assert.ok(pkg.files.includes('bin'));
+  assert.equal(lstatSync(path.join(repo, launcher)).isFile(), true);
+  // --no-index checks effective ignore rules even after the file is selected.
+  const ignored = spawnSync('git', ['check-ignore', '--no-index', '--', launcher], { cwd: repo, encoding: 'utf8' });
+  assert.equal(ignored.status, 1, ignored.stderr || ignored.stdout);
+  assert.equal(ignored.stdout, '');
+  // The index may contain intent-to-add; this does not prove a completed commit
+  // or CI normal-prepack/archive acceptance after promotion.
+  assert.equal(execFileSync('git', ['ls-files', '--error-unmatch', '--', launcher],
+    { cwd: repo, encoding: 'utf8' }).trim(), launcher);
+});
+
 test('synthetic fixture exact archive, producer SHA, run and self-pin binding', () => {
   const { bytes } = fixture(), manifest = candidateManifest(bytes, bound);
   assert.equal(manifest.kind, 'unreleased-candidate'); assert.equal(manifest.officialSource, false);
