@@ -385,3 +385,12 @@ test('project has exactly the two authorized subagents and no Claude settings, H
   }
   await assertAbsent('.agents/skills');
 });
+
+test('managed startup discovers on-demand B3 workflow without granting upgrade authority or requiring user npm/hash edits', async () => {
+  const block = await readProjectFile('templates/claude-md-block.md.tmpl');
+  for (const text of ['dev-foundry://help/runtime', 'source POP/index/task/profile authority', 'actual Operator authorization', 'Never self-authorize', 'fresh independently verified target MCP session', 'one-time B4 host bootstrap']) assert.ok(block.includes(text), text);
+  assert.ok(!block.includes('/update'));
+  const { renderHelp } = await import('../../src/consumer/help.js');
+  const help = renderHelp('runtime');
+  for (const text of ['No user npm, hash-copying or JSON editing', 'Chat memory', '--yes is forbidden', 'B2', 'actual fresh target MCP process', 'no-op', 'B4 gates']) assert.ok(help.includes(text), text);
+});

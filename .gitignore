@@ -438,3 +438,4 @@ docs/codemie/analytics/
 # Producer release tooling is source, not build output.
 !/scripts/release/
 !/scripts/release/**
+!/bin/dev-foundry-claude-launcher.js

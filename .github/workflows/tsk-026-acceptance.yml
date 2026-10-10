@@ -1,0 +1,118 @@
+name: TSK-026 B4C1 native diagnostic (unreleased)
+
+# PR code/tests run only on disposable hosted runners, with no secrets or
+# persisted checkout credentials. This probe cannot establish full B4 PASS.
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tsk026-probe-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PRODUCER_SHA: ${{ github.event.pull_request.head.sha }}
+
+jobs:
+  candidate:
+    if: github.head_ref == 'task/tsk-026-implementation-preparation' && github.repository == 'mavalenzuela22/dev-foundry-claude'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      sha256: ${{ steps.pack.outputs.sha256 }}
+      pin: ${{ steps.pack.outputs.pin }}
+      manifest-sha256: ${{ steps.pack.outputs.manifest_sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+        timeout-minutes: 3
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        timeout-minutes: 3
+        with:
+          node-version: 22
+      - name: Restore pinned producer dependencies without lifecycle scripts
+        timeout-minutes: 5
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund --cache "$RUNNER_TEMP/tsk026-npm-cache"
+          npm ci --prefix tools/dashboard --ignore-scripts --no-audit --no-fund --cache "$RUNNER_TEMP/tsk026-npm-cache"
+      - name: Pack once with normal prepack; bind exact candidate bytes
+        id: pack
+        timeout-minutes: 5
+        run: node scripts/acceptance/tsk026-ci.mjs candidate
+      - uses: actions/upload-artifact@v4
+        timeout-minutes: 3
+        with:
+          name: tsk026-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/tsk026-candidate/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload bounded candidate pack diagnostics
+        uses: actions/upload-artifact@v4
+        if: always()
+        timeout-minutes: 1
+        with:
+          name: tsk026-pack-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/tsk026-pack-diagnostics/
+          if-no-files-found: warn
+          retention-days: 7
+
+  native:
+    needs: candidate
+    if: github.head_ref == 'task/tsk-026-implementation-preparation' && github.repository == 'mavalenzuela22/dev-foundry-claude'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    env:
+      CANDIDATE_SHA256: ${{ needs.candidate.outputs.sha256 }}
+      CANDIDATE_PIN: ${{ needs.candidate.outputs.pin }}
+      MANIFEST_SHA256: ${{ needs.candidate.outputs.manifest-sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+        timeout-minutes: 3
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        timeout-minutes: 3
+        with:
+          node-version: 22
+      - name: Initialize honest pending host receipt before acquisition
+        timeout-minutes: 1
+        run: node scripts/acceptance/tsk026-ci.mjs init
+      - uses: actions/download-artifact@v4
+        timeout-minutes: 3
+        with:
+          name: tsk026-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/tsk026-candidate
+      - name: Restore pinned test dependencies without lifecycle scripts
+        timeout-minutes: 5
+        # Native candidate installation below is offline. These dependencies
+        # support the existing suite, whose packaging fixtures are separate.
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund --cache "${{ runner.temp }}/tsk026-npm-cache"
+          npm ci --prefix tools/dashboard --ignore-scripts --no-audit --no-fund --cache "${{ runner.temp }}/tsk026-npm-cache"
+      - name: Verify same bytes, install isolated candidate, diagnose host and run npm test
+        timeout-minutes: 22
+        run: node scripts/acceptance/tsk026-ci.mjs native
+      - name: Final diagnostic verdict (Windows ACL BLOCKED fails)
+        if: always()
+        timeout-minutes: 1
+        run: node scripts/acceptance/tsk026-ci.mjs verdict
+      - uses: actions/upload-artifact@v4
+        if: always()
+        timeout-minutes: 3
+        with:
+          name: tsk026-report-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/tsk026-reports/*
+          if-no-files-found: error
+          retention-days: 7

@@ -18,7 +18,7 @@ test('read-only MCP help and installed CLI render the same canonical versioned c
   try {
     await client.connect(transport);
     const { resources } = await client.listResources();
-    assert.deepEqual(resources.map((resource) => resource.uri).sort(), Object.keys(helpTopics).map(helpUri).sort());
+    assert.deepEqual(resources.map((resource) => resource.uri).sort(), [...Object.keys(helpTopics).map(helpUri), 'dev-foundry://runtime/identity'].sort());
     for (const topic of Object.keys(helpTopics)) {
       const resource = await client.readResource({ uri: helpUri(topic) });
       assert.equal(resource.contents[0].text, renderHelp(topic));
