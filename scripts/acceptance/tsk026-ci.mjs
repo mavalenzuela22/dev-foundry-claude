@@ -222,6 +222,47 @@ const safeCode = value => typeof value === 'string' &&
   /^(?:EACCES|EPERM|ENOENT|EEXIST|ENOTDIR|EISDIR|ENOSPC|EIO|EROFS|EINVAL|ETIMEDOUT|ENOBUFS|ERR_CHILD_PROCESS_STDIO_MAXBUFFER|ELIFECYCLE|EJSONPARSE|ENOPACKAGE|EBADENGINE|ERESOLVE|Z_DATA_ERROR|Z_BUF_ERROR)$/.test(value) ? value : null;
 const safeSignal = value => /^SIG(?:TERM|KILL|INT|ABRT|SEGV|PIPE|HUP)$/.test(value ?? '') ? value : null;
 const exitCode = value => Number.isSafeInteger(value) && value >= 0 && value <= 255 ? value : null;
+// Every explicit inspectArchive rejection is an exact, closed mapping. Never
+// derive a reason from arbitrary archive paths, JSON excerpts or error text.
+const ARCHIVE_REASONS = new Map([
+  ['archive exceeds bound', 'archive-exceeds-bound'],
+  ['invalid tar number', 'archive-invalid-tar-number'],
+  ['invalid tar checksum', 'archive-invalid-tar-checksum'],
+  ['truncated tar entry', 'archive-truncated-tar-entry'],
+  ['unbounded PAX metadata', 'archive-unbounded-pax-metadata'],
+  ['invalid PAX record', 'archive-invalid-pax-record'],
+  ['unsupported PAX metadata', 'archive-unsupported-pax-metadata'],
+  ['archive links/devices/extensions refused', 'archive-links-devices-extensions-refused'],
+  ['unsafe archive path', 'archive-unsafe-path'],
+  ['ambiguous archive path', 'archive-ambiguous-path'],
+  ['duplicate archive entry', 'archive-duplicate-entry'],
+  ['file is archive ancestor', 'archive-file-is-ancestor'],
+  ['archive file/directory collision', 'archive-file-directory-collision'],
+  ['directory has bytes', 'archive-directory-has-bytes'],
+  ['incomplete/trailing tar data', 'archive-incomplete-trailing-data'],
+  ['payload manifest missing', 'archive-payload-manifest-missing'],
+  ['noncanonical payload manifest', 'archive-noncanonical-payload-manifest'],
+  ['wrong source package identity/bins/bundles', 'archive-wrong-source-package-identity-bins-bundles'],
+  ['archive file set mismatch', 'archive-file-set-mismatch'],
+  ['unsafe/duplicate manifest path', 'archive-unsafe-duplicate-manifest-path'],
+  ['archive payload digest mismatch', 'archive-payload-digest-mismatch'],
+  ['wrong bundled dependency identity', 'archive-wrong-bundled-dependency-identity'],
+]);
+const REQUIRED_ARCHIVE_PATHS = Object.freeze([
+  'bin/dev-foundry-claude.js', 'bin/dev-foundry-claude-launcher.js',
+  'framework/dev-foundry-2.1.0.bundle.json', 'migrations/release.json',
+  'src/runtime/identity.js', 'src/runtime/store.js', 'tools/dashboard/dist/index.html',
+  'node_modules/@modelcontextprotocol/server/package.json',
+  'node_modules/yaml/package.json', 'node_modules/zod/package.json',
+]);
+for (const required of REQUIRED_ARCHIVE_PATHS) {
+  ARCHIVE_REASONS.set(`required bundled file missing: ${required}`,
+    `archive-required-bundled-file-missing:${required}`);
+}
+const exceptionType = error => ['Error', 'SyntaxError', 'TypeError', 'RangeError'].includes(error?.name) ? error.name : 'Error';
+export function archiveErrorDiagnostic(error) {
+  return { type: exceptionType(error), reason: ARCHIVE_REASONS.get(error?.message) ?? 'archive-unclassified' };
+}
 export function packOutputDiagnostic(value) {
   const text = typeof value === 'string' ? value : Buffer.isBuffer(value) ? value.toString('utf8') : '';
   const sample = text.length <= 4096 ? text : `${text.slice(0, 2048)}\n${text.slice(-2048)}`;
@@ -317,14 +358,12 @@ export function packCandidate(getContext, run = npmRun, runnerTemp = process.env
   } catch (error) {
     report.outcome = 'FAIL'; report.durationMs = elapsed(); report.errorCode = safeCode(error.code);
     const knownReasons = ['candidate SHA-256 mismatch', 'candidate self-pin mismatch',
-      'archive exceeds bound', 'invalid tar checksum', 'truncated tar entry',
-      'archive links/devices/extensions refused', 'unsafe archive path',
-      'payload manifest missing', 'noncanonical payload manifest',
-      'wrong source package identity/bins/bundles', 'archive file set mismatch',
-      'archive payload digest mismatch', 'wrong bundled dependency identity',
       'unexpected pack filename', 'pack archive missing/not a file', 'npm pack failed'];
-    report.error = { type: ['Error', 'SyntaxError', 'TypeError', 'RangeError'].includes(error.name) ? error.name : 'Error',
-      reason: knownReasons.includes(error.message) ? error.message : 'stage-operation-failed' };
+    report.error = report.phase === 'inspectArchive' ? archiveErrorDiagnostic(error) :
+      { type: exceptionType(error), reason: knownReasons.includes(error.message) ? error.message : 'stage-operation-failed' };
+    // Unknown parser/native errors retain only their stage and closed type/reason.
+    // Native JSON/zlib messages can include payload contents or varying details.
+    if (report.phase === 'inspectArchive') report.errorCode = null;
     let diagnosticFailure = false;
     try {
       // Retry preparation for a transient initial failure; unsafe/unwritable
@@ -335,7 +374,8 @@ export function packCandidate(getContext, run = npmRun, runnerTemp = process.env
     const command = report.command;
     const reason = report.phase === 'npm-pack' ?
       `; exit=${command.exitCode ?? 'unavailable'}; signal=${command.signal ?? 'none'}; code=${command.errorCode ?? 'unavailable'}` :
-      `; code=${report.errorCode ?? 'unavailable'}`;
+      report.phase === 'inspectArchive' ? `; archive-reason=${report.error.reason}` :
+        `; code=${report.errorCode ?? 'unavailable'}`;
     throw Error(`candidate pack failed at ${report.phase}${reason}${diagnosticFailure ? '; diagnostic persistence failed' : ''}`);
   }
 }

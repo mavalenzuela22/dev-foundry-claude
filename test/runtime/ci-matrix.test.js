@@ -5,11 +5,11 @@ import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSy
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import test from 'node:test';
 import { parse } from 'yaml';
 import { buildManifestBytes, sha256, verifyPayload } from '../../src/adopt/pin.js';
-import { candidateManifest, inspectArchive, inspectShims, installArguments, main,
+import { archiveErrorDiagnostic, candidateManifest, inspectArchive, inspectShims, installArguments, main,
   npmCli, packCandidate, packOutputDiagnostic, pendingReceipt, probeExit, tempChild, verifyCandidate } from '../../scripts/acceptance/tsk026-ci.mjs';
 
 const repo = fileURLToPath(new URL('../../', import.meta.url));
@@ -290,7 +290,7 @@ test('postpack archive digest verification failure remains failed and emits no o
   const f = packFixture(t, { bytes: tar(files) });
   assert.throws(f.execute, /inspectArchive/);
   assert.equal(f.diagnostic().phase, 'inspectArchive');
-  assert.equal(f.diagnostic().error.reason, 'archive payload digest mismatch');
+  assert.equal(f.diagnostic().error.reason, 'archive-payload-digest-mismatch');
   assert.equal(existsSync(f.githubOutput), false);
 });
 test('manifest and hash write failures are distinguished and retained', t => {
@@ -362,4 +362,134 @@ test('CLI candidate context failure exits nonzero and retains a safe diagnostic'
 test('bounded output projection retains terminal npm reason after a large prepack log', () => {
   const diagnostic = packOutputDiagnostic(`built in 2.70s\n${'x'.repeat(100000)}\nnpm error code ELIFECYCLE\n`);
   assert.equal(diagnostic.truncated, true); assert.equal(diagnostic.summary, 'build-completed; npm-code:ELIFECYCLE');
+});
+
+// Exercise the unchanged parser with real synthetic gzip/TAR bytes, rather
+// than supplying its rejection strings as fake subprocess errors.
+function changeHeader(edit) {
+  const raw = gunzipSync(tar([['entry', 'bytes']]));
+  edit(raw);
+  raw.fill(32, 148, 156);
+  const sum = [...raw.subarray(0, 512)].reduce((a, b) => a + b, 0);
+  raw.write(`${sum.toString(8).padStart(6, '0')}\0 `, 148, 8, 'ascii');
+  return gzipSync(raw);
+}
+function paxRecord(key, value) {
+  const text = `${key}=${value}\n`;
+  let length = Buffer.byteLength(text) + 2;
+  while (length !== Buffer.byteLength(`${length} ${text}`)) length = Buffer.byteLength(`${length} ${text}`);
+  return `${length} ${text}`;
+}
+function paxArchive(body, following = fixture().bytes) {
+  const prefix = gunzipSync(tar([['PaxHeader', body]], 'x')).subarray(0, -1024);
+  return gzipSync(Buffer.concat([prefix, gunzipSync(following)]));
+}
+function manifestArchive(edit, rebuild = false) {
+  const { files } = fixture();
+  const manifest = JSON.parse(files.get('payload-manifest.json'));
+  edit(files, manifest);
+  files.set('payload-manifest.json', buildManifestBytes({ version: manifest.version,
+    entries: rebuild ? [...files].filter(([p]) => p !== 'payload-manifest.json')
+      .map(([p, bytes]) => ({ path: p, size: bytes.length, sha256: sha256(bytes) })) : manifest.files }));
+  return tar(files);
+}
+const requiredArchivePaths = [
+  ...Object.values(bins), 'framework/dev-foundry-2.1.0.bundle.json', 'migrations/release.json',
+  'src/runtime/identity.js', 'src/runtime/store.js', 'tools/dashboard/dist/index.html',
+  ...Object.keys(dependencies).map(n => `node_modules/${n}/package.json`),
+];
+const archiveFailures = [
+  ['archive-exceeds-bound', () => Buffer.alloc(64 * 1024 * 1024 + 1)],
+  ['archive-invalid-tar-number', () => changeHeader(raw => raw.write('invalid\0', 124, 8, 'ascii'))],
+  ['archive-invalid-tar-checksum', () => {
+    const raw = gunzipSync(fixture().bytes); raw[0] ^= 1; return gzipSync(raw);
+  }],
+  ['archive-truncated-tar-entry', () => changeHeader(raw => raw.write('00000100000\0', 124, 12, 'ascii'))],
+  ['archive-unbounded-pax-metadata', () => paxArchive('x'.repeat(65537))],
+  ['archive-unbounded-pax-metadata', () => paxArchive(paxRecord('mtime', '1'), paxArchive(paxRecord('mtime', '2')))],
+  ['archive-invalid-pax-record', () => paxArchive('9 path=x!')],
+  ['archive-unsupported-pax-metadata', () => paxArchive(paxRecord('unsupported', 'value'))],
+  ['archive-unsupported-pax-metadata', () => paxArchive(paxRecord('path', 'package/a') + paxRecord('path', 'package/b'))],
+  ...['1', '2', '3', '4', '6', 'g', 'L'].map(type =>
+    ['archive-links-devices-extensions-refused', () => tar([['entry', '']], type)]),
+  ['archive-links-devices-extensions-refused', () => changeHeader(raw => raw.write('link-target', 157, 11, 'ascii'))],
+  ['archive-unsafe-path', () => tar([['../escape', 'bytes']])],
+  ['archive-ambiguous-path', () => tar([['bin/a', 'a'], ['BIN/b', 'b']])],
+  ['archive-duplicate-entry', () => tar([['entry', 'a'], ['entry', 'b']])],
+  ['archive-file-is-ancestor', () => tar([['bin', 'file'], ['bin/child', 'bytes']])],
+  ['archive-file-directory-collision', () => tar([['bin/child', 'bytes'], ['bin', 'file']])],
+  ['archive-directory-has-bytes', () => tar([['bin', 'bytes']], '5')],
+  ['archive-incomplete-trailing-data', () => gzipSync(gunzipSync(fixture().bytes).subarray(0, -1024))],
+  ['archive-incomplete-trailing-data', () => gzipSync(Buffer.concat([gunzipSync(fixture().bytes), Buffer.from('trailing')]))],
+  ['archive-incomplete-trailing-data', () => paxArchive(paxRecord('mtime', '1'), gzipSync(Buffer.alloc(1024)))],
+  ['archive-payload-manifest-missing', () => tar([['entry', 'bytes']])],
+  ['archive-noncanonical-payload-manifest', () => {
+    const { files } = fixture(); files.set('payload-manifest.json', Buffer.from(JSON.stringify(JSON.parse(files.get('payload-manifest.json')))));
+    return tar(files);
+  }],
+  ...[{ name: '@foreign/package' }, { version: '9.0.0' }, { bin: {} }, { dependencies: {} }, { bundleDependencies: [] }]
+    .map(delta => ['archive-wrong-source-package-identity-bins-bundles', () => manifestArchive(files => {
+      files.set('package.json', Buffer.from(JSON.stringify({ ...JSON.parse(files.get('package.json')), ...delta })));
+    }, true)]),
+  ['archive-file-set-mismatch', () => {
+    const { files } = fixture(); files.delete('src/runtime/store.js'); return tar(files);
+  }],
+  ['archive-unsafe-duplicate-manifest-path', () => manifestArchive((files, manifest) => { manifest.files[0].path = '../escape'; })],
+  ['archive-unsafe-duplicate-manifest-path', () => manifestArchive((files, manifest) => { manifest.files[1] = manifest.files[0]; })],
+  ['archive-payload-digest-mismatch', () => manifestArchive(files => { files.set('src/runtime/store.js', Buffer.from('changed')); })],
+  ...requiredArchivePaths.map(required => [`archive-required-bundled-file-missing:${required}`,
+    () => manifestArchive(files => { files.delete(required); }, true)]),
+  ['archive-wrong-bundled-dependency-identity', () => manifestArchive(files => {
+    files.set('node_modules/yaml/package.json', Buffer.from(JSON.stringify({ name: 'yaml', version: '0.0.0' })));
+  }, true)],
+];
+for (const [index, [reason, makeBytes]] of archiveFailures.entries()) {
+  test(`archive rejection ${index + 1}: ${reason} stays FAIL without candidate consumption`, t => {
+    const bytes = makeBytes();
+    assert.throws(() => inspectArchive(bytes), error => {
+      assert.equal(archiveErrorDiagnostic(error).reason, reason); return true;
+    });
+    const f = packFixture(t, { bytes, result: { stderr: 'built in 2.70s\nSome chunks are larger than 500 kB after minification.' } });
+    assert.throws(f.execute, error => {
+      assert.equal(error.message, `candidate pack failed at inspectArchive; archive-reason=${reason}`); return true;
+    });
+    const report = f.diagnostic();
+    assert.equal(report.outcome, 'FAIL'); assert.equal(report.phase, 'inspectArchive');
+    assert.deepEqual(report.error, { type: 'Error', reason });
+    assert.match(report.command.stderr.summary, /chunk-size-warning/);
+    assert.equal(existsSync(f.githubOutput), false);
+    for (const name of ['manifest.json', 'SHA256SUMS']) assert.equal(existsSync(path.join(f.c.temp, 'tsk026-candidate', name)), false);
+    assert.equal(existsSync(path.join(f.c.temp, 'tsk026-reports')), false);
+    assert.equal(existsSync(path.join(f.c.temp, 'prefix')), false);
+  });
+}
+test('unknown archive exception messages and required-path lookalikes are closed and redacted', () => {
+  const secret = 'Bearer SYNTHETIC_CREDENTIAL https://user:password@example.test/ ENV=PRIVATE_FILE_CONTENT';
+  for (const message of [secret, `invalid tar number ${secret}`, `required bundled file missing: ${secret}`,
+    'required bundled file missing: src/runtime/store.js/../private', 'invalid tar number\n',
+    ...requiredArchivePaths.map(p => `required bundled file missing: ${p}\n${secret}`)]) {
+    for (const name of ['Error', 'SyntaxError', 'TypeError', 'RangeError', secret]) {
+      const error = Object.assign(Error(message), { name, code: secret });
+      assert.deepEqual(archiveErrorDiagnostic(error), { type: name === secret ? 'Error' : name, reason: 'archive-unclassified' });
+    }
+  }
+});
+test('unknown real JSON/gzip archive failures redact payload text and expose only generic CLI reason', t => {
+  const secret = 'ghp_SYNTHETIC_NOT_REAL_TOKEN password=SYNTHETIC_PRIVATE_ENV_FILE';
+  const { files } = fixture(); files.set('payload-manifest.json', Buffer.from(secret));
+  for (const bytes of [tar(files), Buffer.from(secret)]) {
+    const f = packFixture(t, { bytes });
+    assert.throws(f.execute, error => {
+      assert.equal(error.message, 'candidate pack failed at inspectArchive; archive-reason=archive-unclassified'); return true;
+    });
+    const report = f.diagnostic();
+    assert.equal(report.outcome, 'FAIL'); assert.equal(report.phase, 'inspectArchive');
+    assert.equal(report.error.reason, 'archive-unclassified'); assert.equal(report.errorCode, null);
+    assert.ok(['SyntaxError', 'Error'].includes(report.error.type));
+    assert.doesNotMatch(JSON.stringify(report), /ghp_|SYNTHETIC_PRIVATE|password=|PRIVATE_ENV_FILE/);
+    assert.equal(existsSync(f.githubOutput), false);
+    for (const name of ['manifest.json', 'SHA256SUMS']) assert.equal(existsSync(path.join(f.c.temp, 'tsk026-candidate', name)), false);
+    assert.equal(existsSync(path.join(f.c.temp, 'tsk026-reports')), false);
+    assert.equal(existsSync(path.join(f.c.temp, 'prefix')), false);
+  }
 });
