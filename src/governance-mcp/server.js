@@ -1,3 +1,7 @@
+import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { authoritySnapshot } from '../runtime/plan.js';
+import { assertPackageSelected } from '../runtime/resolver.js';
 import { McpServer } from '@modelcontextprotocol/server';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
@@ -26,6 +30,26 @@ for (const topic of Object.keys(helpTopics)) {
     description: 'Read-only explanatory product help; not repository or methodology authority.',
   }, async () => ({ contents: [{ uri, mimeType: 'text/plain', text: renderHelp(topic) }] }));
 }
+
+// Read-only identity observation is available during pending cutover. It does
+// not bypass the existing session/activation guards on governed tool calls.
+const runtimeSessionId = randomUUID();
+const packageRoot = fileURLToPath(new URL('../../', import.meta.url)).replace(/[\\/]$/, '');
+server.registerResource('runtime-identity', 'dev-foundry://runtime/identity', {
+  title: 'Selected runtime identity', mimeType: 'application/json',
+  description: 'Read-only fresh process identity; grants no governed authority.',
+}, async () => {
+  const selected = assertPackageSelected({ cwd: projectRoot, packageRoot,
+    expect: globalThis[Symbol.for('dev-foundry-claude.consumer-runtime-pin')], pendingMcp: true });
+  const authority = authoritySnapshot(selected.repositoryRoot);
+  const activation = await (consumerGuard ?? (await import('../adopt/activation.js')).evaluateActivation)(selected.repositoryRoot);
+  return { contents: [{ uri: 'dev-foundry://runtime/identity', mimeType: 'application/json', text: JSON.stringify({
+    format: 'dev-foundry.runtime-identity.v1', sessionId: runtimeSessionId, pid: process.pid,
+    probe: process.env.DEV_FOUNDRY_RUNTIME_PROBE ?? null, repositoryRoot: selected.repositoryRoot,
+    packageRoot: selected.runtime.packageRoot, pin: selected.expect, authority: authority.fingerprint, activation: activation.overall,
+    journalState: selected.journal.state, planSha256: selected.journal.planSha256 ?? null,
+  }) }] };
+});
 
 server.registerTool('resolve_governed_operation', {
   title: 'Resolve governed operation',

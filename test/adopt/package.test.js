@@ -11,6 +11,7 @@ import { performance } from 'node:perf_hooks';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { MANIFEST_NAME, buildManifestBytes, formatExpect, rootOf, selfPin, sha256, verifyPayload } from '../../src/adopt/pin.js';
+import { firstPayloadDifference } from '../../scripts/acceptance/tsk026-ci.mjs';
 import { diffTrees, listTree, makeConsumer, repoRoot, applyProposal, readSetSnapshot } from './fixture.js';
 
 const scratchDirs = [];
@@ -23,7 +24,7 @@ after(async () => { for (const dir of scratchDirs) await rm(dir, { recursive: tr
 
 const cleanEnv = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(?:npm_|DEV_FOUNDRY_|OTEL_|CLAUDE)/i.test(key)));
 const npmCache = await scratch('package-npm-cache');
-const npm = (args, cwd, env = {}) => execFileSync('npm', args, { cwd, encoding: 'utf8', env: { ...cleanEnv(), ...env, npm_config_cache: npmCache, npm_config_update_notifier: 'false' }, stdio: ['ignore', 'pipe', 'pipe'] });
+const npm = (args, cwd, env = {}) => execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', args, { cwd, encoding: 'utf8', shell: process.platform === 'win32', env: { ...cleanEnv(), ...env, npm_config_cache: npmCache, npm_config_update_notifier: 'false' }, stdio: ['ignore', 'pipe', 'pipe'] });
 
 // Builds a tarball from a copy of the tracked package inputs plus the prod node_modules.
 async function build(mutate) {
@@ -128,6 +129,21 @@ function baseline() {
     const prefix = await scratch('install-prefix');
     npm(['install', '--prefix', prefix, '--offline', '--no-audit', '--no-fund', '--ignore-scripts', built.tarball], prefix, { npm_config_registry: 'http://127.0.0.1:9/' });
     const installed = path.join(prefix, 'node_modules/@dev-foundry/claude-adapter');
+    if (process.platform === 'win32') {
+      try { verifyPayload(installed, pin); }
+      catch {
+        let difference = null;
+        try {
+          difference = firstPayloadDifference(installed, manifest.files,
+            { size: manifestBytes.length, sha256: sha256(manifestBytes) });
+        } catch { /* Keep diagnostics bounded when the installed tree cannot be inspected. */ }
+        const detail = difference ?? {
+          mismatch: 'unclassified',
+          possible: 'transient filesystem/read/ACL behavior, traversal, or verifier condition outside manifest comparison',
+        };
+        process.stderr.write(`TSK-026 baseline payload diagnostic ${JSON.stringify(detail)}\n`);
+      }
+    }
     await rm(built.tree, { recursive: true, force: true });
     return { ...built, manifest, manifestBytes, pin, prefix, installed };
   })();
@@ -135,32 +151,40 @@ function baseline() {
 }
 
 test('TSK-018 the source launcher has a canonical LF shebang and Git pins its line endings', async () => {
-  const launcher = await readFile(path.join(repoRoot, 'bin/dev-foundry-claude.js'));
-  const shebang = launcher.subarray(0, launcher.indexOf(0x0a) + 1);
-  assert.deepEqual(shebang, Buffer.from('#!/usr/bin/env node\n'));
-  assert.equal(shebang.includes(0x0d), false, 'no CR byte terminates the shebang');
-  assert.equal(launcher.includes(0x0d), false, 'all launcher line endings are LF');
+  const launchers = ['bin/dev-foundry-claude.js', 'bin/dev-foundry-claude-launcher.js'];
+  for (const name of launchers) {
+    const launcher = await readFile(path.join(repoRoot, name));
+    const shebang = launcher.subarray(0, launcher.indexOf(0x0a) + 1);
+    assert.deepEqual(shebang, Buffer.from('#!/usr/bin/env node\n'), name);
+    assert.equal(shebang.includes(0x0d), false, `${name}: no CR byte terminates the shebang`);
+    assert.equal(launcher.includes(0x0d), false, `${name}: all launcher line endings are LF`);
+  }
   const attributes = await readFile(path.join(repoRoot, '.gitattributes'), 'utf8');
-  assert.ok(attributes.split(/\r?\n/).includes('bin/dev-foundry-claude.js text eol=lf'));
-  const effective = execFileSync('git', ['-c', 'core.autocrlf=true', 'check-attr', 'text', 'eol', '--', 'bin/dev-foundry-claude.js'], { cwd: repoRoot, encoding: 'utf8' });
-  assert.equal(effective, 'bin/dev-foundry-claude.js: text: set\nbin/dev-foundry-claude.js: eol: lf\n');
+  for (const name of launchers) assert.ok(attributes.split(/\r?\n/).includes(`${name} text eol=lf`), name);
+  const effective = execFileSync('git', ['-c', 'core.autocrlf=true', 'check-attr', 'text', 'eol', '--', ...launchers], { cwd: repoRoot, encoding: 'utf8' });
+  assert.equal(effective, launchers.flatMap((name) => [`${name}: text: set`, `${name}: eol: lf`]).join('\n') + '\n');
 });
 
 test('TSK-018 packing and offline npm installation preserve every launcher byte', async () => {
   const base = await baseline();
-  const source = await readFile(path.join(repoRoot, 'bin/dev-foundry-claude.js'));
-  const packed = execFileSync('tar', ['-xOzf', base.tarball, 'package/bin/dev-foundry-claude.js']);
-  const installed = await readFile(path.join(base.installed, 'bin/dev-foundry-claude.js'));
-  assert.deepEqual(packed, source);
-  assert.deepEqual(installed, packed);
-  const entry = base.manifest.files.find((file) => file.path === 'bin/dev-foundry-claude.js');
-  assert.equal(entry.size, installed.length);
-  assert.equal(entry.sha256, sha256(installed));
-  assert.equal(selfPin(base.installed).expect, base.pin);
-  const dir = await copyInstalled(base);
-  await writeFile(path.join(dir, 'bin/dev-foundry-claude.js'), Buffer.concat([source.subarray(0, source.indexOf(0x0a)), Buffer.from('\r\n'), source.subarray(source.indexOf(0x0a) + 1)]));
-  assert.throws(() => verifyPayload(dir, base.pin), /verification failed/, 'a CRLF shebang is still an exact-byte mismatch');
-  assert.throws(() => selfPin(dir), /verification failed/);
+  const launchers = ['bin/dev-foundry-claude.js', 'bin/dev-foundry-claude-launcher.js'];
+  for (const name of launchers) {
+    const source = await readFile(path.join(repoRoot, name));
+    const packed = execFileSync('tar', ['-xOzf', base.tarball, `package/${name}`]);
+    const installed = await readFile(path.join(base.installed, name));
+    assert.deepEqual(packed, source, `${name}: tarball bytes match source`);
+    assert.deepEqual(installed, packed, `${name}: offline npm install bytes match tarball`);
+    const entry = base.manifest.files.find((file) => file.path === name);
+    assert.ok(entry, `${name}: manifest entry exists`);
+    assert.equal(entry.size, installed.length, `${name}: manifest size matches installed bytes`);
+    assert.equal(entry.sha256, sha256(installed), `${name}: manifest hash matches installed bytes`);
+    assert.equal(selfPin(base.installed).expect, base.pin);
+    const dir = await copyInstalled(base);
+    await writeFile(path.join(dir, name), Buffer.concat([source.subarray(0, source.indexOf(0x0a)), Buffer.from('\r\n'), source.subarray(source.indexOf(0x0a) + 1)]));
+    assert.throws(() => verifyPayload(dir, base.pin), /verification failed/, `${name}: a CRLF shebang is still an exact-byte mismatch`);
+    assert.throws(() => selfPin(dir), /verification failed/, `${name}: self-pin rejects CRLF tampering`);
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test('16 the manifest is complete and exact for the tarball and the offline install; package-lock.json is not payload', async (t) => {
@@ -470,7 +494,7 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
   const pkg = JSON.parse(await readFile(path.join(repoRoot, 'package.json'), 'utf8'));
   assert.equal(pkg.name, '@dev-foundry/claude-adapter');
   assert.equal(pkg.private, true);
-  assert.deepEqual(pkg.bin, { 'dev-foundry-claude': 'bin/dev-foundry-claude.js' });
+  assert.deepEqual(pkg.bin, { 'dev-foundry-claude': 'bin/dev-foundry-claude.js', 'dev-foundry-claude-launcher': 'bin/dev-foundry-claude-launcher.js' });
   assert.deepEqual([...pkg.bundleDependencies].sort(), Object.keys(pkg.dependencies).sort());
   assert.deepEqual(Object.keys(pkg.dependencies).sort(), ['@modelcontextprotocol/server', 'yaml', 'zod']);
   assert.ok(!pkg.files.includes('package-lock.json'));
@@ -538,6 +562,12 @@ async function startInstalledDashboard(t, base, cwd, args = []) {
     // actual CLI, root/pin checks, server and asynchronous request handler run.
     await writeFile(loader, `import assert from 'node:assert/strict';
 import { Server } from 'node:http';
+// Instrument the new ownership query at the same prohibited socket boundary;
+// production still treats EPERM/unknown listeners as blocked, never absent.
+globalThis.fetch = async (url) => {
+  assert.equal(url, 'http://127.0.0.1:43127/api/runtime/identity');
+  throw new TypeError('synthetic absent listener', { cause: { code: 'ECONNREFUSED' } });
+};
 Server.prototype.listen = function(options, ready) {
   assert.deepEqual(options, { host: '127.0.0.1', port: 43127, exclusive: true });
   this.address = () => ({ address: '127.0.0.1', port: options.port, family: 'IPv4' });
@@ -779,8 +809,8 @@ test('TSK-021 isolated installed package guides fresh and brownfield setup, stat
   const client = new Client({ name: 'packaged-help-parity', version: '1.0.0' });
   await client.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(base.installed, 'bin/dev-foundry-claude.js'), 'mcp', '--expect', base.pin], env: { CLAUDE_PROJECT_DIR: c.root }, cwd: os.tmpdir() }));
   t.after(() => client.close());
-  const listed = await client.listResources(); assert.equal(listed.resources.length, 7);
-  for (const resource of listed.resources) {
+  const listed = await client.listResources(); assert.equal(listed.resources.length, 9);
+  for (const resource of listed.resources.filter(r => r.uri.startsWith('dev-foundry://help/'))) {
     const text = (await client.readResource({ uri: resource.uri })).contents[0].text;
     assert.equal(text, invoke('help', [resource.uri.split('/').at(-1)]).stdout);
   }
@@ -819,7 +849,8 @@ test('TSK-025 installed 1.4.2 proves compatible pin upgrades and managed refresh
     const invoke = (args) => cli(base.installed, ['upgrade', ...args], { cwd: c.root });
     // SPC-008's one-time legacy bridge targets 1.4.0. This release instead
     // compares managed bytes, requiring the exact old package only for refresh.
-    const refresh = version === '1.2.2-windows';
+    // B3 adds on-demand guidance to the managed block in both historical builds.
+    const refresh = true;
     const without = invoke(['--json']); assert.equal(without.status, refresh ? 2 : 0, without.stderr);
     const preview = JSON.parse(without.stdout);
     assert.equal(preview.plan.status, refresh ? 'blocked' : 'ready');
@@ -859,7 +890,7 @@ test('TSK-025 installed 1.4.2 proves compatible pin upgrades and managed refresh
     assert.equal(data.plan.status, 'ready'); assert.equal(data.applied, null); assert.equal(data.applicationFilesAffected, 0);
     assert.equal(data.plan.current.expect, oldPin); assert.equal(data.plan.target.expect, base.pin);
     assert.equal(data.plan.currentPackageRoot, refresh ? await realpath(oldPackage) : undefined);
-    const changed = version === '1.2.2-windows' ? ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md'] : ['.mcp.json'];
+    const changed = version === '1.2.2-windows' ? ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md'] : ['.mcp.json', 'CLAUDE.md'];
     assert.equal(data.plan.merge.length, changed.length); assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
     const planFile = path.join(await scratch('managed-plan'), 'plan.json');
     const exact = cli(base.installed, ['upgrade', 'plan', '--root', c.root, '--from-package', oldPackage, '--out', planFile]);

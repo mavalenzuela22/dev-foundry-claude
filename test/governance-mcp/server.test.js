@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
@@ -13,16 +14,16 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 const serverPath = path.join(repoRoot, 'src/governance-mcp/server.js');
 
 test('read-only MCP help and installed CLI render the same canonical versioned content', async () => {
-  const transport = new StdioClientTransport({ command: process.execPath, args: [serverPath], cwd: '/tmp' });
+  const transport = new StdioClientTransport({ command: process.execPath, args: [serverPath], cwd: os.tmpdir() });
   const client = new Client({ name: 'help-parity', version: '1.0.0' });
   try {
     await client.connect(transport);
     const { resources } = await client.listResources();
-    assert.deepEqual(resources.map((resource) => resource.uri).sort(), Object.keys(helpTopics).map(helpUri).sort());
+    assert.deepEqual(resources.map((resource) => resource.uri).sort(), [...Object.keys(helpTopics).map(helpUri), 'dev-foundry://runtime/identity'].sort());
     for (const topic of Object.keys(helpTopics)) {
       const resource = await client.readResource({ uri: helpUri(topic) });
       assert.equal(resource.contents[0].text, renderHelp(topic));
-      const cli = execFileSync(process.execPath, [path.join(repoRoot, 'bin/dev-foundry-claude.js'), 'help', topic], { encoding: 'utf8', cwd: '/tmp' });
+      const cli = execFileSync(process.execPath, [path.join(repoRoot, 'bin/dev-foundry-claude.js'), 'help', topic], { encoding: 'utf8', cwd: os.tmpdir() });
       assert.equal(cli, resource.contents[0].text);
     }
   } finally { await client.close(); }
@@ -34,7 +35,7 @@ test('stdio MCP smoke lists exactly one tool and calls the resolver', async () =
     command: process.execPath,
     args: [serverPath],
     env: { CLAUDE_PROJECT_DIR: project.root },
-    cwd: '/tmp',
+    cwd: os.tmpdir(),
   });
   const client = new Client({ name: 'governance-mcp-smoke', version: '1.0.0' });
   try {
@@ -76,7 +77,7 @@ test('stdio MCP resolves synthetic brownfield authority and refuses historical g
     command: process.execPath,
     args: [serverPath],
     env: { CLAUDE_PROJECT_DIR: project.root },
-    cwd: '/tmp',
+    cwd: os.tmpdir(),
   });
   const client = new Client({ name: 'brownfield-resolver-proof', version: '1.0.0' });
   const call = async argumentsValue => {

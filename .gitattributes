@@ -1,1 +1,5 @@
 bin/dev-foundry-claude.js text eol=lf
+bin/dev-foundry-claude-launcher.js text eol=lf
+framework/** -text
+.dev-foundry/releases/** -text
+scripts/telemetry/run-claude.sh text eol=lf

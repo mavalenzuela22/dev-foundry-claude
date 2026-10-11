@@ -23,7 +23,27 @@ function flags(argv, allowed) {
 const [command, ...rest] = process.argv.slice(2);
 const packageVersion = () => JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8')).version;
 
-if (!command || ['setup', 'start', 'status', 'doctor', 'help', '--help'].includes(command) || (command === 'upgrade' && !['status', 'plan', 'apply'].includes(rest[0]))) {
+// Managed dispatch markers are observations, never authority. Recheck the
+// selected package and journal before any entrypoint loads consumer work.
+if (process.env.DEV_FOUNDRY_RUNTIME_EXPECT && command !== 'runtime') {
+  try {
+    const { assertPackageSelected } = await import('../src/runtime/resolver.js');
+    assertPackageSelected({ cwd: process.cwd(), packageRoot,
+      expect: process.env.DEV_FOUNDRY_RUNTIME_EXPECT, pendingMcp: command === 'mcp' });
+  } catch (error) { fail(`Runtime dispatch refused: ${error.code ?? error.message}. Next: dev-foundry-claude runtime doctor`, 2); }
+}
+
+if (command === 'runtime') {
+  try {
+    selfPin(packageRoot);
+    const { runtimeCommand } = await import('../src/runtime/cli.js');
+    process.exitCode = await runtimeCommand({ argv: rest });
+  } catch (error) {
+    console.error(JSON.stringify({ status: 'blocked', code: error.code ?? 'runtime-invalid', message: error.message,
+      nextAction: 'dev-foundry-claude runtime doctor; preserve source runtime and exact plan/evidence.' }));
+    process.exitCode = 2;
+  }
+} else if (!command || ['setup', 'start', 'status', 'doctor', 'help', '--help'].includes(command) || (command === 'upgrade' && !['status', 'plan', 'apply'].includes(rest[0]))) {
   const { consumerCommand } = await import('../src/consumer/command.js');
   try { process.exitCode = await consumerCommand({ command: !command || command === '--help' ? 'help' : command, argv: rest, packageRoot }); }
   catch (error) { fail(`The operation could not complete safely. No application files were changed. ${error.exitCode === 2 ? error.message : `Next: dev-foundry-claude doctor. Use --verbose for technical diagnostics.${rest.includes('--verbose') ? ` Detail: ${error.code ?? error.message}` : ''}`}`, error.exitCode ?? 1); }
@@ -105,7 +125,7 @@ if (!command || ['setup', 'start', 'status', 'doctor', 'help', '--help'].include
     verifyPayload(packageRoot, expect);
   } catch { verificationFailure(); }
   const { runLauncher } = await import('../src/telemetry/launch.js');
-  process.exitCode = await runLauncher({ argv: ['--runtime', runtime, '--', ...claudeArgs], projectRoot: root });
+  process.exitCode = await runLauncher({ argv: ['--runtime', runtime, '--', ...claudeArgs], projectRoot: root, packageRoot });
 } else if (command === 'upgrade') {
   const [action, ...args] = rest;
   if (!['status', 'plan', 'apply'].includes(action)) fail('Usage: dev-foundry-claude upgrade <status|plan|apply> --root <repo>', 2);

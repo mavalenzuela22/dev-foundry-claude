@@ -6,6 +6,23 @@ import { canonicalJson, sha256 } from './pin.js';
 // Runtime transaction data is deliberately outside .dev-foundry authority routing.
 export const CUTOVER_DIR = '.dfc-cutover';
 
+// Keep pre-manager adoption/bootstrap imports usable in bounded legacy trees.
+// Absence is proven at the directory boundary; once any journal path exists,
+// unavailable manager code or unreadable/partial state must block, not fall back.
+export async function runtimeUpgradeState(root) {
+  try {
+    const info = await lstat(path.join(root, '.dfc-runtime-upgrade'));
+    if (!info.isDirectory() || await pathHasSymlink(root, '.dfc-runtime-upgrade')) return { state: 'unknown', blocked: true, epoch: null };
+  } catch (error) {
+    if (error.code === 'ENOENT') return { state: 'none', blocked: false, epoch: null };
+    return { state: 'unknown', blocked: true, epoch: null };
+  }
+  try {
+    const { runtimeUpgradeStatus } = await import('../runtime/journal.js');
+    return runtimeUpgradeStatus(await realpath(root));
+  } catch { return { state: 'unknown', blocked: true, epoch: null }; }
+}
+
 export function safeRelativePath(value) {
   return typeof value === 'string' && value.length > 0 && !/[\\:\x00-\x1f]/.test(value) &&
     !path.posix.isAbsolute(value) && !path.win32.isAbsolute(value) &&

@@ -1,11 +1,18 @@
 import path from 'node:path';
-import { INDEX_PATH, MCP_FILE, MCP_SERVER_NAME, POP_PATH, cutoverState, pathHasSymlink, readContained, readYamlContained } from '../adopt/common.js';
+import { lstat, realpath } from 'node:fs/promises';
+import { INDEX_PATH, MCP_FILE, MCP_SERVER_NAME, POP_PATH, cutoverState, pathHasSymlink, readContained, readYamlContained, runtimeUpgradeState } from '../adopt/common.js';
 import { canonicalJson, parseExpect, sha256 } from '../adopt/pin.js';
 
 // Only runtime bindings enter this projection. Task content/routes, policies and
 // Authority Index authoring are deliberately resolved afresh by the resolver.
 export async function sessionProjection(root) {
   if (typeof root !== 'string' || !path.isAbsolute(root)) throw new Error('Project root unavailable');
+  // Existing bootstrap callers may use the host's /var temporary-directory
+  // alias. Canonicalize that read-only root while refusing a symlinked project
+  // directory; B2 write APIs still require a fully non-symlink absolute root.
+  if ((await lstat(root)).isSymbolicLink()) throw new Error('Unsafe project root');
+  const upgrade = await runtimeUpgradeState(await realpath(root));
+  if (upgrade.blocked) throw new Error('Runtime upgrade requires recovery or fresh independent verification');
   const cutover = await cutoverState(root);
   if (cutover.blocked) throw new Error('Authority cutover requires recovery');
   if (await pathHasSymlink(root, POP_PATH) || await pathHasSymlink(root, MCP_FILE)) throw new Error('Unsafe runtime authority path');
@@ -39,7 +46,7 @@ export async function sessionProjection(root) {
   if (index?.status !== 'active') throw new Error('Runtime routes unavailable');
   const runtimePaths = new Set([POP_PATH, ...Object.keys(identities)]);
   const runtimeRoutes = [...(index.routes ?? []), ...(index.bindings ?? [])].filter((route) => runtimePaths.has(route.path));
-  return { adapterPin: entry.args[2], cutoverEpoch: cutover.epoch, project: pop.repository?.name, framework, actorBindings, bootstraps, runtimeRoutes, identities };
+  return { adapterPin: entry.args[2], cutoverEpoch: cutover.epoch, runtimeUpgradeEpoch: upgrade.epoch, project: pop.repository?.name, framework, actorBindings, bootstraps, runtimeRoutes, identities };
 }
 
 export async function createSessionGuard(root, expectedRuntimePin) {

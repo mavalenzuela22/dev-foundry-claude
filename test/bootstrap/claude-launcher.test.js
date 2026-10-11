@@ -214,19 +214,24 @@ test('SIGINT and SIGTERM are forwarded and handlers are removed afterwards', asy
 
 test('run-claude.sh is executable, delegates to the node launcher and holds no policy', async () => {
   const script = path.join(repoRoot, 'scripts/telemetry/run-claude.sh');
-  await access(script, constants.X_OK);
-  assert.ok(((await stat(script)).mode & 0o111) !== 0);
   const mode = execFileSync('git', ['ls-files', '-s', 'scripts/telemetry/run-claude.sh'], { cwd: repoRoot, encoding: 'utf8' }).split(' ')[0];
-  if (mode) assert.equal(mode, '100755');
+  if (process.platform === 'win32') assert.equal(mode, '100755');
+  else {
+    await access(script, constants.X_OK);
+    assert.ok(((await stat(script)).mode & 0o111) !== 0);
+    if (mode) assert.equal(mode, '100755');
+  }
   const text = await readFile(script, 'utf8');
   assert.ok(text.startsWith('#!/bin/sh\n'));
   assert.match(text, /exec node scripts\/telemetry\/claude\.mjs --runtime "\$mode" "\$@"/);
   for (const forbidden of [/OTEL_/, /ANTHROPIC/, /DIAL_API/i, /model/i, /collector/i, /4318/]) assert.doesNotMatch(text, forbidden);
-  const none = spawnSync(script, [], { encoding: 'utf8' });
+  const launcher = process.platform === 'win32' ? 'bash' : script;
+  const launcherArgs = process.platform === 'win32' ? [script.replaceAll(path.sep, '/')] : [];
+  const none = spawnSync(launcher, launcherArgs, { encoding: 'utf8' });
   assert.equal(none.status, 2);
   assert.match(none.stderr, /Usage/);
   // Bad invocations are rejected by the Node launcher before any collector or child starts.
-  const bad = spawnSync(script, ['bogus', '--', 'x'], { encoding: 'utf8', cwd: os.tmpdir() });
+  const bad = spawnSync(launcher, [...launcherArgs, 'bogus', '--', 'x'], { encoding: 'utf8', cwd: os.tmpdir() });
   assert.equal(bad.status, 2);
   assert.ok(!bad.stderr.includes('    at '));
 });

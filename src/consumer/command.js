@@ -162,7 +162,7 @@ export async function consumerCommand({ command, argv = [], packageRoot, cwd = p
   if (command === 'start') {
     if (!view.readyToWork) { emit(publicView(view), humanView(view)); return 2; }
     output(`Starting Claude (${runtime}) in ${view.project}. Telemetry preflight passed.`);
-    const code = await launcher({ argv: ['--runtime', runtime, '--', ...options.claudeArgs], projectRoot: view.repository, env,
+    const code = await launcher({ argv: ['--runtime', runtime, '--', ...options.claudeArgs], projectRoot: view.repository, env, packageRoot,
       onReady: ({ port }) => output(`Local telemetry is ready.${verbose ? ` Collector: http://127.0.0.1:${port}` : ''}\nDashboard: in another terminal run ${cli} dashboard --port 4319, then open its printed URL. If occupied, select another local port.`) });
     output(code === 0 ? `Claude session finished. Next: ${cli} status` : `Claude could not complete the session. Next: ${cli} doctor --runtime ${runtime}`);
     return code;
@@ -183,6 +183,12 @@ export async function consumerCommand({ command, argv = [], packageRoot, cwd = p
     return 0;
   }
   if (command === 'upgrade') {
+    if (env.DEV_FOUNDRY_RUNTIME_STORE) {
+      if (options['--yes'] || options['--apply']) throw new ConsumerUsageError('Managed runtime transition requires exact Operator authorization; --yes cannot authorize it. Next: dev-foundry-claude runtime proposal');
+      emit({ summary: 'Continue the managed runtime upgrade in your source-governed Claude session.', nextAction: `${cli} runtime status`, applied: null, applicationFilesAffected: 0 },
+        `Ask Claude to upgrade this managed runtime. Claude reviews source authority, an exact verified target and its semantic delta, obtains Operator choices, validates and uses runtime plan/prepare/commit/verify. Next: ${cli} runtime status`);
+      return 0;
+    }
     if (!view.repository) { emit(publicView(view), humanView(view)); return 2; }
     const result = await createUpgradePlan({ root: view.repository, adapter, currentPackageRoot: options['--from-package'] ? path.resolve(cwd, options['--from-package']) : undefined });
     const plan = result.plan;

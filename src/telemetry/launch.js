@@ -28,6 +28,7 @@ export async function runLauncher({
   argv,
   env = process.env,
   projectRoot = process.cwd(),
+  packageRoot,
   spawn = nodeSpawn,
   startCollector = defaultStartCollector,
   signalTarget = process,
@@ -45,6 +46,14 @@ export async function runLauncher({
     stderr('Usage: claude.mjs --runtime <direct|dial|codemie> -- <claude args>');
     return 2;
   }
+  let runtimeIdentity;
+  if (packageRoot) {
+    try {
+      const { assertPackageSelected } = await import('../runtime/resolver.js');
+      const selected = assertPackageSelected({ cwd: projectRoot, packageRoot });
+      runtimeIdentity = { pin: selected.expect, packageRoot: selected.runtime.packageRoot, repositoryRoot: selected.repositoryRoot };
+    } catch (error) { stderr(`Telemetry runtime selection refused: ${error.code ?? error.message}`); return 2; }
+  }
   const telemetryRunId = randomUUID();
   const telemetryDir = path.join(projectRoot, '.dev-foundry/telemetry/local');
   let collector;
@@ -58,7 +67,7 @@ export async function runLauncher({
       telemetryRunId,
     });
     const childEnv = buildTelemetryEnvironment({ telemetryDir, telemetryRunId, port: collector.port, baseEnv: env, launchMode: runtime });
-    onReady({ runtime, port: collector.port, telemetryDir });
+    onReady({ runtime, port: collector.port, telemetryDir, runtimeIdentity });
     const child = spawn(plan.executable, plan.args, { stdio: 'inherit', cwd: projectRoot, env: childEnv, shell: false });
     let killTimer;
     const forwardSignal = (signal) => {

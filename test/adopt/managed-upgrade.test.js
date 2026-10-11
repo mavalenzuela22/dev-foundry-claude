@@ -42,7 +42,7 @@ test('exact released legacy bridge is deterministic, exact-hash enforced, bounde
     assert.equal(result.plan.upgradeKind, 'legacy-bridge'); assert.deepEqual(result.plan.current, old);
     assert.deepEqual(result.bytes, (await plan(fixture)).bytes);
     assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
-    const changed = version === '1.2.2-windows' ? ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md'] : ['.mcp.json'];
+    const changed = version === '1.2.2-windows' ? ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md'] : ['.mcp.json', 'CLAUDE.md'];
     assert.deepEqual(result.ops.writes.map((item) => item.path).sort(), changed);
     await assert.rejects(apply(fixture, { ...result, hash: '0'.repeat(64) }), { code: 'plan-hash-mismatch' });
     const presentationPackage = await makePresentationPackage(); t.after(presentationPackage.cleanup);
@@ -198,4 +198,19 @@ test('public 1.3.0 source fixture matches the exact git tag payload and declares
   const recipe = material.legacy.find((recipe) => recipe.source === old.expect);
   assert.equal(recipe.proof.gitTag, 'v1.3.0');
   assert.equal(recipe.proof.gitCommit, execFileSync('git', ['rev-parse', 'v1.3.0'], { cwd: repoRoot, encoding: 'utf8' }).trim());
+});
+
+import { createCutoverPlan } from '../../src/adopt/cutover.js';
+import { prepare } from '../../src/runtime/transition.js';
+import { fixture as managedRuntimeFixture } from '../runtime/plan.test.js';
+
+test('managed apply/ordinary upgrade/foreign cutover cannot collide with an existing prepared runtime transaction', async t => {
+  const f = managedRuntimeFixture(t); prepare(f.input);
+  const adapter = { expect: f.source.expect, version: '1.4.2', payloadRoot: f.source.expect.split(':')[2] };
+  const adoption = await createPlan({ root: f.a.root, adapter });
+  assert.equal(adoption.plan.status, 'blocked'); assert.ok(adoption.plan.blockers.some(b => b.code === 'runtime-upgrade-in-flight'));
+  const upgrade = await createUpgradePlan({ root: f.a.root, adapter });
+  assert.equal(upgrade.plan.status, 'blocked');
+  const cutover = await createCutoverPlan({ root: f.a.root, packageRoot: f.source.root });
+  assert.equal(cutover.plan.status, 'blocked');
 });
