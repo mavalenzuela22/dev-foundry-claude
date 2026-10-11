@@ -9,7 +9,7 @@ import { gunzipSync, gzipSync } from 'node:zlib';
 import test from 'node:test';
 import { parse } from 'yaml';
 import { buildManifestBytes, sha256, verifyPayload } from '../../src/adopt/pin.js';
-import { archiveErrorDiagnostic, candidateManifest, inspectArchive, inspectShims, installArguments, main,
+import { archiveErrorDiagnostic, candidateManifest, firstPayloadDifference, inspectArchive, inspectShims, installArguments, main,
   npmCli, packCandidate, packOutputDiagnostic, pendingReceipt, probeExit, tempChild, verifyCandidate } from '../../scripts/acceptance/tsk026-ci.mjs';
 
 const repo = fileURLToPath(new URL('../../', import.meta.url));
@@ -72,6 +72,44 @@ test('synthetic fixture exact archive, producer SHA, run and self-pin binding', 
   assert.equal(manifest.kind, 'unreleased-candidate'); assert.equal(manifest.officialSource, false);
   assert.equal(verifyCandidate(bytes, manifest, expectations(bytes, manifest)).version, '1.4.2');
   assert.equal(manifest.package.payloadFiles, 11);
+});
+test('native payload diagnosis reports only first relative mismatch metadata', t => {
+  const root = scratch(t), { files } = fixture();
+  for (const [relative, bytes] of files) {
+    const target = path.join(root, ...relative.split('/'));
+    mkdirSync(path.dirname(target), { recursive: true }); writeFileSync(target, bytes);
+  }
+  const manifest = JSON.parse(files.get('payload-manifest.json'));
+  const archive = inspectArchive(tar(files), { includePayloadEntries: true });
+  assert.equal(firstPayloadDifference(root, archive.payloadEntries, archive.payloadManifest), null);
+  const relative = manifest.files[0].path, expected = manifest.files[0];
+  const original = readFileSync(path.join(root, ...relative.split('/')));
+  writeFileSync(path.join(root, ...relative.split('/')), Buffer.alloc(original.length, 0x78));
+  const difference = firstPayloadDifference(root, archive.payloadEntries, archive.payloadManifest);
+  assert.deepEqual(difference, { path: relative, mismatch: 'sha256',
+    expected: { size: expected.size, sha256: expected.sha256 },
+    observed: { size: original.length, sha256: sha256(Buffer.alloc(original.length, 0x78)) } });
+  assert.doesNotMatch(JSON.stringify(difference), /synthetic|fixture|#!/);
+});
+test('native payload diagnosis tolerates direct regular npm shims and finds unlisted regular files', t => {
+  const root = scratch(t), { files } = fixture();
+  for (const [relative, bytes] of files) {
+    const target = path.join(root, ...relative.split('/'));
+    mkdirSync(path.dirname(target), { recursive: true }); writeFileSync(target, bytes);
+  }
+  const archive = inspectArchive(tar(files), { includePayloadEntries: true });
+  const bin = path.join(root, 'node_modules/.bin');
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(path.join(bin, 'yaml'), '#!/usr/bin/env node\n');
+  writeFileSync(path.join(bin, 'yaml.cmd'), '@echo off\r\n');
+  assert.equal(firstPayloadDifference(root, archive.payloadEntries, archive.payloadManifest), null);
+  assert.doesNotThrow(() => verifyPayload(root, archive.selfPin));
+
+  writeFileSync(path.join(root, 'src/extra.js'), 'unlisted');
+  const difference = firstPayloadDifference(root, archive.payloadEntries, archive.payloadManifest);
+  assert.deepEqual(difference, { path: 'src/extra.js', mismatch: 'unlisted-file',
+    expected: { size: null, sha256: null },
+    observed: { size: 8, sha256: sha256(Buffer.from('unlisted')) } });
 });
 test('reject wrong candidate SHA even when manifest claims that digest', () => {
   const { bytes } = fixture(), manifest = candidateManifest(bytes, bound);

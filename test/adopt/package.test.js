@@ -11,6 +11,7 @@ import { performance } from 'node:perf_hooks';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { MANIFEST_NAME, buildManifestBytes, formatExpect, rootOf, selfPin, sha256, verifyPayload } from '../../src/adopt/pin.js';
+import { firstPayloadDifference } from '../../scripts/acceptance/tsk026-ci.mjs';
 import { diffTrees, listTree, makeConsumer, repoRoot, applyProposal, readSetSnapshot } from './fixture.js';
 
 const scratchDirs = [];
@@ -128,6 +129,21 @@ function baseline() {
     const prefix = await scratch('install-prefix');
     npm(['install', '--prefix', prefix, '--offline', '--no-audit', '--no-fund', '--ignore-scripts', built.tarball], prefix, { npm_config_registry: 'http://127.0.0.1:9/' });
     const installed = path.join(prefix, 'node_modules/@dev-foundry/claude-adapter');
+    if (process.platform === 'win32') {
+      try { verifyPayload(installed, pin); }
+      catch {
+        let difference = null;
+        try {
+          difference = firstPayloadDifference(installed, manifest.files,
+            { size: manifestBytes.length, sha256: sha256(manifestBytes) });
+        } catch { /* Keep diagnostics bounded when the installed tree cannot be inspected. */ }
+        const detail = difference ?? {
+          mismatch: 'unclassified',
+          possible: 'transient filesystem/read/ACL behavior, traversal, or verifier condition outside manifest comparison',
+        };
+        process.stderr.write(`TSK-026 baseline payload diagnostic ${JSON.stringify(detail)}\n`);
+      }
+    }
     await rm(built.tree, { recursive: true, force: true });
     return { ...built, manifest, manifestBytes, pin, prefix, installed };
   })();

@@ -1,7 +1,7 @@
 // TSK-026 B4C1 diagnostic only. No release acquisition, publisher authentication,
 // global install, consumer selection, target lifecycle execution or acceptance promotion.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { appendFileSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync,
+import { appendFileSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync,
   readFileSync, readlinkSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -20,10 +20,12 @@ const digest = value => /^[a-f0-9]{64}$/.test(value ?? '');
 const portable = value => typeof value === 'string' && !/[\\:\x00-\x1f]/.test(value) &&
   value.split('/').every(p => p && p !== '.' && p !== '..' && !/[. ]$/.test(p) &&
     !/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(p));
+// Keep the native diagnostic aligned with verifyPayload's installer-owned paths.
+const isInstallerBinArtifact = relative => path.posix.dirname(relative) === 'node_modules/.bin';
 
 // Read and verify tar bytes in memory BEFORE npm sees them. No extraction here.
 // Only regular files/directories and bounded POSIX PAX path/metadata are allowed.
-export function inspectArchive(bytes) {
+export function inspectArchive(bytes, { includePayloadEntries = false } = {}) {
   check(Buffer.isBuffer(bytes) && bytes.length <= 64 * 1024 * 1024, 'archive exceeds bound');
   const tar = gunzipSync(bytes, { maxOutputLength: 128 * 1024 * 1024 });
   const files = new Map(), names = new Map(), entries = new Set();
@@ -95,7 +97,69 @@ export function inspectArchive(bytes) {
     check(bundled.name === name && bundled.version === version, 'wrong bundled dependency identity');
   }
   return { name: pkg.name, version: pkg.version, selfPin: `${pkg.version}:sha256:${sha256(manifestBytes)}`,
-    bins: pkg.bin, payloadManifestSha256: sha256(manifestBytes), payloadFiles: manifest.files.length };
+    bins: pkg.bin, payloadManifestSha256: sha256(manifestBytes), payloadFiles: manifest.files.length,
+    ...(includePayloadEntries ? { payloadEntries: manifest.files,
+      payloadManifest: { size: manifestBytes.length, sha256: sha256(manifestBytes) } } : {}) };
+}
+
+// Bounded native failure context. Mirrors verifyPayload's manifest-first order
+// and returns metadata only; its caller keeps the verifier's generic error.
+export function firstPayloadDifference(packageRoot, entries, expectedManifest) {
+  const observed = relative => {
+    try {
+      const stat = lstatSync(path.join(packageRoot, ...relative.split('/')));
+      if (!stat.isFile()) return { kind: stat.isSymbolicLink() ? 'link' : stat.isDirectory() ? 'directory' : 'other' };
+      if (stat.size > 128 * 1024 * 1024) return { kind: 'file', size: stat.size, sha256: null };
+      const bytes = readFileSync(path.join(packageRoot, ...relative.split('/')));
+      return { kind: 'file', size: stat.size, sha256: sha256(bytes) };
+    } catch (error) {
+      return { kind: error.code === 'ENOENT' ? 'missing' : 'unreadable' };
+    }
+  };
+  const difference = (relative, expected, actual) => {
+    let mismatch;
+    if (actual.kind !== 'file') mismatch = actual.kind;
+    else if (expected.size !== actual.size) mismatch = 'size';
+    else if (actual.sha256 !== null && expected.sha256 !== actual.sha256) mismatch = 'sha256';
+    return mismatch ? { path: relative, mismatch,
+      expected: { size: expected.size ?? null, sha256: expected.sha256 ?? null },
+      observed: { size: actual.size ?? null, sha256: actual.sha256 ?? null } } : null;
+  };
+
+  const manifestDiff = difference('payload-manifest.json', expectedManifest, observed('payload-manifest.json'));
+  if (manifestDiff) return manifestDiff;
+  const listed = new Set();
+  for (const entry of entries) {
+    listed.add(entry.path);
+    const diff = difference(entry.path, entry, observed(entry.path));
+    if (diff) return diff;
+  }
+
+  const found = [];
+  let inspected = 0;
+  const walk = (directory, relative = '') => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (++inspected > 20000) throw Error('diagnostic entry bound exceeded');
+      const rel = relative ? `${relative}/${entry.name}` : entry.name;
+      const full = path.join(directory, entry.name), stat = lstatSync(full);
+      if (stat.isSymbolicLink()) found.push({ path: rel, kind: 'link' });
+      else if (stat.isDirectory()) walk(full, rel);
+      else if (stat.isFile()) found.push({ path: rel, kind: 'file', size: stat.size });
+      else found.push({ path: rel, kind: 'other' });
+    }
+  };
+  try { walk(packageRoot); } catch { return null; }
+  found.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  for (const item of found) {
+    if (item.path === 'payload-manifest.json' || (item.kind === 'link' && isInstallerBinArtifact(item.path))) continue;
+    if (item.kind === 'other' || item.kind === 'link' || (item.kind === 'file' && !listed.has(item.path) && !isInstallerBinArtifact(item.path))) {
+      const actual = item.kind === 'file' ? observed(item.path) : null;
+      return { path: item.path, mismatch: item.kind === 'file' ? 'unlisted-file' : item.kind,
+        expected: { size: null, sha256: null },
+        observed: { size: actual?.size ?? null, sha256: actual?.sha256 ?? null } };
+    }
+  }
+  return null;
 }
 
 function binding(value) {
@@ -392,6 +456,7 @@ async function native(c) {
     const manifestBytes = readFileSync(tempChild(temp, 'tsk026-candidate/manifest.json'));
     check(digest(process.env.MANIFEST_SHA256) && sha256(manifestBytes) === process.env.MANIFEST_SHA256, 'artifact manifest SHA mismatch');
     const pkg = verifyCandidate(bytes, JSON.parse(manifestBytes), expected);
+    const archivePayload = inspectArchive(bytes, { includePayloadEntries: true });
     report.packageVersion = pkg.version; report.selfPin = pkg.selfPin;
     const archive = path.join(work, 'candidate.tgz'), prefix = path.join(work, 'prefix');
     copyFileSync(tempChild(temp, 'tsk026-candidate/candidate.tgz'), archive);
@@ -401,7 +466,11 @@ async function native(c) {
     check(!install.error && install.status === 0, 'isolated install failed');
     const installed = path.join(prefix, 'node_modules/@dev-foundry/claude-adapter');
     report.installedPackageLocation = installed;
-    verifyPayload(installed, pkg.selfPin);
+    try { verifyPayload(installed, pkg.selfPin); }
+    catch (error) {
+      report.payloadDifference = firstPayloadDifference(installed, archivePayload.payloadEntries, archivePayload.payloadManifest);
+      throw error;
+    }
     const metadata = JSON.parse(readFileSync(path.join(installed, 'package.json')));
     check(metadata.name === pkg.name && metadata.version === pkg.version && equal(metadata.bin, pkg.bins), 'installed manifest identity mismatch');
     report.coverage.candidateInstall = 'PASS';
