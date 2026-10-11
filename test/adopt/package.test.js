@@ -23,7 +23,7 @@ after(async () => { for (const dir of scratchDirs) await rm(dir, { recursive: tr
 
 const cleanEnv = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(?:npm_|DEV_FOUNDRY_|OTEL_|CLAUDE)/i.test(key)));
 const npmCache = await scratch('package-npm-cache');
-const npm = (args, cwd, env = {}) => execFileSync('npm', args, { cwd, encoding: 'utf8', env: { ...cleanEnv(), ...env, npm_config_cache: npmCache, npm_config_update_notifier: 'false' }, stdio: ['ignore', 'pipe', 'pipe'] });
+const npm = (args, cwd, env = {}) => execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', args, { cwd, encoding: 'utf8', shell: process.platform === 'win32', env: { ...cleanEnv(), ...env, npm_config_cache: npmCache, npm_config_update_notifier: 'false' }, stdio: ['ignore', 'pipe', 'pipe'] });
 
 // Builds a tarball from a copy of the tracked package inputs plus the prod node_modules.
 async function build(mutate) {

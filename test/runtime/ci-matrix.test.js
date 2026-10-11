@@ -195,6 +195,9 @@ test('workflow only accepts PR base main with exact task HEAD, exact head SHA an
         assert.equal(step.with.ref, '${{ github.event.pull_request.head.sha }}');
         assert.equal(step.with['persist-credentials'], false);
         assert.equal(step.with.repository, '${{ github.event.pull_request.head.repo.full_name }}');
+        if (job === workflow.jobs.native && step === job.steps.find(candidate => candidate.uses?.startsWith('actions/checkout@'))) {
+          assert.equal(step.with['fetch-depth'], 0, 'native provenance tests need historical commits and tags');
+        }
       }
       if (step.uses?.startsWith('actions/setup-node@')) assert.equal(step.with['node-version'], 22);
       if (step.run) assert.doesNotMatch(step.run, /secrets\.|gh release|npm publish|--global|git checkout|curl|wget/);
