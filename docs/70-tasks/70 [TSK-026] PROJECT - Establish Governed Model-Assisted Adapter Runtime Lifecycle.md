@@ -5,7 +5,7 @@ artifact:
   type: TSK
   title: Establish Governed Model-Assisted Adapter Runtime Lifecycle
   status: IN_PROGRESS
-artifactVersion: "3"
+artifactVersion: "4"
 authorityScope: tsk-026-governed-model-assisted-adapter-runtime-lifecycle
 ownerRole: governance-author
 canonical: true
@@ -370,3 +370,106 @@ another costly producer implementation run that can only generate Mac
 fixtures and would falsely be counted as B4C acceptance. A missing native
 route remains an explicit BLOCKED gate, not a new TSK or a license to
 reuse the Windows consumer runner.
+## 14. B4C7 executor handoff incident and project-local lessons (2026-10-10)
+
+This is an Author's scoped reconciliation and prevention record, **not**
+a modification to DEV FOUNDRY 2.1.0, a runner repair, an independent audit
+verdict or TSK-026 implementation evidence. Preserve the original B4C7 prompt,
+contract and execution artifacts as historical evidence; do not reinterpret
+earlier B1–B4B evidence without inspecting each boundary.
+
+### Observed B4C7 facts versus unresolved cause
+
+- The Author dispatched scoped CI-host-compatibility corrective B4C7 with
+  execution contract `.dev-foundry/execution-contracts/TSK-026.json` at
+  SHA-256 `b1c84104394f37f7d82715f5317f237f19c907f56e4e3a9509070c68c4b52438`,
+  prompt `.dev-foundry/prompts/TSK-026-B4C7-CI-HOST-COMPAT-V001.md`,
+  request `req_081a6deb0dd6d9e7bbcf86ad2880d7cc`, execution
+  `execution_37e8a1a2dceb34b2dc53deba068b46fd4a147610fbf99abf56cd813780354cac`.
+  Intended producer HEAD `a3be469e680a2553684685b37789ae5bfafeb9a8`,
+  branch `task/tsk-026-implementation-preparation`.
+- Executor reported a **preflight STOP**, not implementation: its local Git
+  inspection matched the intended checkout; a runner queried from its tool
+  context reportedly returned `main` at `c6b60f796e37c1ffd04e83c13f81a62ae73196b1`
+  with seven untracked telemetry files. The precise MCP selection/binding
+  mechanism is **not independently diagnosed**. Do not assert that the
+  process-bound producer runner actually changed repositories.
+- Runner evidence for that request records `status: passed`, executor exit
+  code `0`, six validation commands returning `0`, and
+  `pathPolicy.changedFiles: []`; before/after HEAD unchanged. The
+  validation commands checked existing code, **not completion of B4C7**.
+  Consequently **B4C7 IMPLEMENTATION = NOT PERFORMED / BLOCKED**. The
+  mechanically successful runner envelope is retained but does not establish
+  acceptance, implementation, CI correction, native Windows proof or closure.
+  No product commit/push was produced by this attempt.
+- The B4C7 prompt said to "Use the eligible process-bound Implementation
+  Executor" and to "reobserve" POP/index/framework/capability. That wording
+  blurred roles and encouraged unnecessary governance-tool discovery inside
+  an already bound Executor. Earlier B1–B4 prompts also direct authority
+  inspection; **authority reading alone is permitted** by the active
+  Implementation Executor role, so this does NOT establish historical
+  misconduct or invalidate prior evidence without a separate review.
+
+### Mandatory project-local practices for the next TSK-026 dispatch
+
+1. **Author owns resolution.** Before dispatch, select and authorize the
+   single bounded operation; inspect the live producer repository, POP,
+   Authority Index, selected profile and task; record exact handoff
+   authorization and expected branch/HEAD. Do not delegate role selection,
+   governance authorization, independent audit or reserved Operator choices
+   back to Codex/Claude/Copilot.
+2. **Executor owns implementation.** Send concise implementation-only
+   direction: exact issue, directed authority *paths*, permitted product
+   changes, hard exclusions, focused proof and observable stop conditions.
+   Local read-only Git/source checks are permitted; do **not** ask the
+   Executor to invoke runner MCP for a second role/authorization/binding
+   resolution. If tools independently expose a conflicting external
+   runner, report the discrepancy without treating it as authority or
+   changing any unrelated checkout. Tool-access isolation remains a
+   **deferred runner/runtime investigation**, not a TSK-026 product fix.
+3. **Separate transport success from goal completion.** For a corrective
+   explicitly requiring a code delta, define the expected nonempty or
+   otherwise precisely justifiable change projection in the contract and
+   handoff. Author must reconcile executor's implementation claim, actual
+   diff, bounded focused proof and stop reason before describing the result
+   as implemented. `exitCode=0`, passing unrelated tests, or a runner
+   `passed` envelope **alone** cannot satisfy an implementation boundary.
+   Genuine read-only/no-op work may be valid only when it was the authorized
+   objective or the Author explicitly accepts its verified rationale.
+4. **Handle BLOCKED truthfully.** Require the Executor to emit an explicit,
+   unambiguous stop result when no authorized implementation occurred.
+   Until the runner enforces structured semantic disposition, the Author
+   manually classifies such runs as **NOT IMPLEMENTED / BLOCKED**; no silent
+   retry or automatic promotion. Changing runner exit-status semantics is
+   **deferred to a separately governed runner task**, never patched here.
+5. **Conserve execution budget.** Diagnose from existing CI artifacts before
+   model-assisted implementation. Set a single falsifiable hypothesis,
+   minimal allowed paths, proportionate focused commands and a bounded
+   timeout; no speculative `npm test`, native workflow or package builds
+   after every small edit. Run full cross-platform gates only when the
+   material acceptance boundary warrants them. Codex's effective model is
+   selected manually by the Operator; the Capability Profile does not
+   demonstrate an actual model switch. Announce any requested switch
+   **before** dispatch and avoid unverified claims about model identity.
+6. **Keep dependencies local.** TSK-026 must not hold PagoElectronico,
+   another consumer, or runner maintenance hostage. Record cross-project
+   blockers for separate work, but do not enlarge this task or use the
+   producer as an excuse to mutate a consumer or another repository.
+   Continue B4C7 only after reconciling its existing prompt/contract and
+   the dispatch assumptions under the same authorized task boundary.
+
+### Open findings deliberately deferred
+
+- `DFC-026-HO-01`: determine why executor-visible MCP returned a foreign
+  `main` checkout, including tool configuration and workspace binding.
+  **Unresolved**; no runner/MCP configuration mutation authorized here.
+- `DFC-026-HO-02`: design a runner-level distinction between transport/
+  test success and blocked/empty implementation. **Unresolved**; leave
+  runner source untouched.
+- `DFC-026-HO-03`: proportionally inspect earlier TSK-026 executor
+  transcripts for unauthorized role re-resolution *if justified by evidence*.
+  Existing separately recorded B1–B4B code/test evidence remains historical
+  evidence, not presumed false or retroactively re-audited by this note.
+- B4 native Windows security, official source provenance and actual
+  source-governed Claude/Operator semantics remain **BLOCKED/PENDING**
+  exactly as stated above. No release, merge, consumer adoption or closure.
