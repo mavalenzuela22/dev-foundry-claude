@@ -151,32 +151,40 @@ function baseline() {
 }
 
 test('TSK-018 the source launcher has a canonical LF shebang and Git pins its line endings', async () => {
-  const launcher = await readFile(path.join(repoRoot, 'bin/dev-foundry-claude.js'));
-  const shebang = launcher.subarray(0, launcher.indexOf(0x0a) + 1);
-  assert.deepEqual(shebang, Buffer.from('#!/usr/bin/env node\n'));
-  assert.equal(shebang.includes(0x0d), false, 'no CR byte terminates the shebang');
-  assert.equal(launcher.includes(0x0d), false, 'all launcher line endings are LF');
+  const launchers = ['bin/dev-foundry-claude.js', 'bin/dev-foundry-claude-launcher.js'];
+  for (const name of launchers) {
+    const launcher = await readFile(path.join(repoRoot, name));
+    const shebang = launcher.subarray(0, launcher.indexOf(0x0a) + 1);
+    assert.deepEqual(shebang, Buffer.from('#!/usr/bin/env node\n'), name);
+    assert.equal(shebang.includes(0x0d), false, `${name}: no CR byte terminates the shebang`);
+    assert.equal(launcher.includes(0x0d), false, `${name}: all launcher line endings are LF`);
+  }
   const attributes = await readFile(path.join(repoRoot, '.gitattributes'), 'utf8');
-  assert.ok(attributes.split(/\r?\n/).includes('bin/dev-foundry-claude.js text eol=lf'));
-  const effective = execFileSync('git', ['-c', 'core.autocrlf=true', 'check-attr', 'text', 'eol', '--', 'bin/dev-foundry-claude.js'], { cwd: repoRoot, encoding: 'utf8' });
-  assert.equal(effective, 'bin/dev-foundry-claude.js: text: set\nbin/dev-foundry-claude.js: eol: lf\n');
+  for (const name of launchers) assert.ok(attributes.split(/\r?\n/).includes(`${name} text eol=lf`), name);
+  const effective = execFileSync('git', ['-c', 'core.autocrlf=true', 'check-attr', 'text', 'eol', '--', ...launchers], { cwd: repoRoot, encoding: 'utf8' });
+  assert.equal(effective, launchers.flatMap((name) => [`${name}: text: set`, `${name}: eol: lf`]).join('\n') + '\n');
 });
 
 test('TSK-018 packing and offline npm installation preserve every launcher byte', async () => {
   const base = await baseline();
-  const source = await readFile(path.join(repoRoot, 'bin/dev-foundry-claude.js'));
-  const packed = execFileSync('tar', ['-xOzf', base.tarball, 'package/bin/dev-foundry-claude.js']);
-  const installed = await readFile(path.join(base.installed, 'bin/dev-foundry-claude.js'));
-  assert.deepEqual(packed, source);
-  assert.deepEqual(installed, packed);
-  const entry = base.manifest.files.find((file) => file.path === 'bin/dev-foundry-claude.js');
-  assert.equal(entry.size, installed.length);
-  assert.equal(entry.sha256, sha256(installed));
-  assert.equal(selfPin(base.installed).expect, base.pin);
-  const dir = await copyInstalled(base);
-  await writeFile(path.join(dir, 'bin/dev-foundry-claude.js'), Buffer.concat([source.subarray(0, source.indexOf(0x0a)), Buffer.from('\r\n'), source.subarray(source.indexOf(0x0a) + 1)]));
-  assert.throws(() => verifyPayload(dir, base.pin), /verification failed/, 'a CRLF shebang is still an exact-byte mismatch');
-  assert.throws(() => selfPin(dir), /verification failed/);
+  const launchers = ['bin/dev-foundry-claude.js', 'bin/dev-foundry-claude-launcher.js'];
+  for (const name of launchers) {
+    const source = await readFile(path.join(repoRoot, name));
+    const packed = execFileSync('tar', ['-xOzf', base.tarball, `package/${name}`]);
+    const installed = await readFile(path.join(base.installed, name));
+    assert.deepEqual(packed, source, `${name}: tarball bytes match source`);
+    assert.deepEqual(installed, packed, `${name}: offline npm install bytes match tarball`);
+    const entry = base.manifest.files.find((file) => file.path === name);
+    assert.ok(entry, `${name}: manifest entry exists`);
+    assert.equal(entry.size, installed.length, `${name}: manifest size matches installed bytes`);
+    assert.equal(entry.sha256, sha256(installed), `${name}: manifest hash matches installed bytes`);
+    assert.equal(selfPin(base.installed).expect, base.pin);
+    const dir = await copyInstalled(base);
+    await writeFile(path.join(dir, name), Buffer.concat([source.subarray(0, source.indexOf(0x0a)), Buffer.from('\r\n'), source.subarray(source.indexOf(0x0a) + 1)]));
+    assert.throws(() => verifyPayload(dir, base.pin), /verification failed/, `${name}: a CRLF shebang is still an exact-byte mismatch`);
+    assert.throws(() => selfPin(dir), /verification failed/, `${name}: self-pin rejects CRLF tampering`);
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test('16 the manifest is complete and exact for the tarball and the offline install; package-lock.json is not payload', async (t) => {
