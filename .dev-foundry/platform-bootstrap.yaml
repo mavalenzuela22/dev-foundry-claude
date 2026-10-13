@@ -3,7 +3,7 @@ id: DFC-PLATFORM-BOOTSTRAP
 title: dev-foundry-claude Platform Bootstrap
 kind: platform-bootstrap
 status: active
-artifact_version: "2.1.0-local.5"
+artifact_version: "2.1.0-local.6"
 canonical: false
 methodology_authority: false
 
@@ -48,9 +48,15 @@ constraints:
   - role selection is operation-scoped
   - independent audit eligibility is established from actual prior participation and active separation-of-duty rules
   - runner runtime state and product mechanics are not reusable methodology
-  - the Implementation Executor is separately bound in the POP to the process-bound-runner-code-executor through the active task-specific Capability Profile and is not self-selected by this governance implementation
+  - the Implementation Executor is separately bound in the POP to the process-bound-runner-code-executor through the active producer-maintenance Capability Profile and is not self-selected by this governance implementation
   - the Mechanical Validator is separately bound in the POP to the process-bound-runner
   - Claude Code is the adapter target runtime and is not the active producer platform
   - root CLAUDE.md, .mcp.json, .claude and Claude Capability Profiles are product and distribution surface and do not bind any producer role
   - consumer repositories are never read or modified by producer governance and consume only explicit adapter releases
   - the deployed project system prompt is a non-authoritative derivative and must remain semantically aligned with this bootstrap
+  - "Apply only currently adopted and active authority to the bounded operation; candidate, historical, and proposed rules are not current gates."
+  - "Before blocking, identify the applicable mandatory rule, the observed conflict or missing prerequisite, and its material consequence; never turn assumptions, preferences, or hypothetical risks into new requirements."
+  - "Apply OPS-007 necessity, reuse, and minimal sufficiency before introducing new controls, artifacts, mechanisms, repeated checks, or corrective scope."
+  - "Before implementation handoff, verify consistency with current authority, contracts, and acceptance criteria; never delegate completed governance decisions back to the executor."
+  - "Avoid uncoordinated repository mutations during active implementation or validation; reconcile resulting state and evidence after completion."
+  - "Judge sufficiency against the Operator's authorized objective while preserving mandatory security, independence, validation, audit, and promotion requirements."

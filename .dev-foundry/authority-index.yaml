@@ -3,7 +3,7 @@ id: DFC-AUTHORITY-INDEX
 title: dev-foundry-claude Repository Authority Index
 kind: authority-index
 status: active
-artifact_version: "2.1.0-local.41"
+artifact_version: "2.1.0-local.45"
 canonical: false
 
 subject:
@@ -94,6 +94,14 @@ routes:
       - governed-operation-resolver-output
       - governed-operation-resolver-errors
       - governed-operation-context-fingerprint
+    section_id: null
+  - id: mcp-predelegation-readiness-contract
+    path: docs/60-data-contracts/60 [DAT-002] PROJECT - MCP Predelegation Readiness Diagnostics Contract.md
+    authority_class: product
+    governs:
+      - model-facing-predelegation-readiness-tool
+      - readiness-diagnostic-serialization
+      - non-authorizing-mcp-handoff-presentation
     section_id: null
   - id: claude-native-cutover-binding-contract
     path: docs/40-specifications/40 [SPC-002] PROJECT - Claude-Native Cutover Binding Contract.md
@@ -484,12 +492,28 @@ routes:
       - packaged-cross-platform-consumer-acceptance
     section_id: null
 
+  - id: TSK-027
+    path: docs/70-tasks/70 [TSK-027] PROJECT - Restore Governed Adapter Operability and Execution Readiness.md
+    authority_class: task
+    governs:
+      - governance-authoring-and-predelegation-operability
+      - deterministic-execution-readiness
+      - governance-mcp-contract-discoverability-and-diagnostics
+      - role-handoff-efficiency-without-independence-loss
+      - governed-profile-reconciliation-for-producer-maintenance
+    section_id: null
+
 bindings:
+  - id: governance-author-capability-producer-maintenance-v1
+    path: .dev-foundry/profiles/capability-profiles/governance-author-producer-maintenance-v1.yaml
+    kind: capability-profile
+    authority_class: configured
+    required: true
   - id: governance-author-capability-tsk026-design-v1
     path: .dev-foundry/profiles/capability-profiles/governance-author-tsk026-design-v1.yaml
     kind: capability-profile
     authority_class: configured
-    required: true
+    required: false
   - id: governance-author-capability-tsk025-release-v1
     path: .dev-foundry/profiles/capability-profiles/governance-author-tsk025-release-142-v1.yaml
     kind: capability-profile
@@ -499,7 +523,7 @@ bindings:
     path: .dev-foundry/profiles/capability-profiles/implementation-executor-tsk025-release-142-v1.yaml
     kind: capability-profile
     authority_class: configured
-    required: true
+    required: false
   - id: governance-author-capability-tsk024-promotion-v2
     path: .dev-foundry/profiles/capability-profiles/governance-author-tsk024-promotion-v2.yaml
     kind: capability-profile
@@ -564,7 +588,7 @@ bindings:
     path: .dev-foundry/profiles/capability-profiles/implementation-executor-runner-v3.yaml
     kind: capability-profile
     authority_class: configured
-    required: false
+    required: true
   - id: implementation-executor-capability-tsk022-cutover
     path: .dev-foundry/profiles/capability-profiles/implementation-executor-tsk022-cutover-v1.yaml
     kind: capability-profile

@@ -5,7 +5,7 @@ artifact:
   type: SPC
   title: Guided Consumer CLI and Help Contract
   status: ACTIVE
-artifactVersion: "2"
+artifactVersion: "4"
 authorityScope: guided-consumer-cli-and-help-contract
 ownerRole: governance-author
 canonical: true
@@ -240,3 +240,77 @@ A developer unfamiliar with DEV FOUNDRY SHALL be able to:
    explicit human confirmation rather than manual artifact construction;
 7. understand when a legacy one-time bridge or a model-assisted upgrade/restart
    is required without learning internal migration artifact names.
+
+## 10. Optional bounded readiness observation CLI (TSK-027 / MT-003-B)
+
+The advanced CLI MAY expose exactly one **read-only**, non-interactive
+`dev-foundry-claude readiness check --input -` entry point that
+accepts a bounded JSON observation bundle from standard input and calls
+the existing pure `evaluateReadiness` helper. This is an advanced
+diagnostic for the selected Governance Author/host, **not** a primary
+consumer onboarding command, a new governance MCP tool, a project
+authorization surface, or a separate executor scheduler.
+
+- Only the exact `readiness check --input -` command form is allowed;
+  `-` means standard input. No arbitrary file, repository, network or
+  provider lookup is performed by this command.
+- Read at most 128 KiB of UTF-8 JSON input; malformed JSON, oversize
+  data, invalid command options or inaccessible runtime fail safely with
+  nonzero exit code and no side effects.
+- Return a machine-readable single JSON object containing the
+  helper's `outcome`, `reasonCodes`, `nextActions`,
+  `contextFingerprint`, and `handoff`, together with
+  `nonAuthorizing: true` and `dispatchAllowed: false`. The helper's
+  context fingerprint is a drift indicator over supplied observations,
+  never authentication of Operator intent.
+- Exit 0 for a syntactically valid `READY` diagnostic (but still
+  `dispatchAllowed: false`); exit 2 for `BLOCKED`; exit 3 for
+  `INDETERMINATE`. Failure and unknown statuses MUST NOT be
+  normalized to `READY`. Unknown/unreconciled prior effects
+  prohibit a handoff and require reconciliation by the owning host.
+- The caller must obtain actual repository facts, external execution
+  eligibility, role/profile fit, source-bound authorization and prior
+  side-effect state from their *own active* governance and runner
+  authority **before** preparing observations. The CLI does not
+  independently verify arbitrary claims inside supplied JSON and
+  SHALL NOT be used as proof that the real runner has authorized a
+  concrete execution.
+- Dispatch retains the host/runner's authoritative independent
+  verification, authorization and side-effect responsibility; no CLI
+  READY overrides a runner BLOCKED/INDETERMINATE response. Do not
+  introduce a second governance MCP tool or a new listener.
+- Do not modify `dev-foundry-claude start`, managed consumer bootstrap,
+  installer/adoption/cutover state, existing command contracts, provider
+  routing, dependencies, or the adopted methodology.
+
+This low-level command is optional and intentionally scoped to the
+existing versioned product runtime. Its introduction does not
+retroactively change released adapter packages or grant adoption
+authorization. Validate with direct Node CLI process tests including
+positive realistic input, missing required evidence, malformed/oversize
+JSON, closed CLI flags, and an indeterminate prior execution.
+
+## 11. Model-facing readiness is owned by governance MCP (TSK-027 correction)
+
+The optional `readiness check --input -` command in section 10
+remains a supported **advanced standalone diagnostic** for
+explicit scripts and debugging. It is NOT the Governance
+Author's normal route to predelegation readiness and SHALL
+NOT be required for Claude to operate or to decide which
+governed checks remain.
+
+The model-facing readiness entry point belongs to the
+existing **local stdio governance MCP**, with a distinct
+read-only tool and its own product contract, DAT-002.
+Do not grow or silently change DAT-001's
+`resolve_governed_operation` envelope. Any actual
+delegation keeps a fresh role/authority/authorization
+assessment and independent audit when applicable.
+
+This correction changes neither the behavior nor the
+historical acceptance of the CLI's scoped feature;
+it corrects the previously mistaken assumption that
+CLI accessibility by itself completes the Claude
+model workflow. Model-visible MCP transport tests and
+a Claude-targeted discovery instruction are required
+before marking the original operability outcome complete.

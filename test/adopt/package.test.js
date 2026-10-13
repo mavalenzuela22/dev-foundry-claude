@@ -817,49 +817,43 @@ test('TSK-025 installed 1.4.2 proves compatible pin upgrades and managed refresh
     assert.equal(setup.status, 0, setup.stderr); c.commit();
     const before = await listTree(c.root); const authority = await readSetSnapshot(c.root);
     const invoke = (args) => cli(base.installed, ['upgrade', ...args], { cwd: c.root });
-    // SPC-008's one-time legacy bridge targets 1.4.0. This release instead
-    // compares managed bytes, requiring the exact old package only for refresh.
-    const refresh = version === '1.2.2-windows';
-    const without = invoke(['--json']); assert.equal(without.status, refresh ? 2 : 0, without.stderr);
+    // This target compares managed bytes. Its changed CLAUDE.md block needs
+    // the exact old package to prove ownership for both historical variants.
+    const without = invoke(['--json']); assert.equal(without.status, 2, without.stderr);
     const preview = JSON.parse(without.stdout);
-    assert.equal(preview.plan.status, refresh ? 'blocked' : 'ready');
+    assert.equal(preview.plan.status, 'blocked');
     assert.equal(preview.applied, null);
     assert.equal(preview.applicationFilesAffected, 0);
     assert.equal(preview.plan.upgradeKind, undefined);
     assert.equal(preview.plan.legacyRecipe, undefined);
-    if (refresh) {
-      assert.ok(preview.plan.blockers.some((blocker) => blocker.code === 'upgrade-migration-required'));
-      assert.deepEqual(preview.plan.merge, []);
-      const wrongSource = invoke(['--from-package', base.installed, '--json']);
-      assert.equal(wrongSource.status, 2, wrongSource.stderr);
-      assert.ok(JSON.parse(wrongSource.stdout).plan.blockers.some((blocker) => blocker.code === 'upgrade-ownership-unverified'));
-      const damagedSource = await copyInstalled({ installed: oldPackage });
-      await bump(path.join(damagedSource, 'README.md'));
-      assert.throws(() => selfPin(damagedSource), /verification failed/);
-      const damaged = invoke(['--from-package', damagedSource, '--json']);
-      assert.equal(damaged.status, 2, damaged.stderr);
-      assert.ok(JSON.parse(damaged.stdout).plan.blockers.some((blocker) => blocker.code === 'upgrade-ownership-unverified'));
-      const agent = '.claude/agents/dev-foundry-executor.md';
-      const original = await c.read(agent);
-      await c.put(agent, original + '\nUnowned edit.\n'); c.commit();
-      const unowned = await listTree(c.root);
-      const collision = invoke(['--from-package', oldPackage, '--json']);
-      assert.equal(collision.status, 2, collision.stderr);
-      assert.ok(JSON.parse(collision.stdout).plan.blockers.some((blocker) => blocker.code === 'upgrade-ownership-unverified'));
-      assert.deepEqual(diffTrees(unowned, await listTree(c.root)), []);
-      await c.put(agent, original); c.commit();
-    } else {
-      assert.deepEqual(preview.plan.blockers, []);
-      assert.deepEqual(preview.plan.merge.map((entry) => entry.path), ['.mcp.json']);
-    }
+    assert.ok(preview.plan.blockers.some((blocker) => blocker.code === 'upgrade-migration-required'));
+    assert.deepEqual(preview.plan.merge, []);
+    const wrongSource = invoke(['--from-package', base.installed, '--json']);
+    assert.equal(wrongSource.status, 2, wrongSource.stderr);
+    assert.ok(JSON.parse(wrongSource.stdout).plan.blockers.some((blocker) => blocker.code === 'upgrade-ownership-unverified'));
+    const damagedSource = await copyInstalled({ installed: oldPackage });
+    await bump(path.join(damagedSource, 'README.md'));
+    assert.throws(() => selfPin(damagedSource), /verification failed/);
+    const damaged = invoke(['--from-package', damagedSource, '--json']);
+    assert.equal(damaged.status, 2, damaged.stderr);
+    assert.ok(JSON.parse(damaged.stdout).plan.blockers.some((blocker) => blocker.code === 'upgrade-ownership-unverified'));
+    const agent = '.claude/agents/dev-foundry-executor.md';
+    const original = await c.read(agent);
+    await c.put(agent, original + '\nUnowned edit.\n'); c.commit();
+    const unowned = await listTree(c.root);
+    const collision = invoke(['--from-package', oldPackage, '--json']);
+    assert.equal(collision.status, 2, collision.stderr);
+    assert.ok(JSON.parse(collision.stdout).plan.blockers.some((blocker) => blocker.code === 'upgrade-ownership-unverified'));
+    assert.deepEqual(diffTrees(unowned, await listTree(c.root)), []);
+    await c.put(agent, original); c.commit();
     assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
     const planned = invoke(['--from-package', oldPackage, '--json']); assert.equal(planned.status, 0, planned.stderr);
-    const data = JSON.parse(planned.stdout); assert.equal(data.plan.upgradeKind, refresh ? 'managed-refresh' : undefined);
+    const data = JSON.parse(planned.stdout); assert.equal(data.plan.upgradeKind, 'managed-refresh');
     assert.equal(data.plan.legacyRecipe, undefined);
     assert.equal(data.plan.status, 'ready'); assert.equal(data.applied, null); assert.equal(data.applicationFilesAffected, 0);
     assert.equal(data.plan.current.expect, oldPin); assert.equal(data.plan.target.expect, base.pin);
-    assert.equal(data.plan.currentPackageRoot, refresh ? await realpath(oldPackage) : undefined);
-    const changed = version === '1.2.2-windows' ? ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md'] : ['.mcp.json'];
+    assert.equal(data.plan.currentPackageRoot, await realpath(oldPackage));
+    const changed = version === '1.2.2-windows' ? ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md'] : ['.mcp.json', 'CLAUDE.md'];
     assert.equal(data.plan.merge.length, changed.length); assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
     const planFile = path.join(await scratch('managed-plan'), 'plan.json');
     const exact = cli(base.installed, ['upgrade', 'plan', '--root', c.root, '--from-package', oldPackage, '--out', planFile]);

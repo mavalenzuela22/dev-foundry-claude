@@ -8,6 +8,54 @@ import { selfPin, verifyPayload } from '../src/adopt/pin.js';
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fail = (message, code = 1) => { console.error(message); process.exit(code); };
 const verificationFailure = () => fail('Adapter runtime verification failed.');
+const READINESS_LIMIT = 131072;
+const READINESS_USAGE = 'Usage: dev-foundry-claude readiness check --input -';
+
+async function readBoundedStdin(limit) {
+  const chunks = [];
+  let bytes = 0;
+  for await (const chunk of process.stdin) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    if (bytes + buffer.byteLength > limit) throw new Error('input-too-large');
+    chunks.push(buffer);
+    bytes += buffer.byteLength;
+  }
+  return Buffer.concat(chunks, bytes);
+}
+
+async function readinessCommand(argv) {
+  if (argv.length !== 3 || argv[0] !== 'check' || argv[1] !== '--input' || argv[2] !== '-') {
+    fail(READINESS_USAGE, 2);
+  }
+
+  let input;
+  try {
+    const bytes = await readBoundedStdin(READINESS_LIMIT);
+    input = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  } catch {
+    fail('Invalid or oversized readiness JSON input.', 2);
+  }
+
+  try {
+    const { evaluateReadiness } = await import('../src/governance-mcp/readiness.js');
+    const result = evaluateReadiness(input);
+    const exitCodes = { READY: 0, BLOCKED: 2, INDETERMINATE: 3 };
+    if (!Object.hasOwn(exitCodes, result.outcome)) fail('Readiness evaluation failed safely.', 1);
+    const diagnostic = {
+      outcome: result.outcome,
+      reasonCodes: result.reasonCodes,
+      nextActions: result.nextActions,
+      contextFingerprint: result.contextFingerprint,
+      handoff: result.handoff,
+      nonAuthorizing: true,
+      dispatchAllowed: false,
+    };
+    process.stdout.write(`${JSON.stringify(diagnostic)}\n`);
+    process.exitCode = exitCodes[result.outcome];
+  } catch {
+    fail('Readiness evaluation failed safely.', 1);
+  }
+}
 
 function flags(argv, allowed) {
   const options = {};
@@ -23,7 +71,9 @@ function flags(argv, allowed) {
 const [command, ...rest] = process.argv.slice(2);
 const packageVersion = () => JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8')).version;
 
-if (!command || ['setup', 'start', 'status', 'doctor', 'help', '--help'].includes(command) || (command === 'upgrade' && !['status', 'plan', 'apply'].includes(rest[0]))) {
+if (command === 'readiness') {
+  await readinessCommand(rest);
+} else if (!command || ['setup', 'start', 'status', 'doctor', 'help', '--help'].includes(command) || (command === 'upgrade' && !['status', 'plan', 'apply'].includes(rest[0]))) {
   const { consumerCommand } = await import('../src/consumer/command.js');
   try { process.exitCode = await consumerCommand({ command: !command || command === '--help' ? 'help' : command, argv: rest, packageRoot }); }
   catch (error) { fail(`The operation could not complete safely. No application files were changed. ${error.exitCode === 2 ? error.message : `Next: dev-foundry-claude doctor. Use --verbose for technical diagnostics.${rest.includes('--verbose') ? ` Detail: ${error.code ?? error.message}` : ''}`}`, error.exitCode ?? 1); }

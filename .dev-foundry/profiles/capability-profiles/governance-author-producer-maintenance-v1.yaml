@@ -1,0 +1,59 @@
+schema_version: dev-foundry.capability-profile.v1
+id: DFC-GOVERNANCE-AUTHOR-PRODUCER-MAINTENANCE-V1
+status: active
+implementation_class: operator-assisted-dev-foundry-copilot
+
+supported_actions:
+  - inspect_and_reconcile_bounded_project_authority
+  - author_new_operator_authorized_tasks
+  - maintain_project_authority_index_and_configured_bindings
+  - prepare_bounded_implementation_handoffs
+  - reconcile_execution_evidence_and_projection_variance
+  - request_mechanical_validation
+  - perform_semantic_self_assessment
+  - prepare_independent_audit_handoffs_when_triggered
+
+prohibited_actions:
+  - implement_product_as_governance_author
+  - modify_immutable_framework_release
+  - mutate_consumer_or_foreign_repositories
+  - self_authorize_operator_reserved_boundaries
+  - issue_required_independent_audit_verdict
+  - bypass_role_or_capability_enforcement
+  - commit_push_merge_release_or_deploy_without_separate_authorization
+  - expand_material_task_scope_without_authority
+
+limits:
+  repository: dev-foundry-claude
+  platform: chatgpt-project
+  task_binding: operation_scoped_explicit_authority
+  taskless_authoring: configured_authority_preparation_only
+  implementation: prohibited
+  consumer_mutation: prohibited
+  publication: prohibited
+
+proof_capabilities:
+  - repository_and_authority_reobservation
+  - configured_binding_consistency_review
+  - exact_governance_change_manifest
+  - bounded_task_and_handoff_preparation
+  - validation_and_evidence_reconciliation
+
+environment_constraints:
+  - process_bound_repository_must_be_dev_foundry_claude
+  - adopted_framework_authority_must_be_verified
+  - active_pop_must_bind_governance_author_to_this_profile
+  - operator_authorization_required_for_governance_mutation
+  - implementation_executor_requires_separate_active_binding
+
+stop_conditions:
+  - missing_or_conflicting_authority
+  - missing_operator_authorization
+  - incompatible_role_or_capability
+  - unexpected_repository_or_branch_state
+  - unauthorized_product_implementation
+  - material_scope_expansion
+  - required_independent_audit_unavailable
+  - indeterminate_side_effect
+
+portability: configure
