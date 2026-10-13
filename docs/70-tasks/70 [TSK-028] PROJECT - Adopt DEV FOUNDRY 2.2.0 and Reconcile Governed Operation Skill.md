@@ -416,3 +416,45 @@ Author reconciles this bounded contract and decides exactly which product
 changes and tests are needed. After source and consumer-support prerequisites
 are genuinely resolved, hand off only those paths; do not ask the Executor to
 re-design governance, discover another repository or re-author the methodology.
+
+## 9. A1 terminal executor-start failure — no implementation attempt
+
+The Operator-authorized A1 bounded consumer-role delivery contract
+`.dev-foundry/execution-contracts/TSK-028.json` was independently validated
+`valid: true`, with exact SHA-256
+`7a39a6672853d191a7b27bada69ca4f456ec4455098708fcd9caac00537ad121`.
+The canonical basename `TSK-028.json` corrected a previously diagnosed
+package-eligibility mismatch (TSK-027 §13) and the 2.1.0 governed resolver
+returned `READY`, eligible implementation, source-bound authorized intent.
+
+Accepted request `req_d195382af741daee0cc259126abf44e9`
+produced execution
+`execution_3f350fce9c9c4075f0df5e16813f13fbc9b49eadb4f1d5222d9585fbd7674df7`,
+terminal `failed`, error `EXECUTOR_UNAVAILABLE`, with precise runner
+failure `Codex model selection failed: The process-bound capability profile
+reference is invalid.` Terminal `status.json` confirms
+`executorInvoked: false`, `executor.available: false`, no executor exit code,
+no changed files, no validation commands, and post-execution validation
+`blocked` solely because executor dispatch failed. Repository branch
+`task/tsk-028-framework-220-skill-adoption` stayed at
+`6d2301b581d6215cc898977659e0a2ef1625ac98`, zero visible/hidden
+changes. This is a **runner model-selection/dispatch mechanism failure**, NOT
+a product implementation FAIL or product validation verdict.
+
+Verified producer POP remains v2 and binds implementation-executor to the
+existing active `implementation-executor-runner-v3.yaml` profile, whose
+`limits.execution_provider` is `codex-cli`. The canonical execution contract
+contains no model override. These observations do not establish which internal
+Runner process-bound model capability-profile reference is invalid. Do not
+modify the producer POP or profile, choose a substitute model, or start another
+execution by guesswork.
+
+**Minimal recovery condition:** diagnose/correct the exact invalid
+process-bound model capability-profile reference in the authorized Runner
+runtime/configuration boundary (without widening TSK-028 or altering a
+consumer). Confirm the corrected reference/model selection using the existing
+permitted runner checks; then reobserve exact task/branch/contract eligibility,
+authorization and prior terminal effects before a **new distinctly identified**
+A1 execution request. Reuse the unchanged scoped contract and focused tests
+where still applicable. No new product task, comprehensive regression suite,
+fresh Governance Audit, or repeat launch is justified by this failure alone.
