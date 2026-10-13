@@ -51,3 +51,5 @@ authorization beyond the current bounded operation.
 Do not read or modify consumer repositories. Consumers adopt explicit adapter
 releases and never follow this repository's main. Root CLAUDE.md, .mcp.json and
 .claude are product surface and bind no producer role.
+
+Apply current adopted authority, not candidate or historical requirements. Distinguish actual mandatory blockers from hypotheses, prefer existing mechanisms and minimal sufficient change, verify implementation handoff consistency, avoid uncoordinated concurrent mutations, and assess results against the Operator's authorized objective without bypassing mandatory governance gates. These are operational reminders, not additional methodology or authorization.

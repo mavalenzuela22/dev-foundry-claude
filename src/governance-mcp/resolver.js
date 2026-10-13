@@ -13,8 +13,8 @@ export const inputSchema = z.object({
   requestedRole: z.string().min(1).optional(),
   expectedContextFingerprint: z.string().regex(/^[0-9a-f]{64}$/).optional(),
 }).strict().superRefine((input, context) => {
-  if (!input.taskId && !input.boundaryId) context.addIssue({ code: 'custom', message: 'taskId or boundaryId is required' });
-  if (input.requestedAction === 'implement' && !input.taskId) context.addIssue({ code: 'custom', message: 'implement requires taskId' });
+  if (!input.taskId && !input.boundaryId) context.addIssue({ code: 'custom', path: ['taskId'], message: 'taskId or boundaryId is required' });
+  if (input.requestedAction === 'implement' && !input.taskId) context.addIssue({ code: 'custom', path: ['taskId'], message: 'taskId is required when requestedAction is implement' });
 });
 
 const defaultRoles = {
@@ -64,24 +64,28 @@ class ResolutionError extends Error {
   }
 }
 
-const invalidAuthority = (message = 'Required authority is invalid or contradictory.') => new ResolutionError('AUTHORITY_INVALID', message);
-const readFailure = () => new ResolutionError('READ_FAILED', 'A required authority source could not be read.');
+const invalidAuthority = (message = 'A required authority fact is invalid or contradictory; check the active authority metadata and routes.') => new ResolutionError('AUTHORITY_INVALID', message);
+const safeConfiguredPath = (value) => typeof value === 'string' && value.length <= 180 && /^[A-Za-z0-9._/ -]+$/.test(value) && !path.isAbsolute(value) && !value.split(/[\\/]/).includes('..') ? value : null;
+const safeObserved = (value) => typeof value === 'string' && value.length <= 128 && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value) ? value : (typeof value);
+const readFailure = (relativePath = null) => new ResolutionError('READ_FAILED', safeConfiguredPath(relativePath)
+  ? `The configured authority source at ${safeConfiguredPath(relativePath)} could not be read. Verify that this POP/index-bound path exists and is readable; if the binding is wrong, stop for Governance Author reconciliation.`
+  : 'A required authority source could not be read.');
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const comparePaths = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 function parseYaml(bytes) {
   const document = parseDocument(bytes.toString('utf8'), { uniqueKeys: true, prettyErrors: false });
-  if (document.errors.length || document.warnings.length) throw invalidAuthority();
+  if (document.errors.length || document.warnings.length) throw invalidAuthority('An authority YAML document is malformed; check its syntax and duplicate keys.');
   const value = document.toJS();
-  if (!isObject(value)) throw invalidAuthority();
+  if (!isObject(value)) throw invalidAuthority('An authority YAML document must contain an object at its root.');
   return value;
 }
 
 function parseFrontmatter(bytes) {
   const text = bytes.toString('utf8');
   const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
-  if (!match) throw invalidAuthority();
+  if (!match) throw invalidAuthority('An authority document is missing valid YAML frontmatter.');
   return parseYaml(Buffer.from(match[1], 'utf8'));
 }
 
@@ -90,29 +94,32 @@ function parseSoT(bytes) {
   if (frontmatter.schemaVersion !== 'dev-foundry.sot-document.v2' ||
       !isObject(frontmatter.artifact) || typeof frontmatter.artifact.id !== 'string' ||
       typeof frontmatter.artifact.type !== 'string' || typeof frontmatter.artifact.status !== 'string') {
-    throw invalidAuthority();
+    throw invalidAuthority('Authority frontmatter must define the supported schemaVersion and artifact id, type, and status.');
   }
   if (!isObject(frontmatter.authority) || !Array.isArray(frontmatter.authority.governedBy) ||
       frontmatter.authority.governedBy.some((id) => typeof id !== 'string' || !id)) {
-    throw invalidAuthority();
+    throw invalidAuthority('Authority frontmatter must define authority.governedBy as an array of non-empty artifact identifiers.');
   }
-  if (!isObject(frontmatter.lifecycle) || typeof frontmatter.lifecycle.phase !== 'string') throw invalidAuthority();
+  if (!isObject(frontmatter.lifecycle) || typeof frontmatter.lifecycle.phase !== 'string') throw invalidAuthority('Authority frontmatter must define lifecycle.phase as a string.');
   return frontmatter;
 }
 
 function parseAuthorityIndex(bytes) {
   const index = parseYaml(bytes);
-  if (index.schema_version !== 'dev-foundry.authority-index.v2' || index.status !== 'active' ||
-      !Array.isArray(index.routes) || !isObject(index.subject) || typeof index.id !== 'string') throw invalidAuthority();
+  if (index.schema_version !== 'dev-foundry.authority-index.v2') throw invalidAuthority('Authority index schema_version must be dev-foundry.authority-index.v2.');
+  if (index.status !== 'active') throw invalidAuthority('The authority index status must be active.');
+  if (!Array.isArray(index.routes)) throw invalidAuthority('Authority index routes must be an array.');
+  if (!isObject(index.subject) || typeof index.id !== 'string' || !index.id.trim()) throw invalidAuthority('Authority index must define subject metadata and a non-empty id.');
   const routeIds = new Set();
   for (const route of index.routes) {
-    if (!isObject(route) || typeof route.id !== 'string' || !route.id.trim() ||
-        typeof route.path !== 'string' || !route.path.trim() ||
-        !routeAuthorityClasses.has(route.authority_class) || !Array.isArray(route.governs) || !route.governs.length ||
-        route.governs.some((item) => typeof item !== 'string' || !item.trim()) ||
-        new Set(route.governs).size !== route.governs.length ||
-        (route.section_id !== null && route.section_id !== undefined && typeof route.section_id !== 'string') ||
-        routeIds.has(route.id)) throw invalidAuthority();
+    if (!isObject(route)) throw invalidAuthority('Each authority index route must be an object.');
+    if (typeof route.id !== 'string' || !route.id.trim()) throw invalidAuthority('Each authority index route must define a non-empty id.');
+    if (typeof route.path !== 'string' || !route.path.trim()) throw invalidAuthority('An authority index route must define a non-empty path.');
+    if (!routeAuthorityClasses.has(route.authority_class)) throw invalidAuthority('An authority index route has an unsupported authority_class.');
+    if (!Array.isArray(route.governs) || !route.governs.length || route.governs.some((item) => typeof item !== 'string' || !item.trim())) throw invalidAuthority('An authority index route must define governs as a non-empty list of artifact identifiers.');
+    if (new Set(route.governs).size !== route.governs.length) throw invalidAuthority('An authority index route repeats an artifact in governs.');
+    if (route.section_id !== null && route.section_id !== undefined && typeof route.section_id !== 'string') throw invalidAuthority('An authority index route section_id must be a string or null.');
+    if (routeIds.has(route.id)) throw invalidAuthority('An authority index route id is duplicated.');
     routeIds.add(route.id);
   }
   return index;
@@ -151,7 +158,7 @@ class Resolver {
       return bytes;
     } catch (error) {
       if (error instanceof ResolutionError) throw error;
-      throw readFailure();
+      throw readFailure(relativePath);
     }
   }
 
@@ -182,7 +189,7 @@ class Resolver {
         typeof pop.framework.selected_authority_index !== 'string' ||
         typeof pop.framework.selected_manifest !== 'string' || pop.framework.adoption_status !== 'active' ||
         !isObject(pop.actor_bindings) || !isObject(pop.policies) || typeof pop.policies.default_role !== 'string') {
-      throw invalidAuthority();
+      throw invalidAuthority('The active project operating profile is missing a supported schema, repository, framework, actor_bindings, or policy field.');
     }
     if (pop.repository.name !== this.request.targetProject || projectIndex.subject.id !== this.request.targetProject ||
         projectIndex.subject.kind !== 'project') {
@@ -206,7 +213,7 @@ class Resolver {
     if (this.frameworkIndex.subject.kind !== 'framework-release' ||
         this.frameworkIndex.subject.version !== frameworkVersionSupported ||
         this.frameworkIndex.subject.id !== `DF-FRAMEWORK-${frameworkVersionSupported}`) {
-      throw invalidAuthority();
+      throw invalidAuthority('The POP-selected authority index does not identify the supported framework release.');
     }
     this.frameworkVersion = pop.framework.adopted_version;
   }
@@ -257,19 +264,30 @@ class Resolver {
       if (frontmatter.artifact.id !== artifactId) throw invalidAuthority();
       matches.push({ route, frontmatter });
     }
-    if (matches.length !== 1 && requireUnique) throw invalidAuthority(matches.length ? 'Authority resolves to multiple routed artifacts.' : 'A required authority artifact has no active route.');
+    if (matches.length !== 1 && requireUnique) {
+      const sourcePath = safeConfiguredPath(indexPath) ?? 'the configured Authority Index';
+      const id = safeObserved(artifactId);
+      throw invalidAuthority(matches.length
+        ? `Authority Index ${sourcePath} routes artifact ${id} to ${matches.length} matching sources; reconcile duplicate routes with Governance Author.`
+        : `Authority artifact ${id} has no active route in Authority Index ${sourcePath}; reconcile the source authority with Governance Author.`);
+    }
     return matches;
   }
 
   async resolveTask(taskId) {
     const matches = await this.resolveFromIndex(this.projectIndex, this.projectIndexPath, taskId, { authorityClass: 'task', requireUnique: false });
-    if (matches.length !== 1) throw invalidAuthority(matches.length ? 'Task identity resolves through duplicate routes.' : 'The requested task has no active route.');
+    if (matches.length !== 1) {
+      const sourcePath = safeConfiguredPath(this.projectIndexPath) ?? 'the configured project Authority Index';
+      throw invalidAuthority(matches.length
+        ? `taskId resolves through ${matches.length} active routes in ${sourcePath}; reconcile duplicate task routes with Governance Author.`
+        : `taskId has no active task route in ${sourcePath}. Check the exact taskId against the project index, correct the caller argument, and retry once.`);
+    }
     const task = matches[0];
     if (task.frontmatter.artifact.type !== 'TSK') throw invalidAuthority();
     const status = parseFrontmatterStatus(task.frontmatter);
     const phase = task.frontmatter.lifecycle.phase.toLowerCase();
     if (this.request.requestedAction === 'implement' && !(status === 'IN_PROGRESS' && phase === 'in-progress')) {
-      throw new ResolutionError('ROLE_INELIGIBLE', 'The task lifecycle does not authorize implementation.');
+      throw new ResolutionError('ROLE_INELIGIBLE', 'Implementation requires task artifact.status IN_PROGRESS and lifecycle.phase in-progress.');
     }
     return task;
   }
@@ -286,7 +304,12 @@ class Resolver {
       matches = await this.resolveFromIndex(secondIndex, secondPath, artifactId, { requireUnique: false });
       sourceIndex = secondIndex;
     }
-    if (matches.length !== 1) throw invalidAuthority(matches.length ? 'Authority artifact identity is routed more than once.' : 'A required authority artifact is not routed.');
+    if (matches.length !== 1) {
+      const id = safeObserved(artifactId);
+      const configuredIndexes = [safeConfiguredPath(firstPath), safeConfiguredPath(secondPath)].filter(Boolean);
+      if (matches.length) throw invalidAuthority(`Authority artifact ${id} is routed ${matches.length} times in ${configuredIndexes.join(' and ')}; reconcile duplicate routes with Governance Author.`);
+      throw invalidAuthority(`Required authority artifact ${id} has no route in ${configuredIndexes.join(' or ') || 'the configured Authority Index'}. Reconcile the governing authority route with Governance Author.`);
+    }
     const match = { ...matches[0], index: sourceIndex };
     const scopeKey = `${sourceIndex === this.projectIndex ? 'project' : 'framework'}:${artifactId}`;
     if (stack.includes(scopeKey)) throw invalidAuthority('The routed authority chain contains a cycle.');
@@ -311,23 +334,41 @@ class Resolver {
   async resolveRole() {
     const action = this.request.requestedAction;
     const roleId = this.request.requestedRole ?? (defaultRoles[action] ?? this.pop.policies.default_role);
+    const popPath = '.dev-foundry/profiles/project-operating-profile.yaml';
+    const bindingField = `${popPath}: actor_bindings.${safeObserved(roleId)}`;
     if (action === 'inspect') {
       const binding = this.pop.actor_bindings[roleId];
-      if (!isActiveBinding(binding)) throw new ResolutionError('ROLE_INELIGIBLE', 'The selected project role is missing or inactive.');
-    } else if (!compatibleRoles[action].includes(roleId) || !isActiveBinding(this.pop.actor_bindings[roleId])) {
-      throw new ResolutionError('ROLE_INELIGIBLE', 'The requested role is incompatible, missing, or inactive.');
+      if (!isActiveBinding(binding)) {
+        const status = isObject(binding) ? safeObserved(binding.status) : 'missing';
+        throw new ResolutionError('ROLE_INELIGIBLE', `POP binding ${bindingField} is ${status}; expected an active project role binding. Stop for Governance Author reconciliation; do not guess another profile.`);
+      }
+    } else if (!compatibleRoles[action].includes(roleId)) {
+      const expected = compatibleRoles[action].join(' or ');
+      const pathLike = roleId.includes('/') || /\.ya?ml$/i.test(roleId);
+      throw new ResolutionError('ROLE_INELIGIBLE', `requestedRole must be a project role ID compatible with requestedAction ${action}; expected ${expected}, received ${pathLike ? 'a path-like value' : safeObserved(roleId)}. Actor Profile paths and Capability Profile IDs/paths are separate POP-bound values. Set requestedRole to the expected role ID and retry once.`);
+    } else if (!isActiveBinding(this.pop.actor_bindings[roleId])) {
+      const binding = this.pop.actor_bindings[roleId];
+      const status = isObject(binding) ? safeObserved(binding.status) : 'missing';
+      throw new ResolutionError('ROLE_INELIGIBLE', `POP binding ${bindingField} is ${status}; expected active for ${action}. Stop for Governance Author reconciliation; do not guess another profile.`);
     }
     const binding = this.pop.actor_bindings[roleId];
     const capabilityPaths = binding.capability_profiles ?? [];
-    if (!Array.isArray(capabilityPaths) || capabilityPaths.some((item) => typeof item !== 'string')) throw invalidAuthority();
+    if (!Array.isArray(capabilityPaths) || capabilityPaths.some((item) => typeof item !== 'string')) {
+      throw invalidAuthority(`POP field ${popPath}: actor_bindings.${safeObserved(roleId)}.capability_profiles must be an array of configured Capability Profile paths; actual value type is ${Array.isArray(capabilityPaths) ? 'array with a non-string entry' : typeof capabilityPaths}. Stop for Governance Author reconciliation.`);
+    }
     const actorPath = binding.profile;
     const actorData = parseYaml(await this.readBytes(actorPath));
-    if (actorData.role !== roleId || actorData.status !== 'active') throw invalidAuthority();
+    if (actorData.role !== roleId || actorData.status !== 'active') {
+      const mismatches = [];
+      if (actorData.role !== roleId) mismatches.push(`role expected ${safeObserved(roleId)}, actual ${safeObserved(actorData.role)}`);
+      if (actorData.status !== 'active') mismatches.push(`status expected active, actual ${safeObserved(actorData.status)}`);
+      throw invalidAuthority(`Actor Profile ${safeConfiguredPath(actorPath) ?? 'bound by the active POP'} has ${mismatches.join('; ')}. Reconcile ${popPath}: actor_bindings.${safeObserved(roleId)}.profile and the Actor Profile with Governance Author.`);
+    }
     await this.addSource(actorData.id ?? roleId, actorPath, 'profile');
     const capabilities = [];
     for (const capabilityPath of capabilityPaths) {
       const capability = parseYaml(await this.readBytes(capabilityPath));
-      if (capability.status !== 'active') throw invalidAuthority();
+      if (capability.status !== 'active') throw invalidAuthority(`Capability Profile ${safeConfiguredPath(capabilityPath) ?? 'bound by the active POP'} has status ${safeObserved(capability.status)}; expected active. Reconcile ${popPath}: actor_bindings.${safeObserved(roleId)}.capability_profiles and the profile with Governance Author.`);
       await this.addSource(capability.id ?? capabilityPath, capabilityPath, 'profile');
       capabilities.push(capabilityPath);
     }
@@ -343,7 +384,7 @@ class Resolver {
       await this.addRoutedArtifact(task.frontmatter.artifact.id);
     } else {
       if (!request.boundaryId) throw new ResolutionError('INVALID_REQUEST', 'boundaryId is required for taskless resolution.');
-      if (request.requestedAction === 'implement') throw new ResolutionError('INVALID_REQUEST', 'implement requires taskId.');
+      if (request.requestedAction === 'implement') throw new ResolutionError('INVALID_REQUEST', 'taskId is required when requestedAction is implement.');
       await this.loadTasklessRoot();
     }
     const role = await this.resolveRole();
@@ -359,7 +400,7 @@ class Resolver {
     const sourceLines = [...this.sources.values()].sort((a, b) => comparePaths(a.path, b.path)).map((source) => `source=${source.path}\t${source.sha256}`);
     const contextFingerprint = digest(Buffer.from(`${[...selector, ...sourceLines].join('\n')}\n`, 'utf8'));
     if (request.expectedContextFingerprint && request.expectedContextFingerprint !== contextFingerprint) {
-      throw new ResolutionError('STALE_CONTEXT', 'The authority context changed since the supplied fingerprint was produced.');
+      throw new ResolutionError('STALE_CONTEXT', 'expectedContextFingerprint is stale for the current POP and routed authority sources. Resolve this operation once without the old fingerprint, then use the newly returned contextFingerprint.');
     }
     const resolution = {
       targetProject: request.targetProject,
@@ -379,7 +420,23 @@ class Resolver {
 
 export async function resolveGovernedOperation(input, { projectRoot } = {}) {
   const parsed = inputSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, errorCode: 'INVALID_REQUEST', message: 'The request does not match the resolver contract.' };
+  if (!parsed.success) {
+    const diagnostics = parsed.error.issues.map((issue) => {
+      const field = issue.path.length ? issue.path.join('.') : 'request';
+      if (issue.code === 'unrecognized_keys') {
+        const keys = issue.keys.map((key) => String(key).replace(/[^A-Za-z0-9_.-]/g, '?').slice(0, 80));
+        return `unknown argument${keys.length === 1 ? '' : 's'}: ${keys.join(', ')}`;
+      }
+      if (issue.code === 'custom') return issue.message;
+      if (field === 'requestedAction') return 'requestedAction must be one of inspect, author, implement, validate, audit, promote, or close';
+      if (field === 'targetProject') return 'targetProject must be a non-empty string';
+      if (field === 'taskId' || field === 'boundaryId') return `${field} must be a 1-128 character identifier using letters, digits, dot, underscore, or hyphen`;
+      if (field === 'requestedRole') return 'requestedRole must be a non-empty string';
+      if (field === 'expectedContextFingerprint') return 'expectedContextFingerprint must be a 64-character lowercase SHA-256 hex string';
+      return `${field} is invalid`;
+    });
+    return { ok: false, errorCode: 'INVALID_REQUEST', message: `Invalid request: ${[...new Set(diagnostics)].join('; ')}.` };
+  }
   if (typeof projectRoot !== 'string' || !path.isAbsolute(projectRoot)) return { ok: false, errorCode: 'READ_FAILED', message: 'The configured project root is unavailable.' };
   try {
     return await new Resolver(projectRoot).resolve(parsed.data);

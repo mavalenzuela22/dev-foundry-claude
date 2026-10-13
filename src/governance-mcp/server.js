@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
 import { createSessionGuard } from './session.js';
 import { resolveGovernedOperation } from './resolver.js';
+import { assessPredelegationReadiness, readinessInputSchema } from './readiness-mcp.js';
 import { writeOperationMarker } from '../telemetry/telemetry.js';
 import { helpTopics, helpUri, renderHelp } from '../consumer/help.js';
 
@@ -16,8 +17,56 @@ const sessionGuard = consumerGuard ? await createSessionGuard(projectRoot, globa
 const server = new McpServer({
   name: 'dev-foundry-governance',
   version: '1.0.0',
-  instructions: 'Use this server to resolve one bounded DEV FOUNDRY operation and its current authority references.',
+  instructions: 'Use resolve_governed_operation first to bind one action, task or boundary, project role, and POP-configured authority. Use assess_predelegation_readiness only for optional advisory checks after a fresh implementation resolution. Role IDs, task IDs, Actor Profile paths, and Capability Profile IDs/paths are different values. This local MCP reads authority and reports diagnostics; it grants no permission and dispatches no work. Recoverable caller-input errors may be corrected and retried once; contradictory project authority must stop for Governance Author reconciliation. External host facts remain advisory and belong to the existing Claude Code native/host workflow.',
 });
+
+const identifierSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/);
+const strictToolInputSchema = z.object({
+  requestedAction: z.enum(['inspect', 'author', 'implement', 'validate', 'audit', 'promote', 'close']).describe('Required operation to resolve.'),
+  targetProject: z.string().min(1).describe('Required non-empty target project identifier.'),
+  taskId: identifierSchema.optional().describe('Optional task artifact identifier.'),
+  boundaryId: identifierSchema.optional().describe('Optional boundary identifier for taskless governance authoring.'),
+  requestedRole: z.string().min(1).optional().describe('Optional active project role.'),
+  expectedContextFingerprint: z.string().regex(/^[0-9a-f]{64}$/).optional().describe('Optional lowercase SHA-256 fingerprint from a prior resolution.'),
+}).strict();
+
+// The MCP SDK validates before calling the tool handler. Keep its public JSON
+// Schema strict, but defer runtime validation to resolveGovernedOperation so
+// malformed calls receive the DAT-001 result envelope. This Standard Schema
+// adapter preserves the original value; the resolver's strict safeParse is
+// the sole request enforcement point.
+const dat001ToolInputSchema = {
+  '~standard': {
+    version: 1,
+    vendor: 'dev-foundry-claude',
+    jsonSchema: strictToolInputSchema['~standard'].jsonSchema,
+    validate: (value) => ({ value }),
+  },
+};
+
+const dat002ToolInputSchema = {
+  '~standard': {
+    version: 1,
+    vendor: 'dev-foundry-claude',
+    jsonSchema: readinessInputSchema['~standard'].jsonSchema,
+    validate: (value) => ({ value }),
+  },
+};
+
+async function guardGovernedCall() {
+  if (sessionGuard) {
+    const denied = await sessionGuard();
+    if (denied) return denied;
+  }
+  if (consumerGuard && (await consumerGuard(projectRoot)).overall !== 'active') {
+    return { ok: false, errorCode: 'BINDING_INACTIVE', message: 'Claude role activation is not complete for this project.' };
+  }
+  return null;
+}
+
+function contentResult(value) {
+  return { content: [{ type: 'text', text: JSON.stringify(value) }] };
+}
 
 for (const topic of Object.keys(helpTopics)) {
   const uri = helpUri(topic);
@@ -29,24 +78,11 @@ for (const topic of Object.keys(helpTopics)) {
 
 server.registerTool('resolve_governed_operation', {
   title: 'Resolve governed operation',
-  description: 'Resolve role, authority references, lifecycle routing, and a context fingerprint. Inputs are checked strictly; unknown fields are rejected.',
-  inputSchema: z.object({
-    requestedAction: z.unknown().optional().describe('Required: inspect, author, implement, validate, audit, promote, or close.'),
-    targetProject: z.unknown().optional().describe('Required: non-empty target project identifier.'),
-    taskId: z.unknown().optional().describe('Optional task artifact identifier.'),
-    boundaryId: z.unknown().optional().describe('Optional taskless governance boundary identifier.'),
-    requestedRole: z.unknown().optional().describe('Optional active project role.'),
-    expectedContextFingerprint: z.unknown().optional().describe('Optional lowercase SHA-256 fingerprint from a prior resolution.'),
-  }).passthrough(),
+  description: 'Call first to resolve one action and targetProject with taskId (or boundaryId for taskless authoring); taskId is the routed TSK artifact ID, never an Authority Index route ID. requestedRole, if supplied, is a project role ID such as implementation-executor, never an Actor Profile path or Capability Profile ID/path. Actor and Capability Profile paths come from actor_bindings in the active POP. Success returns current authority references and a context fingerprint; failure returns a DAT-001 error code and recovery message. Correct caller input and retry once; stop on contradictory POP/source authority for Governance Author reconciliation. This local resolver grants no permission and dispatches no work.',
+  inputSchema: dat001ToolInputSchema,
 }, async (input) => {
-  if (sessionGuard) {
-    const denied = await sessionGuard();
-    if (denied) return { content: [{ type: 'text', text: JSON.stringify(denied) }] };
-  }
-  if (consumerGuard && (await consumerGuard(projectRoot)).overall !== 'active') {
-    const denied = { ok: false, errorCode: 'BINDING_INACTIVE', message: 'Claude role activation is not complete for this project.' };
-    return { content: [{ type: 'text', text: JSON.stringify(denied) }] };
-  }
+  const denied = await guardGovernedCall();
+  if (denied) return contentResult(denied);
   const result = await resolveGovernedOperation(input, { projectRoot });
   if (result.ok === true && process.env.DEV_FOUNDRY_TELEMETRY_RUN_ID && process.env.DEV_FOUNDRY_TELEMETRY_DIR) {
     const { resolution } = result;
@@ -65,7 +101,23 @@ server.registerTool('resolve_governed_operation', {
       console.error('Governance telemetry operation marker could not be written.');
     }
   }
-  return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+  return contentResult(result);
+});
+
+server.registerTool('assess_predelegation_readiness', {
+  title: 'Assess predelegation readiness',
+  description: 'Optional advisory diagnostic after resolve_governed_operation and before implementation delegation, using a fresh resolution for an implementation taskId and targetProject; taskId is the routed TSK artifact ID, never an Authority Index route ID. It rechecks the POP-bound implementation-executor role and task route, then reports evidence gaps; it cannot authenticate external host facts, Operator authorization, grant permission, or dispatch work. Follow a resolver cause to correct caller input once or stop for Governance Author reconciliation; use the existing Claude Code native/host workflow once for external facts. Never call or await an external runner from this consumer MCP.',
+  inputSchema: dat002ToolInputSchema,
+}, async (input) => {
+  const denied = await guardGovernedCall();
+  if (denied) return contentResult({
+    outcome: 'BLOCKED', reasonCodes: [denied.errorCode === 'STALE_SESSION' ? 'STALE_SESSION' : 'ACTIVATION_INACTIVE'],
+    nextActions: [denied.errorCode === 'STALE_SESSION'
+      ? 'Start a fresh Claude session with the current project runtime binding.'
+      : 'Complete the project-scoped Claude role activation before assessing readiness.'],
+    contextFingerprint: null, handoff: null, nonAuthorizing: true, dispatchAllowed: false,
+  });
+  return contentResult(await assessPredelegationReadiness(input, { projectRoot }));
 });
 
 const transport = new StdioServerTransport();

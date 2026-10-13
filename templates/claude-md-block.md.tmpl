@@ -3,6 +3,8 @@
 
 Verify that the current repository is `{{PROJECT}}` before governed work.
 Use the governance MCP `resolve_governed_operation` as the deterministic entry point for a bounded operation, and resolve exactly one operation-scoped role before role-dependent work.
+After `resolve_governed_operation`, the Governance Author calls `assess_predelegation_readiness` before implementation delegation; its diagnostic handoff does not authorize dispatch.
+Treat `INDETERMINATE` as advisory: continue permitted Governance Author reading, evidence, and documentation while completing the existing independent native/host authorization and executor checks. Do not repeat the diagnostic or invent evidence.
 
 An active POP binding to the Claude implementation, not the presence of this block, the subagent files, or the MCP entry, authorizes role work. While that binding is inactive, `BINDING_INACTIVE` means stop; do not work around it.
 This block is a startup mechanism and is not authority.

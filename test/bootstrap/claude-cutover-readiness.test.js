@@ -65,7 +65,7 @@ function assertProducerCapabilityIndex(pop, index) {
     assert.equal(binding.required, active.has(binding.path),
       `Only active POP capabilities may be required: ${binding.path}`);
   }
-  for (const path of [runnerV1Path, runnerPath, runnerV3Path, historicalClaudePath, claudePath, auditorPath]) {
+  for (const path of [runnerV1Path, runnerPath, historicalClaudePath, claudePath, auditorPath]) {
     const bindings = index.bindings.filter((binding) => binding.path === path);
     assert.equal(bindings.length, 1, `Expected exactly one historical/consumer capability binding: ${path}`);
     assert.equal(bindings[0].kind, 'capability-profile', path);
@@ -173,6 +173,7 @@ test('active POP has exactly the ChatGPT-project producer-maintenance role bindi
       assert.ok(binding.capability_profiles.length > 0, 'Author must retain governed capabilities');
     } else if (role === 'implementation-executor') {
       assert.equal(binding.capability_profiles.length, 1, 'Producer must have exactly one bound executor capability');
+      assert.deepEqual(binding.capability_profiles, [runnerV3Path], 'Producer Executor must bind the active runner V3 capability');
     } else {
       assert.deepEqual(binding.capability_profiles, [], role);
     }
@@ -312,9 +313,9 @@ test('active ChatGPT-project Platform Bootstrap permits Author, Auditor, and Cus
     'The active POP-bound, routed capability must identify the producer Executor');
   assert.equal(capability.status, 'active', capability.id);
   assert.equal(capability.implementation_class, executor.implementation.identity, capability.id);
-  assert.equal(capability.limits.implementation_identity, executor.implementation.identity, capability.id);
-  assert.equal(capability.limits.platform, bootstrap.platform.id, capability.id);
-  assert.match(text, /Implementation[- ]Executor[^.\n]*separately bound in the POP[^.\n]*through the active (?:task-specific )?Capability Profile/i);
+  assert.equal(capability.limits.hosting_purpose, 'chatgpt-governed-producer-maintenance', capability.id);
+  assert.equal(capability.limits.execution_provider, 'codex-cli', capability.id);
+  assert.match(text, /Implementation[- ]Executor[^.\n]*separately bound in the POP[^.\n]*through the active (?:task-specific |producer-maintenance )?Capability Profile/i);
   assert.match(text, /Implementation[- ]Executor[^.\n]*not (?:be )?self-selected|not self-selected[^.\n]*Implementation[- ]Executor/i);
   assert.match(text, /Mechanical[- ]Validator[^.\n]*(?:separately )?bound[^.\n]*process-bound[- ]runner/i);
   assert.match(text, /Claude Code[^.\n]*target runtime[^.\n]*not[^.\n]*active producer platform/i);

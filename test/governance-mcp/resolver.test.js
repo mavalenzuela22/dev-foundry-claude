@@ -18,17 +18,21 @@ test('accepts a valid request and strictly rejects unknown, invalid, and cross-f
     const valid = await resolveGovernedOperation(validImplement, { projectRoot: root });
     assert.equal(valid.ok, true);
     assert.deepEqual(Object.keys(valid), ['ok', 'message', 'resolution']);
-    for (const request of [
-      { ...validImplement, unknown: true },
-      { requestedAction: 'write', targetProject: 'fixture-project', taskId: 'TSK-002' },
-      { requestedAction: 'implement', targetProject: 'fixture-project', taskId: 'not valid' },
-      { requestedAction: 'author', targetProject: 'fixture-project' },
-      { requestedAction: 'implement', targetProject: 'fixture-project', boundaryId: 'pre-task' },
-    ]) {
+    const invalidCases = [
+      [{ ...validImplement, unknown: true }, /unknown argument: unknown/],
+      [{ requestedAction: 'write', targetProject: 'fixture-project', taskId: 'TSK-002' }, /requestedAction must be one of/],
+      [{ requestedAction: 'implement', targetProject: 'fixture-project', taskId: 'not valid' }, /taskId must be a 1-128 character identifier/],
+      [{ requestedAction: 'author', targetProject: 'fixture-project' }, /taskId or boundaryId is required/],
+      [{ requestedAction: 'implement', targetProject: 'fixture-project', boundaryId: 'pre-task' }, /taskId is required when requestedAction is implement/],
+      [{ requestedAction: 'author', targetProject: '', boundaryId: 'pre-task' }, /targetProject must be a non-empty string/],
+      [{ requestedAction: 'author', targetProject: 'fixture-project', boundaryId: 'pre-task', expectedContextFingerprint: 'not-a-digest' }, /expectedContextFingerprint must be a 64-character lowercase SHA-256 hex string/],
+    ];
+    for (const [request, diagnostic] of invalidCases) {
       const result = await resolveGovernedOperation(request, { projectRoot: root });
       assert.equal(result.ok, false);
       assert.equal(result.errorCode, 'INVALID_REQUEST');
       assert.deepEqual(Object.keys(result), ['ok', 'errorCode', 'message']);
+      assert.match(result.message, diagnostic);
     }
   });
 });
@@ -58,6 +62,8 @@ test('resolves a taskless author boundary without a synthetic task', async () =>
 test('implement without taskId returns INVALID_REQUEST', async () => {
   const result = await resolveGovernedOperation({ requestedAction: 'implement', targetProject: 'fixture-project', boundaryId: 'implementation' }, { projectRoot: '/tmp' });
   assert.equal(result.errorCode, 'INVALID_REQUEST');
+  assert.match(result.message, /taskId is required when requestedAction is implement/);
+  assert.deepEqual(Object.keys(result), ['ok', 'errorCode', 'message']);
 });
 
 test('rejects target-project mismatch', async () => {
@@ -79,12 +85,69 @@ test('rejects incompatible, deferred, or inactive roles', async () => {
   await withProject(async ({ root, write }) => {
     const incompatible = await resolveGovernedOperation({ ...validImplement, requestedRole: 'governance-auditor' }, { projectRoot: root });
     assert.equal(incompatible.errorCode, 'ROLE_INELIGIBLE');
+    assert.match(incompatible.message, /requestedRole.*role ID.*expected implementation-executor.*retry once/i);
     const popPath = '.dev-foundry/profiles/project-operating-profile.yaml';
     const pop = JSON.parse(await readFile(path.join(root, popPath), 'utf8'));
     pop.actor_bindings['implementation-executor'].status = 'deferred';
     await write(popPath, JSON.stringify(pop));
     const deferred = await resolveGovernedOperation(validImplement, { projectRoot: root });
     assert.equal(deferred.errorCode, 'ROLE_INELIGIBLE');
+    assert.match(deferred.message, /project-operating-profile\.yaml: actor_bindings\.implementation-executor is deferred.*Governance Author reconciliation/i);
+  });
+});
+
+test('diagnoses role ID versus profile path, Actor Profile contradictions, and missing Capability Profile paths safely', async () => {
+  await withProject(async ({ root, write }) => {
+    const confused = await resolveGovernedOperation({ ...validImplement, requestedRole: '.dev-foundry/profiles/implementation-executor.yaml' }, { projectRoot: root });
+    assert.equal(confused.errorCode, 'ROLE_INELIGIBLE');
+    assert.match(confused.message, /requestedRole must be a project role ID.*path-like value.*Actor Profile paths and Capability Profile IDs\/paths are separate.*retry once/i);
+    assert.deepEqual(Object.keys(confused), ['ok', 'errorCode', 'message']);
+
+    const popPath = '.dev-foundry/profiles/project-operating-profile.yaml';
+    const pop = JSON.parse(await readFile(path.join(root, popPath), 'utf8'));
+    const actorPath = pop.actor_bindings['implementation-executor'].profile;
+    await write(actorPath, 'schema_version: dev-foundry.actor-profile.v2\nid: executor-profile\nstatus: deferred\nrole: governance-author\nprivate: DO_NOT_ECHO\n');
+    const actor = await resolveGovernedOperation(validImplement, { projectRoot: root });
+    assert.equal(actor.errorCode, 'AUTHORITY_INVALID');
+    assert.match(actor.message, /Actor Profile .*actor-profiles\/implementation-executor\.yaml.*role expected implementation-executor, actual governance-author; status expected active, actual deferred.*Reconcile .*actor_bindings\.implementation-executor\.profile/i);
+    assert.equal(actor.message.includes('DO_NOT_ECHO'), false);
+
+    pop.actor_bindings['implementation-executor'].profile = '.dev-foundry/releases/2.1.0/actor-profiles/missing-executor.yaml';
+    await write(popPath, JSON.stringify(pop));
+    const missingActor = await resolveGovernedOperation(validImplement, { projectRoot: root });
+    assert.equal(missingActor.errorCode, 'READ_FAILED');
+    assert.match(missingActor.message, /missing-executor\.yaml.*Governance Author reconciliation/i);
+
+    pop.actor_bindings['implementation-executor'].profile = actorPath;
+    pop.actor_bindings['implementation-executor'].capability_profiles = ['.dev-foundry/profiles/capability-profiles/missing-capability.yaml'];
+    await write(popPath, JSON.stringify(pop));
+    await write(actorPath, 'schema_version: dev-foundry.actor-profile.v2\nid: executor-profile\nstatus: active\nrole: implementation-executor\n');
+    const missingCapability = await resolveGovernedOperation(validImplement, { projectRoot: root });
+    assert.equal(missingCapability.errorCode, 'READ_FAILED');
+    assert.match(missingCapability.message, /missing-capability\.yaml.*POP\/index-bound path exists and is readable/i);
+
+    pop.actor_bindings['implementation-executor'].capability_profiles = ['.dev-foundry/profiles/capability-profiles/executor.yaml'];
+    await write(popPath, JSON.stringify(pop));
+    await write('.dev-foundry/profiles/capability-profiles/executor.yaml', 'schema_version: dev-foundry.capability-profile.v1\nid: EXECUTOR-CAPABILITY\nstatus: deferred\n');
+    const deferredCapability = await resolveGovernedOperation(validImplement, { projectRoot: root });
+    assert.equal(deferredCapability.errorCode, 'AUTHORITY_INVALID');
+    assert.match(deferredCapability.message, /Capability Profile .*executor\.yaml has status deferred; expected active.*actor_bindings\.implementation-executor\.capability_profiles/i);
+  });
+});
+
+test('diagnoses missing and duplicate routed task and authority identities with configured index paths', async () => {
+  await withProject(async ({ root, write }) => {
+    const missing = await resolveGovernedOperation({ ...validImplement, taskId: 'TSK-TYPO' }, { projectRoot: root });
+    assert.equal(missing.errorCode, 'AUTHORITY_INVALID');
+    assert.match(missing.message, /taskId.*no active task route.*authority-index\.yaml.*correct the caller argument.*retry once/i);
+
+    const indexPath = '.dev-foundry/authority-index.yaml';
+    const index = JSON.parse(await readFile(path.join(root, indexPath), 'utf8'));
+    index.routes.push({ ...index.routes.find(route => route.authority_class === 'task'), id: 'second-task-route' });
+    await write(indexPath, JSON.stringify(index));
+    const duplicate = await resolveGovernedOperation(validImplement, { projectRoot: root });
+    assert.equal(duplicate.errorCode, 'AUTHORITY_INVALID');
+    assert.match(duplicate.message, /taskId.*2 active routes.*authority-index\.yaml.*Governance Author/i);
   });
 });
 
@@ -95,13 +158,25 @@ test('changed authority source with prior fingerprint returns STALE_CONTEXT', as
     await write(frameworkDocPath, `---\nschemaVersion: dev-foundry.sot-document.v2\nartifact:\n  id: OPS-001\n  type: OPS\n  status: ACTIVE\nauthority:\n  governedBy: []\nlifecycle:\n  phase: active\n---\nchanged\n`);
     const stale = await resolveGovernedOperation({ ...validImplement, expectedContextFingerprint: first.resolution.contextFingerprint }, { projectRoot: root });
     assert.equal(stale.errorCode, 'STALE_CONTEXT');
+    assert.match(stale.message, /expectedContextFingerprint is stale.*Resolve this operation once without the old fingerprint.*newly returned contextFingerprint/i);
   });
 });
 
 test('missing, duplicate, malformed, and contradictory routed authority fails closed', async () => {
   await withProject(async ({ root, taskPath, write }) => {
     await write(taskPath, '---\nnot: [valid\n---\n');
-    assert.equal((await resolveGovernedOperation(validImplement, { projectRoot: root })).errorCode, 'AUTHORITY_INVALID');
+    const malformed = await resolveGovernedOperation(validImplement, { projectRoot: root });
+    assert.equal(malformed.errorCode, 'AUTHORITY_INVALID');
+    assert.match(malformed.message, /YAML document is malformed/);
+  });
+  await withProject(async ({ root, taskPath, write }) => {
+    await write(taskPath, `---\nschemaVersion: dev-foundry.sot-document.v2\nartifact:\n  id: TSK-002\n  type: TSK\n  status: IN_PROGRESS\nauthority:\n  governedBy: invalid\nlifecycle:\n  phase: in-progress\n---\nPRIVATE_AUTHORITY_BODY\n`);
+    const malformedField = await resolveGovernedOperation(validImplement, { projectRoot: root });
+    assertAuthorityFailure(malformedField);
+    assert.match(malformedField.message, /authority\.governedBy/);
+    assert.equal(malformedField.message.includes('PRIVATE_AUTHORITY_BODY'), false);
+    assert.deepEqual(Object.keys(malformedField), ['ok', 'errorCode', 'message']);
+    assert.ok(taskPath);
   });
   await withProject(async ({ root, taskPath, write }) => {
     const indexPath = '.dev-foundry/authority-index.yaml';
@@ -116,7 +191,9 @@ test('missing, duplicate, malformed, and contradictory routed authority fails cl
     const index = JSON.parse(await readFile(path.join(root, indexPath), 'utf8'));
     index.routes[1].path = 'docs/tasks/missing.md';
     await write(indexPath, JSON.stringify(index));
-    assert.equal((await resolveGovernedOperation(validImplement, { projectRoot: root })).errorCode, 'READ_FAILED');
+    const missing = await resolveGovernedOperation(validImplement, { projectRoot: root });
+    assert.equal(missing.errorCode, 'READ_FAILED');
+    assert.match(missing.message, /docs\/tasks\/missing\.md/);
     await write(taskPath, '---\nschemaVersion: dev-foundry.sot-document.v2\nartifact:\n  id: ADR-001\n  type: ADR\n  status: ACTIVE\nauthority:\n  governedBy: []\nlifecycle:\n  phase: active\n---\n');
     index.routes[1].path = taskPath;
     await write(indexPath, JSON.stringify(index));
@@ -204,7 +281,9 @@ test('rejects unsupported framework versions and contradictory framework routes'
     const index = JSON.parse(await readFile(path.join(root, indexPath), 'utf8'));
     index.routes[0].path = '.dev-foundry/releases/1.0.0/authority-index.yaml';
     await write(indexPath, JSON.stringify(index));
-    assert.equal((await resolveGovernedOperation(validImplement, { projectRoot: root })).errorCode, 'AUTHORITY_INVALID');
+    const contradictory = await resolveGovernedOperation(validImplement, { projectRoot: root });
+    assert.equal(contradictory.errorCode, 'AUTHORITY_INVALID');
+    assert.match(contradictory.message, /project framework route contradicts the POP-selected release/);
   });
 });
 
@@ -357,7 +436,7 @@ test('missing or duplicate active governing identities are refused in brownfield
     });
     const result = await resolveGovernedOperation(validImplement, { projectRoot: project.root });
     assertAuthorityFailure(result);
-    assert.equal(result.message, 'Authority artifact identity is routed more than once.');
+    assert.match(result.message, /Authority artifact ADR-001 is routed 2 times.*Governance Author/);
   }, makeBrownfieldProject);
 });
 
@@ -370,7 +449,7 @@ test('duplicate task identity remains invalid with independent route IDs and fil
     });
     const result = await resolveGovernedOperation(validImplement, { projectRoot: project.root });
     assertAuthorityFailure(result);
-    assert.equal(result.message, 'Task identity resolves through duplicate routes.');
+    assert.match(result.message, /taskId resolves through 2 active routes.*Governance Author/);
   }, makeBrownfieldProject);
 });
 

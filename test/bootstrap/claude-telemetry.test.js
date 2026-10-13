@@ -281,13 +281,19 @@ test('MCP markers follow successful resolution only and preserve exact results w
   const disabled = await startMcp(t, project.root);
   const enabled = await startMcp(t, project.root, { DEV_FOUNDRY_TELEMETRY_RUN_ID: telemetryRunId, DEV_FOUNDRY_TELEMETRY_DIR: telemetryDir });
   const tools = await enabled.rpc('tools/list', {});
-  assert.deepEqual(tools.tools.map((tool) => tool.name), ['resolve_governed_operation']);
+  assert.deepEqual(tools.tools.map((tool) => tool.name), ['resolve_governed_operation', 'assess_predelegation_readiness']);
   const args = { requestedAction: 'implement', targetProject: 'fixture-project', taskId: 'TSK-002' };
   const call = (server, arguments_) => server.rpc('tools/call', { name: 'resolve_governed_operation', arguments: arguments_ });
+  const readinessCall = (server, arguments_) => server.rpc('tools/call', { name: 'assess_predelegation_readiness', arguments: arguments_ });
   const expected = await call(disabled, args);
   assert.equal(JSON.parse(expected.content[0].text).ok, true);
   assert.deepEqual(await readdir(telemetryDir), []);
   assert.deepEqual(await call(enabled, args), expected);
+  const readinessArgs = { targetProject: 'fixture-project', taskId: 'TSK-002' };
+  const expectedReadiness = await readinessCall(disabled, readinessArgs);
+  assert.deepEqual(await readinessCall(enabled, readinessArgs), expectedReadiness);
+  assert.equal(JSON.parse(expectedReadiness.content[0].text).nonAuthorizing, true);
+  assert.equal(JSON.parse(expectedReadiness.content[0].text).dispatchAllowed, false);
   const invalid = { ...args, unexpected: true };
   assert.deepEqual(await call(enabled, invalid), await call(disabled, invalid));
   assert.equal(JSON.parse((await call(enabled, invalid)).content[0].text).ok, false);
@@ -304,20 +310,21 @@ test('MCP markers follow successful resolution only and preserve exact results w
   await writeFile(notDirectory, 'test');
   const failing = await startMcp(t, project.root, { DEV_FOUNDRY_TELEMETRY_RUN_ID: telemetryRunId, DEV_FOUNDRY_TELEMETRY_DIR: notDirectory });
   assert.deepEqual(await call(failing, args), expected);
+  assert.deepEqual(await readinessCall(failing, readinessArgs), expectedReadiness);
   // The warning travels on a separate pipe; allow its data event to arrive.
   await new Promise((resolve) => setImmediate(resolve));
   assert.match(failing.stderr(), /operation marker could not be written/);
   assert.ok(!failing.stderr().includes(notDirectory));
 });
 
-test('server source keeps one tool and opt-in marker after resolver success; launcher remains passive', async () => {
+test('server source keeps two tools and opt-in marker after resolver success; launcher remains passive', async () => {
   const server = await readFile(serverPath, 'utf8');
-  assert.equal((server.match(/\.registerTool\(/g) ?? []).length, 1);
+  assert.equal((server.match(/\.registerTool\(/g) ?? []).length, 2);
   const resolution = server.indexOf('const result = await resolveGovernedOperation');
   const gate = server.indexOf('if (result.ok === true && process.env.DEV_FOUNDRY_TELEMETRY_RUN_ID && process.env.DEV_FOUNDRY_TELEMETRY_DIR)');
   assert.ok(gate > resolution);
   assert.ok(server.indexOf('await writeOperationMarker', gate) > gate);
-  assert.ok(server.indexOf("return { content: [{ type: 'text', text: JSON.stringify(result) }] }") > gate);
+  assert.ok(server.indexOf('return contentResult(result)') > gate);
   const entry = await readFile(path.join(repoRoot, 'scripts/telemetry/claude.mjs'), 'utf8');
   assert.match(entry, /runLauncher\(\{ argv: process\.argv\.slice\(2\) \}\)/);
   const launcher = await readFile(path.join(repoRoot, 'src/telemetry/launch.js'), 'utf8');

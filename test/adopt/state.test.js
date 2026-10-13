@@ -54,14 +54,15 @@ async function connect(t, projectRoot, { guard }) {
   await client.connect(new StdioClientTransport({ command: process.execPath, args: [entry], env: { CLAUDE_PROJECT_DIR: projectRoot }, cwd: os.tmpdir() }));
   t.after(() => client.close());
   const call = async (args) => JSON.parse((await client.callTool({ name: 'resolve_governed_operation', arguments: args })).content[0].text);
-  return { client, call };
+  const readiness = async (args) => JSON.parse((await client.callTool({ name: 'assess_predelegation_readiness', arguments: args })).content[0].text);
+  return { client, call, readiness };
 }
 const ask = (role, project = 'acme-billing') => ({ targetProject: project, ...requestFor[role] });
 
 test('7 8 prepared state and every partial or mixed state fail closed with BINDING_INACTIVE', async (t) => {
   const { consumer } = await prepared(t);
   const server = await connect(t, consumer.root, { guard: true });
-  assert.deepEqual((await server.client.listTools()).tools.map((tool) => tool.name), ['resolve_governed_operation']);
+  assert.deepEqual((await server.client.listTools()).tools.map((tool) => tool.name), ['resolve_governed_operation', 'assess_predelegation_readiness']);
   assert.equal((await evaluateActivation(consumer.root)).overall, 'prepared');
   for (const role of ROLES) {
     const result = await server.call(ask(role));
@@ -70,6 +71,13 @@ test('7 8 prepared state and every partial or mixed state fail closed with BINDI
     assert.equal(result.resolution, undefined);
   }
   assert.deepEqual(await server.call({ requestedAction: 'bogus' }), { ok: false, errorCode: 'BINDING_INACTIVE', message: 'Claude role activation is not complete for this project.' });
+  const readiness = await server.readiness({ targetProject: 'acme-billing', taskId: 'TSK-001' });
+  assert.equal(readiness.outcome, 'BLOCKED');
+  assert.deepEqual(readiness.reasonCodes, ['ACTIVATION_INACTIVE']);
+  assert.deepEqual(readiness.nextActions, ['Complete the project-scoped Claude role activation before assessing readiness.']);
+  assert.equal(readiness.handoff, null);
+  assert.equal(readiness.nonAuthorizing, true);
+  assert.equal(readiness.dispatchAllowed, false);
 
   const cases = {
     'four of five Claude roles': async (c) => editYaml(c, POP, (d) => d.setIn(['actor_bindings', 'evidence-custodian', 'implementation'], d.createNode({ kind: 'service', identity: 'acme-runner', platform: 'runner' }))),
