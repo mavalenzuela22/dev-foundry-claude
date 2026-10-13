@@ -4,8 +4,8 @@ artifact:
   id: TSK-027
   type: TSK
   title: Restore Governed Adapter Operability and Execution Readiness
-  status: IN_PROGRESS
-artifactVersion: "30"
+  status: CLOSED
+artifactVersion: "31"
 authorityScope: tsk-027-governed-adapter-operability-and-readiness
 ownerRole: governance-author
 canonical: true
@@ -53,13 +53,14 @@ authority:
     - DAT-016
   supersedes: []
 traceability:
+  closureArtifact: TSK-027-CLOSURE
   derivedFrom:
     - TSK-002
     - TSK-007
     - TSK-024
     - TSK-026
 lifecycle:
-  phase: in-progress
+  phase: closed
   blockedBy: []
   promotionRequired: true
 portability: project-specific
@@ -2108,3 +2109,30 @@ their respective explicit Operator authorization and state checks.
 **Author sufficiency and limitation:** the correction specifically improves local mini MCP discovery and safe actionable role/profile/authority errors, preserving DAT-001/DAT-002 envelopes, activation guards, native Claude Code workflow boundaries and non-authorizing advisory readiness. No new runner dependency, MCP tool, contract gate, consumer mutation, implementation attempt, or unnecessary test iteration is justified by the currently observed results. Automated stdio and deterministic tests cannot prove real human/Claude Code behavior; future naturally occurring consumer work may supply that observation without creating an additional current acceptance gate.
 
 **Lifecycle:** TSK-027 remains `IN_PROGRESS`, `promotionRequired: true`. Technical candidate acceptance is PASS, but commit, push, PR, merge, publication, consumer adoption and terminal closure remain unperformed and require their own applicable authority/Operator authorization. This author evidence reconciliation alone is not a separate mechanical validation, Governance Audit or promotion approval.
+
+## 37. Documentary closure after verified producer promotion
+
+The Operator authorized documentary closure **before** a separately governed
+adapter release. The terminal evidence and bounded disposition are recorded in
+`TSK-027-CLOSURE` (routed in the active project Authority Index). This terminal
+update supersedes the older *time-of-writing* statements in prior sections that
+commit, PR, merge or closure were still pending; it does not alter those
+historical observations or their timestamps.
+
+Producer promotion `TSK-027-PROMOTION-20261012` completed through cleanup:
+[PR #53](https://github.com/mavalenzuela22/dev-foundry-claude/pull/53) merged
+25 scoped paths to `main` at
+`0038ed53b126922f2774156cc623e2f5bb9c359e`. The Runner verified clean
+`main`, no hidden or visible changes, and deletion of the task branch.
+Independent mechanical validation `TSK-027-INTEGRAL-POST-DIAGNOSTIC-C001`
+passed **358/358** tests, syntax and diff checks, with complete evidence and
+zero findings. POP audit triggers remain empty; independent Governance Audit was
+not required. No further product changes, validations or control mechanisms are
+introduced by this documentation-only closure.
+
+**Terminal task state: CLOSED (producer code accepted and promoted).** No
+adapter release containing TSK-027 changes has been published, and no
+PagoElectronico or other consumer state has been inspected or changed by this
+producer closure. Release identity, public assets and consumer migration belong
+to future separately authorized operations. The CLOSURE artifact and this task
+metadata become durably effective upon their governed documentation-only merge.
