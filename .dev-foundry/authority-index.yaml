@@ -533,6 +533,15 @@ routes:
       - runtime-cli-argument-forwarding-correctness
       - launcher-pass-through-regression-recovery
     section_id: null
+  - id: TSK-031
+    path: docs/70-tasks/70 [TSK-031] PROJECT - Prepare Verified Claude Adapter 1.5.0 Release.md
+    authority_class: task
+    governs:
+      - adapter-150-candidate-version-and-migration-identity
+      - integrated-tsk-029-and-tsk-030-release-candidate
+      - nonpublished-verified-release-package-proof
+      - governed-main-only-adapter-release-publication-handoff
+    section_id: null
 
 bindings:
   - id: governance-author-capability-producer-maintenance-v1
