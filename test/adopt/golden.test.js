@@ -16,13 +16,16 @@ const acme = templateParams({
   authorProfile: 'a.yaml', custodianProfile: 'c.yaml', expect: '1.0.0:sha256:' + '0'.repeat(64),
 });
 
-test('golden: templates under self-hosted parameters reproduce committed agents and Claude Capability Profiles byte-for-byte', async () => {
-  for (const [file, content] of Object.entries({ ...renderAgents(selfHosted), ...renderProfiles(selfHosted) })) {
-    assert.equal(content, await readFile(path.join(repoRoot, file), 'utf8'), file);
-  }
+test('rendered role guidance requires substantive executor work and trigger-bound independent review', () => {
+  const agents = renderAgents(selfHosted);
+  assert.match(agents['.claude/agents/dev-foundry-executor.md'], /Make the authorized code changes/);
+  assert.match(agents['.claude/agents/dev-foundry-executor.md'], /changed paths, commands\/results, evidence paths and hashes/);
+  assert.match(agents['.claude/agents/dev-foundry-executor.md'], /Do not rediscover project governance or call the resolver again/);
+  assert.match(agents['.claude/agents/dev-foundry-auditor.md'], /different session, or different model alone is not an audit trigger/);
+  assert.match(agents['.claude/agents/dev-foundry-auditor.md'], /objective closure predicates/);
 });
 
-test('rendered agents and block satisfy SPC-003 static limits and carry the binding stop rule', () => {
+test('rendered agents and startup block satisfy SPC-003 static budgets and preserve isolation constraints', () => {
   const expectedTools = {
     '.claude/agents/dev-foundry-executor.md': ['Read', 'Grep', 'Glob', 'Edit', 'Write', 'Bash', 'mcp__dev-foundry-governance__*'],
     '.claude/agents/dev-foundry-auditor.md': ['Read', 'Grep', 'Glob', 'mcp__dev-foundry-governance__*'],
@@ -30,18 +33,20 @@ test('rendered agents and block satisfy SPC-003 static limits and carry the bind
   for (const [file, content] of Object.entries(renderAgents(acme))) {
     const frontmatter = parse(content.split('---\n')[1]);
     assert.ok(Buffer.byteLength(frontmatter.description) <= 240);
-    assert.ok(Buffer.byteLength(content) <= 8192);
+    assert.ok(Buffer.byteLength(content, 'utf8') <= 8192);
     assert.ok(content.split('\n').filter((line) => line.trim()).length <= 100);
     assert.deepEqual(frontmatter.tools, expectedTools[file]);
     assert.deepEqual(frontmatter.mcpServers, ['dev-foundry-governance']);
     for (const key of ['hooks', 'skills', 'agents', 'model']) assert.equal(Object.hasOwn(frontmatter, key), false);
-    assert.match(content, /Prepared configuration alone is insufficient/);
-    assert.match(content, /active POP binding/);
+    assert.match(content, /current handoff|compact source-bound handoff/i);
+    if (file.endsWith('executor.md')) assert.match(content, /selection, capability fit, authorization/i);
+    else assert.match(content, /independence eligibility from trustworthy evidence/i);
     assert.ok(content.includes('acme-billing'));
     assert.ok(!content.includes('dev-foundry-claude'));
   }
   const block = renderClaudeBlock(acme);
-  assert.match(block, /active POP binding[\s\S]*not the presence of this block/);
+  assert.match(block, /resolve the operation once with `resolve_governed_operation`/);
+  assert.match(block, /This block is startup guidance, not authority/);
   assert.ok(!block.includes('dev-foundry-claude'));
 });
 

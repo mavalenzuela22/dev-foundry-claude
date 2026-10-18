@@ -19,6 +19,7 @@
     "tools/dashboard/server/launch.mjs",
     "tools/dashboard/dist",
     "payload-manifest.json",
+    "framework/dev-foundry-2.3.0.bundle.json",
     "framework/dev-foundry-2.1.0.bundle.json",
     "migrations/release.json"
   ],

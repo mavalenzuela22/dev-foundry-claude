@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import { makeProject } from './fixture.js';
+import { makeProject, makeV3Project } from './fixture.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const serverPath = path.join(repoRoot, 'src/governance-mcp/server.js');
@@ -235,5 +236,49 @@ test('existing resources and resolver DAT-001 response/error semantics remain av
     const failure = await call(client, 'resolve_governed_operation', { requestedAction: 'implement', targetProject: 'fixture-project', taskId: 'TSK-002', expectedContextFingerprint: '0'.repeat(64) });
     assert.deepEqual(Object.keys(failure), ['ok', 'errorCode', 'message']);
     assert.equal(failure.errorCode, 'STALE_CONTEXT');
+  } finally { await client.close(); await project.cleanup(); }
+});
+
+test('POP v3 resolves canonical role policy and bootstrap sources while keeping selection and authorization unresolved', async () => {
+  const project = await makeV3Project();
+  const client = await connected(project);
+  try {
+    const resolution = await call(client, 'resolve_governed_operation', {
+      requestedAction: 'implement', targetProject: 'fixture-project', taskId: 'TSK-029', requestedRole: 'implementation-executor',
+    });
+    assert.equal(resolution.ok, true, JSON.stringify(resolution));
+    assert.equal(resolution.resolution.frameworkVersion, '2.3.0');
+    assert.equal(resolution.resolution.role.id, 'implementation-executor');
+    assert.deepEqual(resolution.resolution.role.requiredCapabilities, []);
+    assert.equal(resolution.resolution.role.eligibilityPolicy, 'operator-and-actor-fit');
+    assert.equal(resolution.resolution.role.operationSelection, 'unresolved');
+    assert.ok(resolution.resolution.authority.some((source) => source.path === '.dev-foundry/platform-bootstrap-claude-code.yaml'));
+    assert.ok(resolution.resolution.authority.some((source) => source.path === '.dev-foundry/releases/2.3.0/release-integrity-manifest.yaml'));
+    assert.equal(Object.hasOwn(JSON.parse(await readFile(path.join(project.root, '.dev-foundry/profiles/project-operating-profile.yaml'), 'utf8')).actor_bindings['implementation-executor'], 'implementation'), false);
+
+    const readiness = await call(client, 'assess_predelegation_readiness', {
+      targetProject: 'fixture-project', taskId: 'TSK-029', expectedContextFingerprint: resolution.resolution.contextFingerprint,
+    });
+    assertEnvelope(readiness, 'INDETERMINATE', 'OPERATION_SELECTION_UNRESOLVED');
+    assert.ok(readiness.reasonCodes.includes('CAPABILITY_FIT_UNVERIFIED'));
+    assert.ok(readiness.reasonCodes.includes('OPERATOR_AUTHORIZATION_UNVERIFIED'));
+
+    const popPath = '.dev-foundry/profiles/project-operating-profile.yaml';
+    const pop = JSON.parse(await readFile(path.join(project.root, popPath), 'utf8'));
+    pop.actor_bindings['implementation-executor'].selection.required_capabilities = ['code.edit'];
+    await project.write(popPath, `${JSON.stringify(pop, null, 2)}\n`);
+    const stale = await call(client, 'resolve_governed_operation', {
+      requestedAction: 'implement', targetProject: 'fixture-project', taskId: 'TSK-029',
+      expectedContextFingerprint: resolution.resolution.contextFingerprint,
+    });
+    assert.equal(stale.ok, false);
+    assert.equal(stale.errorCode, 'STALE_CONTEXT');
+    pop.actor_bindings['implementation-executor'].implementation = { kind: 'agent', identity: 'fabricated', platform: 'fabricated' };
+    await project.write(popPath, `${JSON.stringify(pop, null, 2)}\n`);
+    const invalid = await call(client, 'resolve_governed_operation', {
+      requestedAction: 'implement', targetProject: 'fixture-project', taskId: 'TSK-029',
+    });
+    assert.equal(invalid.ok, false);
+    assert.equal(invalid.errorCode, 'AUTHORITY_INVALID');
   } finally { await client.close(); await project.cleanup(); }
 });

@@ -55,7 +55,7 @@ const compatibleRoles = {
 };
 const authorityClasses = new Set(['methodology', 'product', 'configured', 'decision', 'task', 'profile']);
 const routeAuthorityClasses = new Set([...authorityClasses, 'historical']);
-const frameworkVersionSupported = '2.1.0';
+const frameworkVersionsSupported = new Set(['2.1.0', '2.3.0']);
 
 class ResolutionError extends Error {
   constructor(code, message) {
@@ -183,7 +183,8 @@ class Resolver {
     const projectIndex = parseAuthorityIndex(projectIndexBytes);
     await this.addSource(pop.id ?? 'project-operating-profile', popPath, 'configured');
     await this.addSource(projectIndex.id, projectIndexPath, 'configured');
-    if (pop.schema_version !== 'dev-foundry.project-operating-profile.v2' || pop.status !== 'active' ||
+    const popSchema = pop.schema_version;
+    if (!['dev-foundry.project-operating-profile.v2', 'dev-foundry.project-operating-profile.v3'].includes(popSchema) || pop.status !== 'active' ||
         !isObject(pop.repository) || typeof pop.repository.name !== 'string' ||
         !isObject(pop.framework) || typeof pop.framework.adopted_version !== 'string' ||
         typeof pop.framework.selected_authority_index !== 'string' ||
@@ -195,7 +196,9 @@ class Resolver {
         projectIndex.subject.kind !== 'project') {
       throw new ResolutionError('TARGET_MISMATCH', 'The requested project does not match configured project authority.');
     }
-    if (pop.framework.adopted_version !== frameworkVersionSupported) {
+    if (!frameworkVersionsSupported.has(pop.framework.adopted_version) ||
+        (popSchema === 'dev-foundry.project-operating-profile.v2' && pop.framework.adopted_version !== '2.1.0') ||
+        (popSchema === 'dev-foundry.project-operating-profile.v3' && pop.framework.adopted_version !== '2.3.0')) {
       throw new ResolutionError('UNSUPPORTED_FRAMEWORK', 'The adopted framework version is not supported by this resolver.');
     }
     if (projectIndex.subject.base_version !== pop.framework.adopted_version) throw invalidAuthority('The project and POP framework versions contradict each other.');
@@ -211,11 +214,48 @@ class Resolver {
     this.frameworkIndex = parseAuthorityIndex(frameworkIndexBytes);
     await this.addSource(this.frameworkIndex.id, this.frameworkIndexPath, 'methodology');
     if (this.frameworkIndex.subject.kind !== 'framework-release' ||
-        this.frameworkIndex.subject.version !== frameworkVersionSupported ||
-        this.frameworkIndex.subject.id !== `DF-FRAMEWORK-${frameworkVersionSupported}`) {
+        this.frameworkIndex.subject.version !== pop.framework.adopted_version ||
+        this.frameworkIndex.subject.id !== `DF-FRAMEWORK-${pop.framework.adopted_version}`) {
       throw invalidAuthority('The POP-selected authority index does not identify the supported framework release.');
     }
     this.frameworkVersion = pop.framework.adopted_version;
+    this.popSchema = popSchema;
+    if (popSchema === 'dev-foundry.project-operating-profile.v3') {
+      const manifestPath = pop.framework.selected_manifest;
+      const manifestBytes = await this.readBytes(manifestPath);
+      const manifest = parseYaml(manifestBytes);
+      const indexArtifact = manifest.artifacts?.find((item) => item.path === this.frameworkIndexPath);
+      if (manifest.framework_version !== '2.3.0' || manifest.canonical !== true || !Array.isArray(manifest.artifacts) ||
+          indexArtifact?.sha256 !== digest(frameworkIndexBytes)) {
+        throw invalidAuthority('The POP v3 selected manifest does not verify the canonical 2.3.0 Authority Index bytes.');
+      }
+      this.releaseManifest = manifest;
+      await this.addSource(manifest.id ?? 'release-integrity-manifest-2.3.0', manifestPath, 'methodology');
+    }
+    if (popSchema === 'dev-foundry.project-operating-profile.v3') await this.validateV3Bootstrap();
+  }
+
+  async validateV3Bootstrap() {
+    const active = Object.entries(this.pop.platform_bootstraps ?? {}).filter(([, binding]) => isObject(binding) && binding.status === 'active');
+    if (active.length !== 1 || typeof active[0][1].path !== 'string') throw invalidAuthority('POP v3 requires one active repository-managed bootstrap for this governed Claude operation.');
+    const [key, binding] = active[0];
+    const bootstrapPath = binding.path;
+    const bootstrap = parseYaml(await this.readBytes(bootstrapPath));
+    if (bootstrap.schema_version !== 'dev-foundry.platform-bootstrap.v3' || bootstrap.kind !== 'platform-bootstrap' ||
+        bootstrap.status !== 'active' || bootstrap.repository?.expected_name !== this.request.targetProject ||
+        bootstrap.sources?.project_operating_profile !== '.dev-foundry/profiles/project-operating-profile.yaml' ||
+        bootstrap.sources?.authority_index !== '.dev-foundry/authority-index.yaml' ||
+        !['fixed', 'governed-project-bindings'].includes(bootstrap.actor_resolution?.mode)) {
+      throw invalidAuthority(`Active POP v3 bootstrap ${safeConfiguredPath(bootstrapPath) ?? 'path'} is missing or inconsistent with project authority.`);
+    }
+    if (bootstrap.actor_resolution.mode === 'fixed') {
+      const fixed = bootstrap.actor_resolution.fixed_profile;
+      if (typeof fixed !== 'string' || bootstrap.actor_resolution.eligible_profiles?.length !== 0) throw invalidAuthority('Fixed v3 bootstrap profile selection is malformed.');
+    } else if (bootstrap.actor_resolution.fixed_profile !== null) {
+      throw invalidAuthority('Governed v3 bootstrap must not fix an Actor Profile.');
+    }
+    this.bootstrapBinding = { key, path: bootstrapPath, data: bootstrap };
+    await this.addSource(bootstrap.id ?? key, bootstrapPath, 'configured');
   }
 
   async loadSoT(relativePath) {
@@ -352,6 +392,36 @@ class Resolver {
       throw new ResolutionError('ROLE_INELIGIBLE', `POP binding ${bindingField} is ${status}; expected active for ${action}. Stop for Governance Author reconciliation; do not guess another profile.`);
     }
     const binding = this.pop.actor_bindings[roleId];
+    if (this.popSchema === 'dev-foundry.project-operating-profile.v3') {
+      const selection = binding.selection;
+      const keys = isObject(binding) ? Object.keys(binding).sort().join(',') : '';
+      const selectionKeys = isObject(selection) ? Object.keys(selection).sort().join(',') : '';
+      if (keys !== 'profile,selection,status' || !isObject(selection) ||
+          selectionKeys !== 'eligibility_policy,mode,required_capabilities' ||
+          selection.mode !== 'operation-scoped' || typeof selection.eligibility_policy !== 'string' || !selection.eligibility_policy.trim() ||
+          selection.eligibility_policy.length > 180 || !Array.isArray(selection.required_capabilities) ||
+          selection.required_capabilities.some((item) => typeof item !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(item)) ||
+          new Set(selection.required_capabilities).size !== selection.required_capabilities.length) {
+        throw invalidAuthority(`POP v3 role binding ${bindingField} must contain only an approved profile, active status, and valid operation-scoped selection policy.`);
+      }
+      const actorPath = binding.profile;
+      const actorBytes = await this.readBytes(actorPath);
+      const actorData = parseYaml(actorBytes);
+      const releaseRoot = '.dev-foundry/releases/2.3.0/';
+      const releasePath = actorPath.startsWith(releaseRoot) ? actorPath : null;
+      const artifact = releasePath && this.releaseManifest?.artifacts.find((item) => item.path === releasePath);
+      if (!artifact || artifact.sha256 !== digest(actorBytes)) throw invalidAuthority(`Actor Profile ${safeConfiguredPath(actorPath) ?? 'bound by the active POP'} is not verified by the selected canonical 2.3.0 manifest.`);
+      if (actorData.role !== roleId || actorData.status !== 'active') throw invalidAuthority(`Actor Profile ${safeConfiguredPath(actorPath) ?? 'bound by the active POP'} does not match active role ${safeObserved(roleId)}.`);
+      await this.addSource(actorData.id ?? roleId, actorPath, 'profile');
+      return {
+        id: roleId,
+        actorProfilePath: actorPath,
+        capabilityProfilePaths: [],
+        requiredCapabilities: selection.required_capabilities,
+        eligibilityPolicy: selection.eligibility_policy,
+        operationSelection: 'unresolved',
+      };
+    }
     const capabilityPaths = binding.capability_profiles ?? [];
     if (!Array.isArray(capabilityPaths) || capabilityPaths.some((item) => typeof item !== 'string')) {
       throw invalidAuthority(`POP field ${popPath}: actor_bindings.${safeObserved(roleId)}.capability_profiles must be an array of configured Capability Profile paths; actual value type is ${Array.isArray(capabilityPaths) ? 'array with a non-string entry' : typeof capabilityPaths}. Stop for Governance Author reconciliation.`);

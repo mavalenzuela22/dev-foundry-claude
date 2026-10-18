@@ -1,21 +1,25 @@
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { stringify } from 'yaml';
-import { BOOTSTRAP_KEY, BOOTSTRAP_PATH, CLAUDE_MD, INDEX_PATH, MCP_FILE, MCP_SERVER_NAME, POP_PATH, PROFILE_PATHS, ROLES, TARGETS, pathHasSymlink, parseYamlStrict, readContained } from './common.js';
+import { BOOTSTRAP_KEY, BOOTSTRAP_PATH, CLAUDE_MD, INDEX_PATH, MCP_FILE, MCP_SERVER_NAME, POP_PATH, ROLES, pathHasSymlink, parseYamlStrict, readContained } from './common.js';
 import { canonicalJson, sha256 } from './pin.js';
 import { git, planIgnore } from './ignore.js';
 import { makeUnifiedDiff } from './diff.js';
-import { BLOCK_BEGIN, BLOCK_END, renderAgents, renderBootstrap, renderClaudeBlock, renderMcpEntry, renderProfiles, templateParams } from './render.js';
+import { BLOCK_BEGIN, BLOCK_END, renderAgents, renderBootstrap, renderClaudeBlock, renderMcpEntry, templateParams } from './render.js';
 
-export const FRAMEWORK_BUNDLE = 'framework/dev-foundry-2.1.0.bundle.json';
+export const FRAMEWORK_BUNDLE = 'framework/dev-foundry-2.3.0.bundle.json';
+export const LEGACY_FRAMEWORK_BUNDLE = 'framework/dev-foundry-2.1.0.bundle.json';
 const packageRoot = new URL('../../', import.meta.url);
 export const ONBOARDING_OVERVIEW = '.dev-foundry/onboarding/OVR-001.md';
 export const ONBOARDING_TASK = '.dev-foundry/onboarding/TSK-001.md';
-const releaseRoot = '.dev-foundry/releases/2.1.0';
+const releaseRootFor = (version) => `.dev-foundry/releases/${version}`;
 
-export async function frameworkFiles() {
-  const bundle = JSON.parse(await readFile(new URL(FRAMEWORK_BUNDLE, packageRoot), 'utf8'));
-  if (bundle.format !== 'dev-foundry.framework-bundle.v1' || bundle.version !== '2.1.0' || !Array.isArray(bundle.files)) throw new Error('Invalid framework bundle');
+export async function frameworkFiles(version = '2.3.0') {
+  if (!['2.1.0', '2.3.0'].includes(version)) throw new Error('Unsupported framework bundle version');
+  const bundlePath = version === '2.1.0' ? LEGACY_FRAMEWORK_BUNDLE : FRAMEWORK_BUNDLE;
+  const releaseRoot = releaseRootFor(version);
+  const bundle = JSON.parse(await readFile(new URL(bundlePath, packageRoot), 'utf8'));
+  if (bundle.format !== 'dev-foundry.framework-bundle.v1' || bundle.version !== version || !Array.isArray(bundle.files)) throw new Error('Invalid framework bundle');
   const files = new Map();
   let previous = '';
   for (const entry of bundle.files) {
@@ -25,7 +29,7 @@ export async function frameworkFiles() {
     files.set(`${releaseRoot}/${entry.path}`, bytes); previous = entry.path;
   }
   const manifest = parseYamlStrict(files.get(`${releaseRoot}/release-integrity-manifest.yaml`));
-  if (manifest?.framework_version !== '2.1.0' || manifest.canonical !== true || !Array.isArray(manifest.artifacts)) throw new Error('Invalid framework manifest');
+  if (manifest?.framework_version !== version || manifest.canonical !== true || !Array.isArray(manifest.artifacts)) throw new Error('Invalid framework manifest');
   if (files.size !== manifest.artifacts.length + 1 || manifest.artifacts.some((entry) => !files.has(entry.path) || sha256(files.get(entry.path)) !== entry.sha256)) throw new Error('Framework manifest mismatch');
   return files;
 }
@@ -35,7 +39,7 @@ const sot = (id, type, title, status, governedBy, phase, body, owns) => `---\n${
 // Extends the same deterministic plan/apply model. This function never writes.
 export async function createBootstrapPlan({ facts, adapter, project, classification, operator }) {
   const plan = { planFormat: 'dev-foundry.adopt-plan.v1', mode: 'initial-bootstrap', status: 'blocked', target: { project: null, idPrefix: null }, adapter,
-    framework: { version: '2.1.0', selectedAuthorityIndex: `${releaseRoot}/authority-index.yaml` }, governance: { state: 'initial-bootstrap' }, activation: null,
+    framework: { version: '2.3.0', selectedAuthorityIndex: `${releaseRootFor('2.3.0')}/authority-index.yaml` }, governance: { state: 'initial-bootstrap' }, activation: null,
     create: [], merge: [], delete: [], noop: [], blockers: [...facts.blockers], warnings: [], preconditions: {}, guaranteed_untouched: ['application/product files', 'existing project documents', 'historical evidence', 'other MCP entries', 'CLAUDE.md outside managed block'], applicationFilesAffected: 0 };
   const ops = { writes: [], deletes: [] };
   const finish = () => { if (plan.blockers.length) { ops.writes = []; plan.status = 'blocked'; } const bytes = Buffer.from(canonicalJson(plan)); return { plan, bytes, hash: sha256(bytes), ops }; };
@@ -63,26 +67,27 @@ export async function createBootstrapPlan({ facts, adapter, project, classificat
   const status = git(root, ['status', '--porcelain', '--untracked-files=all']);
   plan.repository = { head: head.status === 0 ? head.stdout.trim() : null, files, localOperator: git(root, ['config', '--local', '--get', 'user.name']).stdout.trim(), statusSha256: sha256(status.stdout) };
   if (plan.blockers.length) return finish();
-  const framework = await frameworkFiles();
+  const framework = await frameworkFiles('2.3.0');
   const actorProfiles = {};
   for (const [file, bytes] of framework) {
     if (!file.includes('/actor-profiles/')) continue;
     const profile = parseYamlStrict(bytes); actorProfiles[profile.role] = { path: file, id: profile.id };
   }
   const params = templateParams({ project, prefix, expect: adapter.expect, executorProfileId: actorProfiles['implementation-executor'].id, auditorProfileId: actorProfiles['governance-auditor'].id, authorProfile: actorProfiles['governance-author'].path, custodianProfile: actorProfiles['evidence-custodian'].path });
-  const pop = { schema_version: 'dev-foundry.project-operating-profile.v2', id: `${prefix}-PROJECT-OPERATING-PROFILE`, title: `${project} Project Operating Profile`, kind: 'project-operating-profile', status: 'active', artifact_version: '2.1.0-local.1', canonical: false,
-    repository: { name: project, classification, authority_index: INDEX_PATH }, framework: { adopted_version: '2.1.0', selected_authority_index: `${releaseRoot}/authority-index.yaml`, selected_manifest: `${releaseRoot}/release-integrity-manifest.yaml`, adoption_status: 'active' }, operator: { kind: 'human', identity: operator },
-    actor_bindings: Object.fromEntries(ROLES.map((role) => { const target = TARGETS[role]; return [role, { profile: actorProfiles[role].path, implementation: { kind: target.kind, identity: target.identity, platform: target.platform }, capability_profiles: target.capabilities, status: 'active' }]; })),
+  const releaseRoot = releaseRootFor('2.3.0');
+  const pop = { schema_version: 'dev-foundry.project-operating-profile.v3', id: `${prefix}-PROJECT-OPERATING-PROFILE`, title: `${project} Project Operating Profile`, kind: 'project-operating-profile', status: 'active', artifact_version: '2.3.0-local.1', canonical: false,
+    repository: { name: project, classification, authority_index: INDEX_PATH }, framework: { adopted_version: '2.3.0', selected_authority_index: `${releaseRoot}/authority-index.yaml`, selected_manifest: `${releaseRoot}/release-integrity-manifest.yaml`, adoption_status: 'active' }, operator: { kind: 'human', identity: operator },
+    actor_bindings: Object.fromEntries(ROLES.map((role) => [role, { profile: actorProfiles[role].path, selection: { mode: 'operation-scoped', required_capabilities: [], eligibility_policy: 'operator-and-actor-fit' }, status: 'active' }])),
     platform_bootstraps: { [BOOTSTRAP_KEY]: { path: BOOTSTRAP_PATH, status: 'active' } }, policies: { frontmatter_schema: 'dev-foundry.sot-document.v2', metadata_migration_mode: 'on-touch', audit_triggers: [], promotion_rules: [], default_role: 'governance-author' }, deviations: [] };
   const route = (id, file, authority_class, governs) => ({ id, path: file, authority_class, governs, section_id: null });
   const binding = (id, file, kind) => ({ id, path: file, kind, authority_class: 'configured', required: true });
-  const index = { schema_version: 'dev-foundry.authority-index.v2', id: `${prefix}-AUTHORITY-INDEX`, title: `${project} Authority Index`, kind: 'authority-index', status: 'active', artifact_version: '2.1.0-local.1', canonical: false,
-    subject: { kind: 'project', id: project, version: null, base_version: '2.1.0', manifest: null }, routes: [route('active-framework', `${releaseRoot}/authority-index.yaml`, 'methodology', ['reusable-dev-foundry-methodology']), route('project-overview', ONBOARDING_OVERVIEW, 'product', ['project-purpose', 'documentation-routing']), route('initial-onboarding', ONBOARDING_TASK, 'task', ['initial-project-baseline'])],
-    bindings: [binding('project-operating-profile', POP_PATH, 'project-operating-profile'), binding('platform-bootstrap-claude-code', BOOTSTRAP_PATH, 'platform-bootstrap'), binding('implementation-executor-capability-claude-code-v2', PROFILE_PATHS.executor, 'capability-profile'), binding('governance-auditor-capability-claude-code-v1', PROFILE_PATHS.auditor, 'capability-profile')],
+  const index = { schema_version: 'dev-foundry.authority-index.v2', id: `${prefix}-AUTHORITY-INDEX`, title: `${project} Authority Index`, kind: 'authority-index', status: 'active', artifact_version: '2.3.0-local.1', canonical: false,
+    subject: { kind: 'project', id: project, version: null, base_version: '2.3.0', manifest: null }, routes: [route('active-framework', `${releaseRoot}/authority-index.yaml`, 'methodology', ['reusable-dev-foundry-methodology']), route('project-overview', ONBOARDING_OVERVIEW, 'product', ['project-purpose', 'documentation-routing']), route('initial-onboarding', ONBOARDING_TASK, 'task', ['initial-project-baseline'])],
+    bindings: [binding('project-operating-profile', POP_PATH, 'project-operating-profile'), binding('platform-bootstrap-claude-code', BOOTSTRAP_PATH, 'platform-bootstrap')],
     rules: { single_authoritative_home_required: true, unindexed_active_authority_forbidden: true, evidence_is_normative: false, consumer_copy_is_canonical: false, runtime_capability_grants_authority: false, automatic_framework_upgrade: false } };
-  const overview = sot('OVR-001', 'OVR', 'Project onboarding overview', 'ACTIVE', [], 'active', `# ${project}\n\nThe human Operator selected ${classification} adoption of DEV FOUNDRY 2.1.0.\nProduct purpose, architecture and behavior have not yet been verified.\n\nRouting: ${INDEX_PATH}. Initial baseline: ${ONBOARDING_TASK}.\nExisting project files remain unchanged. Product decisions require current project authority.`, ['project-purpose', 'documentation-routing']);
+  const overview = sot('OVR-001', 'OVR', 'Project onboarding overview', 'ACTIVE', [], 'active', `# ${project}\n\nThe human Operator selected ${classification} adoption of DEV FOUNDRY 2.3.0.\nProduct purpose, architecture and behavior have not yet been verified.\n\nRouting: ${INDEX_PATH}. Initial baseline: ${ONBOARDING_TASK}.\nExisting project files remain unchanged. Product decisions require current project authority.`, ['project-purpose', 'documentation-routing']);
   const task = sot('TSK-001', 'TSK', 'Observe and establish the initial project baseline', 'IN_PROGRESS', ['OVR-001', 'OPS-001', 'OPS-005'], 'in-progress', `# Initial ${classification} baseline\n\nObserve repository files, available checks and existing decisions. Record a verified baseline, unknowns and validation limits under the selected framework.\n${classification === 'brownfield' ? 'Establish the existing system baseline before ordinary product implementation. No product behavior is asserted by bootstrap.' : 'Establish the initial repository baseline and obtain project decisions before ordinary product implementation.'}\n\nAuthorized surface: observation and bounded onboarding evidence only.\nProduct/application modification, release promotion and changes to the immutable framework are excluded. Human Operator decisions remain reserved.`, ['initial-project-baseline']);
-  const generated = new Map([...framework, ...Object.entries({ [POP_PATH]: stringify(pop), [INDEX_PATH]: stringify(index), [ONBOARDING_OVERVIEW]: overview, [ONBOARDING_TASK]: task, ...renderProfiles(params), ...renderBootstrap(params), ...renderAgents(params) }).map(([file, content]) => [file, Buffer.from(content)])]);
+  const generated = new Map([...framework, ...Object.entries({ [POP_PATH]: stringify(pop), [INDEX_PATH]: stringify(index), [ONBOARDING_OVERVIEW]: overview, [ONBOARDING_TASK]: task, ...renderBootstrap(params), ...renderAgents(params) }).map(([file, content]) => [file, Buffer.from(content)])]);
   const add = async (file, bytes, allowMerge = false) => {
     if (await pathHasSymlink(root, file)) { block('symlink-path', 'A setup path is unsafe. Next: dev-foundry-claude doctor --verbose'); return; }
     const before = await readContained(root, file);

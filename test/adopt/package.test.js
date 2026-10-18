@@ -853,7 +853,7 @@ test('TSK-025 installed 1.4.2 proves compatible pin upgrades and managed refresh
     assert.equal(data.plan.status, 'ready'); assert.equal(data.applied, null); assert.equal(data.applicationFilesAffected, 0);
     assert.equal(data.plan.current.expect, oldPin); assert.equal(data.plan.target.expect, base.pin);
     assert.equal(data.plan.currentPackageRoot, await realpath(oldPackage));
-    const changed = version === '1.2.2-windows' ? ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md'] : ['.mcp.json', 'CLAUDE.md'];
+    const changed = ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md'];
     assert.equal(data.plan.merge.length, changed.length); assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
     const planFile = path.join(await scratch('managed-plan'), 'plan.json');
     const exact = cli(base.installed, ['upgrade', 'plan', '--root', c.root, '--from-package', oldPackage, '--out', planFile]);
@@ -885,7 +885,7 @@ test('TSK-025 installed 1.4.2 proves compatible pin upgrades and managed refresh
 
 test('V005 installed package bootstraps without producer authority; source/target staging preserves runtime and pin; MCP cutover fails stale', async (t) => {
   const base = await baseline();
-  for (const file of ['framework/dev-foundry-2.1.0.bundle.json', 'migrations/release.json', 'src/governance-mcp/session.js']) assert.ok(base.manifest.files.some((entry) => entry.path === file));
+  for (const file of ['framework/dev-foundry-2.3.0.bundle.json', 'framework/dev-foundry-2.1.0.bundle.json', 'migrations/release.json', 'src/governance-mcp/session.js']) assert.ok(base.manifest.files.some((entry) => entry.path === file));
   assert.equal((await import('../../src/adopt/migration.js')).MIGRATION_MATERIAL, 'migrations/release.json');
   const c = await makeConsumer({ governed: false }); t.after(c.cleanup);
   const before = await listTree(c.root);
@@ -896,7 +896,7 @@ test('V005 installed package bootstraps without producer authority; source/targe
   const data = JSON.parse(applied.stdout); assert.equal(data.plan.bootstrap.classification, 'brownfield'); assert.ok(['active', 'ready'].includes(data.integration));
   for (const [file, hash] of before) if (!['CLAUDE.md', '.mcp.json', '.dev-foundry/.gitignore'].includes(file)) assert.equal((await listTree(c.root)).get(file), hash);
   const { frameworkFiles } = await import('../../src/adopt/bootstrap.js');
-  for (const [file, bytes] of await frameworkFiles()) assert.deepEqual(await readFile(path.join(c.root, file)), bytes);
+  for (const [file, bytes] of await frameworkFiles('2.3.0')) assert.deepEqual(await readFile(path.join(c.root, file)), bytes);
   assert.equal(JSON.parse(cli(base.installed, ['setup', '--json'], { cwd: c.root }).stdout).plan.status, 'noop'); c.commit();
   const migration = cli(base.installed, ['migration'], { cwd: os.tmpdir() }); assert.equal(migration.status, 0, migration.stderr);
   const material = JSON.parse(migration.stdout); assert.equal(material.identity.expect, base.pin); assert.equal(material.material.selfUpdateBaseline, '1.4.0');

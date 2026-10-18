@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { INDEX_PATH, POP_PATH, PROFILE_PATHS, ROLES, TARGETS, cutoverState, isObject, pathHasSymlink, readYamlContained } from './common.js';
+import { INDEX_PATH, POP_PATH, PROFILE_PATHS, ROLES, TARGETS, cutoverState, isObject, parseYamlStrict, pathHasSymlink, readContained, readYamlContained } from './common.js';
+import { sha256 } from './pin.js';
 
 const allUnbound = () => Object.fromEntries(ROLES.map((role) => [role, 'unbound']));
 const unavailable = (reason) => ({ overall: 'partial', roles: allUnbound(), bootstrap: { activeEntries: 0, claudeActive: false }, reasons: [reason] });
@@ -13,7 +14,7 @@ export async function evaluateActivation(root) {
   if (await pathHasSymlink(root, POP_PATH) || await pathHasSymlink(root, INDEX_PATH)) return unavailable('unsafe-authority-path');
   const pop = await readYamlContained(root, POP_PATH);
   const index = await readYamlContained(root, INDEX_PATH);
-  if (!pop || !index || pop.schema_version !== 'dev-foundry.project-operating-profile.v2' || pop.status !== 'active' ||
+  if (!pop || !index || !['dev-foundry.project-operating-profile.v2', 'dev-foundry.project-operating-profile.v3'].includes(pop.schema_version) || pop.status !== 'active' ||
       !isObject(pop.repository) || typeof pop.repository.name !== 'string' || !isObject(pop.actor_bindings) ||
       index.schema_version !== 'dev-foundry.authority-index.v2' || index.status !== 'active' || !isObject(index.subject) ||
       index.subject.id !== pop.repository.name) return unavailable('authority-unreadable');
@@ -25,6 +26,63 @@ export async function evaluateActivation(root) {
   const reasons = [];
   const configuredRouteOk = (file) => [...(index.routes ?? []), ...(index.bindings ?? [])]
     .filter((item) => item?.path === file && item.authority_class === 'configured').length === 1;
+
+  if (pop.schema_version === 'dev-foundry.project-operating-profile.v3') {
+    if (pop.framework?.adopted_version !== '2.3.0' || pop.framework?.adoption_status !== 'active' ||
+        index.subject.base_version !== '2.3.0' || index.routes?.filter((route) => route?.authority_class === 'methodology' && route.governs?.includes('reusable-dev-foundry-methodology')).length !== 1 ||
+        index.routes.find((route) => route?.authority_class === 'methodology' && route.governs?.includes('reusable-dev-foundry-methodology'))?.path !== pop.framework.selected_authority_index) {
+      return unavailable('framework-authority-mismatch');
+    }
+    const roles = {};
+    const releaseRoot = '.dev-foundry/releases/2.3.0/';
+    const manifestBytes = await readContained(root, pop.framework.selected_manifest);
+    const manifest = manifestBytes && parseYamlStrict(manifestBytes);
+    const indexBytes = await readContained(root, pop.framework.selected_authority_index);
+    const indexArtifact = manifest?.artifacts?.find((item) => item.path === pop.framework.selected_authority_index);
+    const manifestValid = manifest?.framework_version === '2.3.0' && manifest.canonical === true && Array.isArray(manifest.artifacts) &&
+      pop.framework.selected_manifest === '.dev-foundry/releases/2.3.0/release-integrity-manifest.yaml' &&
+      pop.framework.selected_authority_index === '.dev-foundry/releases/2.3.0/authority-index.yaml' &&
+      indexArtifact?.sha256 === sha256(Buffer.from(indexBytes ?? ''));
+    for (const role of ROLES) {
+      const binding = pop.actor_bindings[role];
+      const selection = binding?.selection;
+      const exact = isObject(binding) && Object.keys(binding).sort().join(',') === 'profile,selection,status' &&
+        binding.status === 'active' && typeof binding.profile === 'string' &&
+        isObject(selection) && Object.keys(selection).sort().join(',') === 'eligibility_policy,mode,required_capabilities' &&
+        selection.mode === 'operation-scoped' && typeof selection.eligibility_policy === 'string' && selection.eligibility_policy.trim() &&
+        Array.isArray(selection.required_capabilities) && selection.required_capabilities.every((value) => typeof value === 'string') &&
+        new Set(selection.required_capabilities).size === selection.required_capabilities.length &&
+        !await pathHasSymlink(root, binding.profile) && binding.profile.startsWith(releaseRoot) && manifestValid;
+      const actor = exact ? await readYamlContained(root, binding.profile) : null;
+      const artifactPath = exact ? binding.profile.slice(releaseRoot.length) : '';
+      const manifestArtifact = exact ? manifest.artifacts.find((item) => item.path === `${releaseRoot}${artifactPath}`) : null;
+      roles[role] = exact && manifestArtifact?.sha256 === sha256(Buffer.from(await readContained(root, binding.profile) ?? '')) &&
+        actor?.status === 'active' && actor.role === role ? 'operation-scoped' : 'unbound';
+    }
+    const extras = Object.entries(pop.actor_bindings).some(([role, binding]) => !ROLES.includes(role) && binding?.status === 'active');
+    const entries = isObject(pop.platform_bootstraps) ? Object.values(pop.platform_bootstraps).filter(isObject) : [];
+    const activeEntries = entries.filter((entry) => entry.status === 'active');
+    let bootstrapActive = false;
+    if (activeEntries.length === 1 && routed.has(activeEntries[0].path) && configuredRouteOk(activeEntries[0].path) && !await pathHasSymlink(root, activeEntries[0].path)) {
+      const bootstrap = await readYamlContained(root, activeEntries[0].path);
+      const resolution = bootstrap?.actor_resolution;
+      const expectedProfiles = [pop.actor_bindings['governance-author']?.profile, pop.actor_bindings['evidence-custodian']?.profile];
+      bootstrapActive = bootstrap?.schema_version === 'dev-foundry.platform-bootstrap.v3' && bootstrap.kind === 'platform-bootstrap' &&
+        bootstrap.status === 'active' && bootstrap.platform?.id === 'claude-code' &&
+        bootstrap.repository?.expected_name === project && bootstrap.repository?.workspace_binding === 'repository-root' &&
+        bootstrap.sources?.project_operating_profile === POP_PATH && bootstrap.sources?.authority_index === INDEX_PATH &&
+        resolution?.mode === 'governed-project-bindings' && resolution.fixed_profile === null &&
+        resolution.default_role === 'governance-author' && resolution.eligible_profiles?.length === 2 &&
+        expectedProfiles.every((profile) => resolution.eligible_profiles.includes(profile));
+    }
+    const active = !extras && ROLES.every((role) => roles[role] === 'operation-scoped') && bootstrapActive;
+    const reasons = [];
+    if (extras) reasons.push('extra-active-role');
+    if (activeEntries.length !== 1) reasons.push('bootstrap-count');
+    else if (!bootstrapActive) reasons.push('bootstrap-not-claude');
+    if (!active) reasons.push('operation-policy-incomplete');
+    return { overall: active ? 'active' : 'partial', roles, bootstrap: { activeEntries: activeEntries.length, claudeActive: bootstrapActive }, reasons };
+  }
 
   const profileOk = async (profilePath, target) => {
     if (!routed.has(profilePath) || !configuredRouteOk(profilePath)) { reasons.push('profile-not-routed'); return false; }

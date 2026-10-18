@@ -124,7 +124,7 @@ function targetMaterial(facts, packageRoot) {
     auditorProfileId: facts.actorData['governance-auditor'].id,
     authorProfile: facts.actorProfiles['governance-author'], custodianProfile: facts.actorProfiles['evidence-custodian'],
   });
-  const adds = { ...renderProfiles(params, path.join(packageRoot, 'templates')), ...renderBootstrap(params, path.join(packageRoot, 'templates')) };
+  const adds = { ...renderProfiles(params, path.join(packageRoot, 'templates')), ...renderBootstrap(params, path.join(packageRoot, 'templates'), { legacyV2: true }) };
   const proposal = buildCutoverProposal(facts, adds, IDS);
   const files = [
     ...proposal.edits.map((edit) => {
@@ -179,6 +179,9 @@ export async function createCutoverPlan({ root: argument, packageRoot }) {
     const adapter = adapterAt(packageRoot);
     const facts = await inspect(argument);
     if (!facts.governed || facts.blockers.length) fail('source-authority-invalid', JSON.stringify(facts.blockers));
+    if (facts.pop.schema_version !== 'dev-foundry.project-operating-profile.v2' || facts.pop.framework?.adopted_version !== '2.1.0') {
+      fail('unsupported-source-pop-version', 'This preserved consumer cutover flow accepts only its original POP v2 / 2.1.0 authority semantics. Migrate v3 only through a separately authorized project-owned adoption decision.');
+    }
     const root = facts.root;
     if ((await cutoverState(root)).status !== 'none') fail('cutover-already-recorded', 'Inspect or recover the existing cutover.');
     const identity = repositoryIdentity(root);

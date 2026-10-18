@@ -87,7 +87,7 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
   });
   const agents = renderAgents(params, templatesRoot);
   const profiles = renderProfiles(params, templatesRoot);
-  const bootstrap = renderBootstrap(params, templatesRoot);
+  const bootstrap = renderBootstrap(params, templatesRoot, { legacyV2: facts.pop.schema_version === 'dev-foundry.project-operating-profile.v2' });
   const block = renderClaudeBlock(params, templatesRoot);
   const entry = renderMcpEntry(params, templatesRoot);
   const touched = [];

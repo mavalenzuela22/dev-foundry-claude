@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -59,6 +59,60 @@ export async function makeProject() {
     taskPath,
     decisionPath,
     frameworkDocPath,
+    async write(relative, value) { await put(relative, value); },
+    async cleanup() { await import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })); },
+  };
+}
+
+export async function makeV3Project() {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'governance-mcp-v3-'));
+  const put = async (relative, contents) => {
+    const target = path.join(root, relative);
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, contents);
+  };
+  await cp(new URL('../../.dev-foundry/releases/2.3.0', import.meta.url), path.join(root, '.dev-foundry/releases/2.3.0'), { recursive: true });
+  const taskPath = 'docs/tasks/task.md';
+  await put(taskPath, `---\nschemaVersion: dev-foundry.sot-document.v2\nartifact:\n  id: TSK-029\n  type: TSK\n  status: IN_PROGRESS\nauthority:\n  governedBy: []\nlifecycle:\n  phase: in-progress\n---\n`);
+  const profile = (role) => `.dev-foundry/releases/2.3.0/actor-profiles/${role}.yaml`;
+  const roles = ['governance-author', 'implementation-executor', 'mechanical-validator', 'governance-auditor', 'evidence-custodian'];
+  const actorBindings = Object.fromEntries(roles.map((role) => [role, {
+    profile: profile(role === 'governance-author' ? 'governance-author-v4' : role === 'governance-auditor' ? 'governance-auditor-v2' : role === 'implementation-executor' ? 'implementation-executor-v2' : role === 'mechanical-validator' ? 'mechanical-validator-v2' : 'evidence-custodian-v1'),
+    selection: { mode: 'operation-scoped', required_capabilities: [], eligibility_policy: 'operator-and-actor-fit' },
+    status: 'active',
+  }]));
+  const bootstrapPath = '.dev-foundry/platform-bootstrap-claude-code.yaml';
+  const frameworkIndex = '.dev-foundry/releases/2.3.0/authority-index.yaml';
+  const popPath = '.dev-foundry/profiles/project-operating-profile.yaml';
+  const indexPath = '.dev-foundry/authority-index.yaml';
+  const pop = {
+    schema_version: 'dev-foundry.project-operating-profile.v3', id: 'FIXTURE-POP', status: 'active',
+    repository: { name: 'fixture-project' },
+    framework: { adopted_version: '2.3.0', selected_authority_index: frameworkIndex, selected_manifest: '.dev-foundry/releases/2.3.0/release-integrity-manifest.yaml', adoption_status: 'active' },
+    policies: { default_role: 'governance-author' }, actor_bindings: actorBindings,
+    platform_bootstraps: { 'claude-code': { path: bootstrapPath, status: 'active' } },
+  };
+  const bootstrap = {
+    schema_version: 'dev-foundry.platform-bootstrap.v3', id: 'FIXTURE-BOOTSTRAP', kind: 'platform-bootstrap', status: 'active',
+    repository: { expected_name: 'fixture-project', workspace_binding: 'repository-root' },
+    sources: { project_operating_profile: popPath, authority_index: indexPath },
+    platform: { id: 'claude-code' },
+    actor_resolution: { mode: 'governed-project-bindings', eligible_profiles: [], fixed_profile: null, default_role: 'governance-author', rule: 'Resolve the active role per operation.' },
+    constraints: [],
+  };
+  const route = (id, file, authority_class, governs) => ({ id, path: file, authority_class, governs, section_id: null });
+  const binding = (id, file, kind) => ({ id, path: file, kind, authority_class: 'configured', required: true });
+  const index = {
+    schema_version: 'dev-foundry.authority-index.v2', id: 'FIXTURE-INDEX', status: 'active',
+    subject: { kind: 'project', id: 'fixture-project', base_version: '2.3.0' },
+    routes: [route('active-framework', frameworkIndex, 'methodology', ['reusable-dev-foundry-methodology']), route('task', taskPath, 'task', ['task'])],
+    bindings: [binding('project-operating-profile', popPath, 'project-operating-profile'), binding('bootstrap', bootstrapPath, 'platform-bootstrap')],
+  };
+  await put(popPath, `${JSON.stringify(pop, null, 2)}\n`);
+  await put(indexPath, `${JSON.stringify(index, null, 2)}\n`);
+  await put(bootstrapPath, `${JSON.stringify(bootstrap, null, 2)}\n`);
+  return {
+    root,
     async write(relative, value) { await put(relative, value); },
     async cleanup() { await import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })); },
   };
