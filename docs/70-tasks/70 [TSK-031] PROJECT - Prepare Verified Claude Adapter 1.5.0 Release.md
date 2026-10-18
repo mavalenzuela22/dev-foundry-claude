@@ -273,3 +273,38 @@ to solve an existing integration/fixture regression. Distinguish
 stale historical test harness from real unsupported upgrade semantics
 and return an explicit blocker instead of changing contracts by guess.
 
+## 8. C002 PASS reconciliation and remaining full-candidate gate
+
+The autonomous Runner completion for C002 was corroborated with one
+terminal read: request `req_aed604e0e3541102e60385eccf587d79`,
+execution `execution_e000c11c8cd199dfef1acb06aa580b1d9831d1c22df3418df2e6c7456a42b9ff`,
+terminal `passed`; focused `node --test
+test/adopt/managed-upgrade.test.js` **21/21 PASS**,
+`git diff --check` PASS, and changed-path policy PASS.
+Actual new delta: only `test/adopt/managed-upgrade.test.js`.
+The six prior C001 package/version edits were preserved unchanged.
+
+Causal correction: the historical bridge test previously fed
+exact released 1.2.2/1.3.0 packages through the **current**
+TSK-029 v3 template render/upgrade logic as if it were the original
+1.4.0 historical implementation. C002 retrieves historical `v1.4.0`
+source by tag in the producer Git tree and uses its actual
+plan/upgrade/apply/consumer implementation, with real previously
+archived source packages, to test **historical** bridge semantics.
+This changed the historic LF-file expectation to a runtime-pin-only
+write; the Windows fixture retains its four exact managed-file writes.
+C002 neither weakens present-day collision/ownership checks nor
+changes shipping `src/`. The tagged source dependency is a
+known portability consideration for clones missing historical tags;
+it is not proof of current target release's direct legacy upgrade
+and must not be generalized. Existing installed-package upgrade tests
+remain the authority for current package behavior.
+
+**C002 is a focused PASS, not yet release acceptance.** C001's
+full-suite FAIL remains historically true. One final full-candidate
+mechanical validation (all tests, npm package dry run,
+non-published release build and diff check) is needed on this
+combined seven-file candidate, followed by author sufficiency
+assessment. No release tag, publish, consumer repin, or automatic
+framework adoption is authorized by these results.
+

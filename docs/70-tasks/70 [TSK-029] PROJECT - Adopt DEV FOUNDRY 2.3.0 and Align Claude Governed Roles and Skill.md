@@ -471,3 +471,16 @@ run the full release suite as one final candidate gate.
 The historical 354 PASS observations do not become a full-suite
 PASS until remaining failures are corrected and objectively retested.
 
+### C003 disposition — resolver did not dispatch; reconciled under TSK-031
+
+The draft `TSK-029-C003.json` execution package was **ineligible** on
+the current `task/tsk-031-adapter-150-release-preparation` branch
+(`EXECUTION_PACKAGE_INELIGIBLE`, no executor effects). The active
+branch-specific release acceptance task TSK-031 §7 became the
+authoritative implementation home for the historical compatibility
+reconciliation, as **TSK-031 C002**. Its real terminal PASS and precise
+test/source delta are recorded in TSK-031 §8. Earlier C003 author
+directions describe causal lineage only and authorize **no future
+TSK-029 executor dispatch** on this branch. TSK-029's 2.3.0
+adoption/promotion remains separately pending.
+
