@@ -76,3 +76,38 @@ checkpoint; no active implementation was running at branch creation.
 Do not reopen or overwrite C001/C002 immutable history. TSK-029 still
 owns eventual producer adoption and promotion; stacking of commit ancestry
 does not authorize automatic promotion of either task.
+
+## C001 terminal result — implementation PASS, DIAL acceptance still unverified
+
+The Runner completion wakeup for request
+`req_fa7e9beaf8208718c6368617414ad541` was corroborated once with
+terminal execution `execution_49b3f69f7df158e35801e88a48c6eacc177dda803cd4a5b48d34886d2a6fd0e6`.
+Terminal status `passed`, executor invoked and returned 0, path policy
+PASS (three exact product/test paths), mechanical validation
+`node --test test/bootstrap/claude-launcher.test.js test/adopt/consumer.test.js`
+**23/23 PASS**, and `git diff --check` PASS. Readable packet and actual diff
+were inspected. The three changed files are only
+`src/telemetry/launch.js`, `test/adopt/consumer.test.js`,
+`test/bootstrap/claude-launcher.test.js`. Product commit
+`63d8ff69f4dc3f2e7fff310a3adee10ad87f7910` preserves this candidate.
+
+The demonstrated actual fix is CodeMie removing the extra injected
+`--` and forwarding literal Claude arguments directly. Direct
+`claude <args>` and DIAL `dial run --harness claude-code -- <args>`
+were unchanged; unit/fake-spawn tests validate **constructed child argv**,
+not that installed provider wrappers accept all flags. In particular the
+Operator's concrete `--runtime dial -- -p "esto no va a jalar"`
+case is **not demonstrated fixed** by the terminal PASS. There is no
+readable supported artifact proving the local EPAM DIAL wrapper's exact
+version/help passthrough semantics; therefore do not assert a DIAL
+compatibility PASS or close the reported multi-runtime defect.
+
+OPS-007 conclusion: reuse the valid state-bound C001 proof and avoid
+new infrastructure, repeated validation, full-suite runs or independent
+audits without a real trigger. Complete remaining DIAL acceptance only
+after obtaining direct local wrapper help/argv or the exact observed
+error from the installed runtime, **without paid model invocations**.
+Do not modify the DIAL mapping in normative SPC-004 or the launcher by
+guessing. Retain TSK-030 IN_PROGRESS for this unresolved exact boundary,
+and leave TSK-029 adoption/promotion separately pending.
+
