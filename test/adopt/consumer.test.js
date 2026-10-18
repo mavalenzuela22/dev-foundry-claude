@@ -64,7 +64,7 @@ test('start delegates all modes and exact Claude arguments; blocks not-ready and
   const before = await listTree(c.root);
   for (const runtime of ['direct', 'dial', 'codemie']) {
     let called;
-    const args = ['--resume', 'a b', '--', '', '$(literal)'];
+    const args = ['-p', 'prompt with "quotes" and spaces', '--model', 'claude-test', '--', '--flag=value'];
     const result = await invoke(c, 'start', ['--runtime', runtime, '--', ...args], { launcher: async (options) => {
       called = options; options.onReady({ port: 12345 }); return 0;
     } });
