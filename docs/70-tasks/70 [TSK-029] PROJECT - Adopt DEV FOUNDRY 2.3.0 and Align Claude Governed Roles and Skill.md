@@ -325,3 +325,91 @@ unrelated hooks, agents, Skills, prompt-cache tuning, command wrappers and
 quantitative cost claims not supported by real measurements. The implementation
 executor may use native focused search and tests inside its authorized product
 boundary, with no read/retry loop or blanket preloading of SoT.
+
+## 8. C001 terminal evidence, minimal corrective and certification research
+
+Operator supplied an explicit FAIL signal for the **first real TSK-029
+product implementation**, accepted request
+`req_bb127980a8fe0c1583940dd05edfcf5b`, execution
+`execution_7c9c7a24e15cd4168fbb632d118323acb91a6b695a66944429747d78d5f4fffc`,
+from clean HEAD `7495abf92a763326d7635a665066b51a993cc579`.
+Terminal: `PATH_POLICY_FAILED` + `VALIDATION_FAILED`.
+Codex actually executed (`exitCode: 0`) and produced 20 material changed
+paths, **not** an empty implementation. Runner post-execution validation
+reported **188 pass / 3 fail** out of 191 assertions; `git diff --check`
+PASS. The failures are two onboarding subtests (greenfield, brownfield) and
+their enclosing suite: rendered setup CLI text reports version 2.1.0 while
+new adoption records describe 2.3.0. Root cause is exactly
+`src/consumer/command.js` line 182, where the human setup summary uses a
+literal 2.1.0; that **producer adapter CLI file** was omitted from C001's
+projection. A change deriving the displayed version from the verified
+`result.plan.framework.version` is necessary for the approved 2.3.0
+onboarding and does not create new behavior or alter external consumers.
+
+Two C001 paths were outside the allowed manifest:
+`test/adopt/golden.test.js` and `test/adopt/package.test.js`.
+The golden change was caused by changed v3 role templates; the package test
+by the exact v3 release bundle. Both are existing corresponding tests with
+direct causal fit, not new capability. Author allows them **for bounded
+regression coverage only**, after reconciliation. Critically, Codex removed
+the existing golden assertions enforcing whole subagent definition
+`<=8192` UTF-8 bytes and `<=100` nonempty lines, while active
+`SPC-003` §5 explicitly **SHALL** preserve these project limits.
+The project rule is still active and applicable; generic advice against
+arbitrary numeric budgets cannot abolish an existing authorized contract.
+Corrective MUST restore these checks, preserve other applicable static
+assertions and only adjust a golden byte-for-byte fixture if a versioned
+rendering actually invalidated its source baseline. Never treat a
+nondeterministic current-version mismatch as grounds to remove every
+integrity check. No governance requirement here forces a new profile,
+agent, hook or new separate task.
+
+**Claude Certified Architect Foundations review (2026-10-18):** consulted
+the user-provided third-party learning site
+`https://claudecertificationguide.com/learn`, especially 1.3 context
+passing/source metadata, 1.4 prompts versus deterministic gates,
+2.2 structured error recovery and valid empty results, 3.4 plan versus
+direct execution, and 5.4 context degradation. Cross-checked with
+Anthropic's official `code.claude.com/docs/en/best-practices`,
+`.../costs`, and `.../sub-agents`. These confirm useful **existing**
+requirements: compact source-attributed handoffs and explicit changed
+targets; reuse host-native tools, permission mechanisms, caching and
+context isolation; once the Author supplies a resolved objective and
+focused tests, Executor directly implements rather than repeating
+architecture planning. Distinguish model-facing instructions from
+mandatory deterministic external gates. Distinguish real source absence,
+invalid caller parameters, host/tool transport failures and actual policy
+denial, without changing the existing DAT-001/DAT-002 wire schemas solely
+to imitate the tutorial's optional `errorCategory/isRetryable` examples.
+An isolated subagent consumes its own tokens, so use one only for actual
+role/risk or material context isolation; no new agents, scratchpad
+services, mandatory workflow hooks, telemetry or token budgets.
+
+**OPS-007 Author self-assessment:** C001 proves material v3 implementation
+progress and a bounded failing regression. No-change is insufficient
+because the setup CLI reports a contradictory adopted version and
+mandatory SPC-003 static-budget proof was weakened. Reuse all 188
+applicable passing assertions, existing tests, exact changed tree and
+current contracts; do **not** rerun broad investigation, launch
+a new product task, or fabricate an independent audit requirement.
+The correcting operation may modify only
+`src/consumer/command.js`, `test/adopt/bootstrap.test.js`,
+`test/adopt/golden.test.js`, `test/adopt/package.test.js` within
+the same approved TSK-029 behavior. The broader original 20 changed
+paths remain present but MUST NOT be rewritten by a corrective without
+a newly demonstrated direct regression. Mechanical evidence is needed
+for the new final tree; original terminal FAIL cannot be promoted.
+When a required externally independent audit trigger is absent under
+current project authority, do not create one by habit; under v2.1.0
+only its actually applicable gates are enforced pending 2.3 adoption.
+
+**Correction acceptance:** CLI human/JSON framework version agrees with
+the verified bootstrap plan; original greenfield and brownfield
+subtests pass; SPC-003 static description/agent line/byte budgets
+remain tested; package bundle's 2.3.0 bytes and preserved legacy
+2.1.0 bundle remain consistent; required changed paths are
+explicitly permitted, all other candidate paths untouched;
+reuse existing relevant focused tests and return actual results.
+No commit/push/promotion or POP adoption by Executor. Preserve the
+first FAIL and its exact evidence unchanged.
+
