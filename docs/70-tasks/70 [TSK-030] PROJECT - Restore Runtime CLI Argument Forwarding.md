@@ -145,3 +145,36 @@ is justified before that observation. Reuse C001's 23/23 PASS and the
 real DIAL forward test. Keep TSK-030 open for narrow launch-path
 acceptance, not a new implementation task.
 
+## Operator telemetry-launcher DIAL confirmation (2026-10-18)
+
+The Operator executed from the producer repository checkout:
+
+`node ./scripts/telemetry/claude.mjs --runtime dial -- -p "hola"`
+
+The actual locally configured DIAL wrapper launched the Claude Code harness
+and Claude returned `¡Hola! ¿En qué te ayudo?`. This is **direct
+user-observed end-to-end acceptance of the telemetry launcher through DIAL
+and Claude for the exact `-p` argument**, not merely an internal fake-spawn
+assertion. The observed output did not independently expose telemetry
+collector readiness or recorded metrics, so telemetry ingestion is not
+independently claimed. The existing C001 terminal mechanical proof
+(23/23 PASS, path policy PASS) remains reusable and unchanged. Authentication
+and model/connector warnings did not prevent prompt handling. Do not
+persist account identifiers, identity provider URLs or tokens.
+
+A separate attempt to run `node ./bin/dev-foundry-claude.js start ...` from
+the **unreleased development checkout** returned the installed adapter
+integrity preflight refusal, before runtime launch. This is expected
+fail-closed product behavior on an unverified package, not evidence
+against `-p` forwarding and not justification to weaken `selfPin()`.
+Therefore the observed DIAL argv-routing problem is satisfied at the
+launcher boundary; a complete installed-package `start` acceptance remains
+**not observed** and should be exercised naturally during governed
+integration/release acceptance with a verifiable package, rather than
+creating a new paid synthetic run or additional control under OPS-007.
+
+No new product edits, runtime mapping changes, repeated validation or audit
+were required by this new evidence. TSK-030's remaining integration/promotion
+disposition stays subject to the current adopted methodology and the
+related TSK-029 release workflow.
+
