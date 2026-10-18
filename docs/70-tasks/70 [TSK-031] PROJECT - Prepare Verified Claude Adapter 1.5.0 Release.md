@@ -225,3 +225,51 @@ upgrade, or broad suite until the focused defect is resolved;
 then perform the final release acceptance checks on the
 resulting exact candidate.
 
+## 7. C002 ownership and branch-correlation corrective — historical regression
+
+An initial bounded Implementation Executor C003 *proposal* was prepared under
+TSK-029 to reconcile the six historical-upgrade subtest failures observed in
+TSK-031 C001. The active 2.1.0 CAP-004 Runner correctly returned
+`EXECUTION_PACKAGE_INELIGIBLE` for its TSK-029 contract while the current
+producer branch is `task/tsk-031-adapter-150-release-preparation`.
+This is a **real task/branch/package correlation prerequisite**, not
+an audit or version failure; no executor ran and no product writes
+occurred from that rejected package. Do not override that result,
+reuse the rejected contract, or move the dirty six-file release
+candidate to a different branch.
+
+This same directly causally necessary regression is now bounded as
+**TSK-031 C002**, because the historical compatibility suite is part
+of the release candidate's mandatory `npm test` acceptance, and
+TSK-031 owns the current exact branch/product integration. This
+explicit Author corrective disposition extends §3 **only** for
+the evidenced legacy-upgrade test boundary: its primary allowed
+new edit is `test/adopt/managed-upgrade.test.js` to restore a
+truthful historical/synthetic fixture when currently rendered v3
+templates invalidate an assumed 1.4.0 fixture. If and only if
+diagnosis proves a genuine regression on a **supported** v2
+consumer upgrade contract, the existing
+`src/adopt/plan.js` or `src/adopt/upgrade.js` MAY be
+corrected with a smallest direct source change and focused proof.
+All other §3 prohibitions remain binding. Product/authority files,
+framework bundles, historical releases, 2.1.0 consumer support,
+agent collision safety, ownership guards, and immutable archived
+packages are strictly preserved. No source edit is authorized
+merely to make an invalid synthetic legacy fixture pass.
+
+The six existing C001 release-version changes are **read-only
+preexisting state** in C002 despite their necessary inclusion in the
+Runner changed-path observation manifest. The original C001 FAIL
+and state-bound 354 PASS assertions, package dry-run PASS and diff-check
+PASS are preserved; a future focused C002 PASS does **not**
+make the full 1.5.0 acceptance PASS until the corrected complete
+candidate is independently mechanically checked. No automated
+publication, PR, release, consumer mutation or full-suite
+reexecution is bundled into this focused corrective.
+
+OPS-007 author decision: do not reopen TSK-029 product implementation,
+reset the worktree, create another TSK/MT, or introduce infrastructure
+to solve an existing integration/fixture regression. Distinguish
+stale historical test harness from real unsupported upgrade semantics
+and return an explicit blocker instead of changing contracts by guess.
+
