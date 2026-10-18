@@ -526,6 +526,14 @@ routes:
       - effective-role-handoff-and-minimal-sot-delivery
     section_id: null
 
+  - id: TSK-030
+    path: docs/70-tasks/70 [TSK-030] PROJECT - Restore Runtime CLI Argument Forwarding.md
+    authority_class: task
+    governs:
+      - runtime-cli-argument-forwarding-correctness
+      - launcher-pass-through-regression-recovery
+    section_id: null
+
 bindings:
   - id: governance-author-capability-producer-maintenance-v1
     path: .dev-foundry/profiles/capability-profiles/governance-author-producer-maintenance-v1.yaml
