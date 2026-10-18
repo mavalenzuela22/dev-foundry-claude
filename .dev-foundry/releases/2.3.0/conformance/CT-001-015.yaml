@@ -1,0 +1,390 @@
+schema_version: dev-foundry.interoperability-conformance.v1
+id: DF-INTEROP-001-CONFORMANCE
+contract_ref: DF-INTEROP-001
+contract_version: "0.1.0"
+authority_owner: DAT-022
+status: active
+case_count: 15
+test_contract:
+  given: abstract_operation_facts
+  expect: required_machine_decidable_projection
+  semantics: independent_of_provider_or_transport
+  oracle: compare_normalized_observation_with_every_expected_field
+  passing_condition: all_expected_fields_match_and_required_evidence_is_present
+  execution_status: fixtures_only_not_executed
+cases:
+  - id: CT-001
+    title: switch-without-authority-mutation
+    given:
+      pop_schema: "v3"
+      role: "governance-author"
+      actor_profile: "approved"
+      role_eligibility: "verified"
+      task_boundary: "TSK-A"
+      platform_from: "chatgpt-runner"
+      platform_to: "codex-cli"
+      identity: "verified"
+      identity_evidence: "independent_of_capability_claim"
+      capabilities: "sufficient"
+      capability_proof: "verified_for_operation"
+      authority: "valid"
+      operation_authorization: "verified_for_scope"
+      repository_authority: "verified"
+      baseline: "unchanged"
+      repository_state: "reobserved_consistent"
+      hard_exclusions: "satisfied"
+      environment: "compatible"
+      prior_participation: "reviewed_eligible"
+      prior_effects: "none"
+    expect:
+      readiness: "READY"
+      pop_mutation: false
+      dispatch: "allowed"
+  - id: CT-002
+    title: profile-reused-across-tasks
+    given:
+      capability_profile_id: "generic-governance-authoring-v1"
+      task_from: "TSK-A"
+      task_to: "TSK-B"
+      requirements: "same"
+      profile_limits: "still_applicable"
+    expect:
+      new_capability_profile_required: false
+      readiness: "INDETERMINATE"
+      dispatch: "prohibited"
+  - id: CT-003
+    title: known-missing-capability
+    given:
+      operation: "cross_platform_continuation"
+      actor_profile: "governance-author"
+      required_capability: "mutate_governance_documents"
+      provided_capabilities: ["inspect_repository"]
+      authority: "valid"
+    expect:
+      readiness: "BLOCKED"
+      dispatch: "prohibited"
+      continuation: "blocked"
+      diagnostic_category: "missing_capability"
+  - id: CT-004
+    title: invalid-contract-diagnostic
+    given:
+      contract_version: "0.1.0-candidate"
+      required_field_missing: "retry_policy"
+    expect:
+      readiness: "BLOCKED"
+      diagnostic_category: "invalid_contract"
+      diagnostic_requires: ["code","stage","category","cause","next_action","retry_policy","side_effect_status","evidence"]
+  - id: CT-005
+    title: empty-required-implementation
+    given:
+      transport: "completed"
+      exit_code: 0
+      required_implementation: true
+      implementation_delta: "none"
+      authorized_noop: false
+    expect:
+      implementation: "incomplete"
+      acceptance: "incomplete"
+      validation: "not_run"
+  - id: CT-006
+    title: directly-necessary-projection-variance
+    given:
+      material_scope: "same_capability"
+      material_authorization: "verified_before_variance"
+      authorized_effects: "include_direct_regression_correction"
+      new_path: "directly_necessary_regression_correction"
+      causal_proof: "present"
+      focused_regression_proof: "verified"
+      necessity: "verified"
+      minimality: "verified"
+      new_capability: false
+      public_behavior_change: false
+      added_dependency: false
+      new_security_or_integrity_decision: false
+      new_persistence_decision: false
+      new_transport_or_infrastructure_decision: false
+      new_target_or_lifecycle_decision: false
+      protected_surface_crossed: false
+      hard_exclusion_crossed: false
+      executor_variance_report: "complete"
+      governance_author_reconciliation: "verified_against_material_authority"
+    expect:
+      reconciliation: "reconciled_projection_variance"
+      separate_corrective_required: false
+      governed_validation_requires_reconciliation: true
+  - id: CT-007
+    title: hard-exclusion-prohibits-variance
+    given:
+      material_scope: "same_capability"
+      new_path: "explicitly_prohibited"
+      causal_proof: "present"
+      hard_exclusion_crossed: true
+    expect:
+      reconciliation: "material_authority_violation"
+      dispatch: "prohibited"
+      approval_escalation_required: true
+  - id: CT-008
+    title: environment-failure-not-product-fail
+    given:
+      command_exit_code: 1
+      subject_nonconformance_proven: false
+      observed_failure: "validator_environment_unavailable"
+    expect:
+      validation: "error"
+      acceptance: "not_evaluated"
+      diagnostic_category: "environment_error"
+  - id: CT-009
+    title: claude-to-chatgpt-continuation
+    given:
+      previous_platform: "claude-code"
+      next_platform: "chatgpt-foundry-runner"
+      pop_schema: "v3"
+      repository_identity: "verified"
+      active_framework: "verified"
+      project_authority: "reobserved"
+      authority_index: "verified"
+      task_boundary: "approved"
+      operation_authorization: "verified_for_scope"
+      role: "governance-author"
+      actor_profile: "approved"
+      role_eligibility: "verified"
+      identity: "verified"
+      identity_evidence: "independent_of_capability_claim"
+      capabilities: "sufficient"
+      capability_proof: "verified_for_operation"
+      capability_profile: "applicable_when_required"
+      environment: "compatible"
+      repository_state: "branch_head_visible_hidden_reobserved_consistent"
+      hard_exclusions: "satisfied"
+      effects: "none"
+      prior_participation: "reviewed_eligible"
+      prior_evidence: "pending_applicability_check"
+    expect:
+      pop_mutation: false
+      continuation: "eligible"
+      evidence_check: "required"
+      evidence_reuse: "not_claimed"
+  - id: CT-010
+    title: chatgpt-to-claude-continuation
+    given:
+      previous_platform: "chatgpt-foundry-runner"
+      next_platform: "claude-code"
+      pop_schema: "v3"
+      repository_identity: "verified"
+      active_framework: "verified"
+      project_authority: "reobserved"
+      authority_index: "verified"
+      task_boundary: "approved"
+      operation_authorization: "verified_for_scope"
+      role: "governance-author"
+      actor_profile: "approved"
+      role_eligibility: "verified"
+      identity: "verified"
+      identity_evidence: "independent_of_capability_claim"
+      capabilities: "sufficient"
+      capability_proof: "verified_for_operation"
+      capability_profile: "applicable_when_required"
+      environment: "compatible"
+      repository_state: "branch_head_visible_hidden_reobserved_consistent"
+      hard_exclusions: "satisfied"
+      effects: "none"
+      prior_participation: "reviewed_eligible"
+      prior_evidence: "pending_applicability_check"
+    expect:
+      pop_mutation: false
+      continuation: "eligible"
+      evidence_check: "required"
+      evidence_reuse: "not_claimed"
+  - id: CT-011
+    title: indeterminate-effect
+    given:
+      prior_effect: "indeterminate_push"
+      remote_state: "unknown"
+      retry_requested: true
+    expect:
+      side_effect_status: "indeterminate"
+      dispatch: "prohibited"
+      reobservation_required: true
+      diagnostic_category: "indeterminate_effect"
+      retry_policy: "after_reobservation"
+  - id: CT-012
+    title: actual-auditor-participation-positive-and-negative
+    given:
+      independent_audit_required: true
+      subject_candidate: "DF-CANDIDATE-004"
+      subject_manifest_sha256: "subject-snapshot-hash-H1"
+      author_attribution: "actor-A"
+      author_participation_evidence: "trustworthy_record_of_material_authoring"
+      trials:
+        independently_eligible_actor:
+          auditor_attribution: "actor-B"
+          attribution_basis: "traceable_operation_evidence"
+          participation_evidence: "verified_no_material_authoring_or_mutation"
+          platform_name: "same-or-different-is-irrelevant"
+        same_author_new_session:
+          auditor_attribution: "actor-A"
+          participation_evidence: "material_authoring_confirmed"
+          session: "new"
+        claimed_distinct_missing_evidence:
+          auditor_attribution: "self-claimed-actor-C"
+          participation_evidence: "unverifiable"
+    expect:
+      trial_eligibility:
+        independently_eligible_actor: "eligible_for_independent_fresh_audit"
+        same_author_new_session: "blocked"
+        claimed_distinct_missing_evidence: "blocked"
+      trial_independence_satisfied:
+        independently_eligible_actor: true
+        same_author_new_session: false
+        claimed_distinct_missing_evidence: false
+      trial_diagnostics:
+        same_author_new_session: "disallowed_prior_participation"
+        claimed_distinct_missing_evidence: "unverified_independence"
+      real_audit_verdict: "not_claimed_fixture_only"
+  - id: CT-013
+    title: objective-documentary-closure-without-repeated-independent-audit
+    given:
+      audit_recovery:
+        original_audit_lineage_id: "AUDIT-LINEAGE-001"
+        original_record: "durable_provenance_verified"
+        original_subject_branch: "tsk-005-platform-agnostic-governed-operations"
+        original_subject_head: "subject-head-H1"
+        original_candidate_manifest_hash: "subject-snapshot-hash-H1"
+        original_auditor_identity: "verified-principal-B"
+        original_auditor_provenance: "independently_verified"
+        original_actor_profile: "governance-auditor-v2"
+        original_participation: "verified_eligible"
+        original_verdict: "fail"
+        frozen_findings: ["A001"]
+        finding_A001_authority: "OPS-004"
+        finding_A001_closure_predicate: "documentary_correction_verified"
+        regression_boundary: "affected_contracts_only"
+        original_validation_evidence: "durable_state_bound_reference"
+        original_session: "lost"
+        corrective_actor_role: "governance-author"
+        corrective_actor_participation: "authored_documentary_correction"
+        frozen_predicate_objectively_decidable: true
+        objective_verification: "state_bound_independent_of_author_claim"
+        new_material_semantic_judgment_required: false
+        independent_reaudit_trigger: false
+        current_authority: "reobserved_consistent"
+        current_subject_head: "corrective-head-H2"
+        current_candidate_manifest_hash: "corrective-snapshot-hash-H2"
+        corrective_delta: "documentation_only_with_bound_manifest_reconciliation"
+        material_scope_expansion: false
+        original_audit_premise_invalidated: false
+      audit_recovery_negative:
+        original_audit_record: "missing_or_unverifiable"
+        claimed_lineage: "conversation_only"
+      semantic_review_required:
+        original_audit_record: "durable_provenance_verified"
+        correcting_actor_role: "governance-author"
+        material_authorship: "confirmed"
+        frozen_predicate_objectively_decidable: false
+        new_material_semantic_judgment_required: true
+        separate_eligible_auditor: "not_yet_assigned"
+      selection_authorization: "verified_for_reuse"
+      evidence_purpose: "required_independent_governance_audit"
+      evidence_candidates:
+        current:
+          source_provenance: "verified"
+          framework_version: "matching"
+          actor_profile_version: "matching"
+          capability_profile_version: "matching_when_applicable"
+          subject_head: "matching"
+          repository_baseline: "matching"
+          scope: "matching"
+          proof_freshness: "current"
+          proof_applicable: true
+          independence: "satisfied_when_required"
+        stale:
+          source_provenance: "verified"
+          framework_version: "matching"
+          actor_profile_version: "matching"
+          capability_profile_version: "matching_when_applicable"
+          subject_head: "matching"
+          repository_baseline: "matching"
+          scope: "matching"
+          proof_freshness: "expired"
+          proof_applicable: true
+          independence: "satisfied_when_required"
+        incompatible_profile:
+          source_provenance: "verified"
+          framework_version: "matching"
+          actor_profile_version: "incompatible"
+          capability_profile_version: "matching_when_applicable"
+          subject_head: "matching"
+          repository_baseline: "matching"
+          scope: "matching"
+          proof_freshness: "current"
+          proof_applicable: true
+          independence: "satisfied_when_required"
+        incompatible_capability_profile:
+          source_provenance: "verified"
+          framework_version: "matching"
+          actor_profile_version: "matching"
+          capability_profile_version: "incompatible"
+          subject_head: "matching"
+          repository_baseline: "matching"
+          scope: "matching"
+          proof_freshness: "current"
+          proof_applicable: true
+          independence: "satisfied_when_required"
+        disallowed_participation:
+          source_provenance: "verified"
+          framework_version: "matching"
+          actor_profile_version: "matching"
+          capability_profile_version: "matching_when_applicable"
+          subject_head: "matching"
+          repository_baseline: "matching"
+          scope: "matching"
+          proof_freshness: "current"
+          proof_applicable: true
+          independence: "not_satisfied_for_required_audit"
+    expect:
+      reused_evidence: ["current"]
+      rejected_evidence: ["stale", "incompatible_profile", "incompatible_capability_profile", "disallowed_participation"]
+      repeat_proof_required_for: ["stale", "incompatible_profile", "incompatible_capability_profile", "disallowed_participation"]
+      recovered_audit_lineage: "AUDIT-LINEAGE-001"
+      bounded_closure_scope: "frozen_A001_closure_and_direct_regressions"
+      objective_finding_closure: "eligible_for_verification_without_new_independent_auditor"
+      new_independent_corrective_review_required: false
+      original_independent_audit_verdict: "fail_preserved"
+      audit_gate_if_objective_closure_proven: "satisfied_by_original_audit_and_verified_complete_findings"
+      recovered_original_snapshot_overwritten: false
+      lost_session_forces_fresh_audit: false
+      documentary_correction_implementation_executor_required: false
+      recovered_independent_verdict: "not_issued_fixture_only"
+      semantic_review_case: "blocked_until_independent_bounded_review"
+      missing_original_lineage_review: "blocked_requires_fresh_independent_audit"
+  - id: CT-014
+    title: capability-not-authorization
+    given:
+      capabilities: "complete"
+      identity: "verified"
+      task_authorization: "verified_for_existing_scope"
+      proposed_variance: "directly_necessary_regression_correction"
+      variance_causal_proof: "present"
+      variance_material_authorization: "missing"
+      variance_hard_exclusion_crossed: false
+      operator_reserved_effect: "requested_without_authorization"
+    expect:
+      readiness: "BLOCKED"
+      dispatch: "prohibited"
+      continuation: "blocked"
+      reconciliation: "material_authority_violation"
+      diagnostic_category: "missing_authority"
+  - id: CT-015
+    title: legacy-binding-migration
+    given:
+      active_pop_schema: "v2"
+      old_implementation: "single_known"
+      adoption_2_2: "operator_authorized"
+      new_pop_schema: "v3"
+      evidence_version: "2.1.0"
+      migration_review: "passed"
+    expect:
+      old_evidence_rewritten: false
+      v2_implicitly_reinterpreted: false
+      old_implementation_exclusive_v3: false
+      post_migration_platform_switch_pop_mutation: false

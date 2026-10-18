@@ -1,0 +1,94 @@
+schema_version: dev-foundry.release-integrity-manifest.v2
+id: DF-FRAMEWORK-RELEASE-2.3.0
+title: DEV FOUNDRY Framework Release 2.3.0
+kind: release-integrity-manifest
+status: canonical
+framework_version: "2.3.0"
+canonical: true
+methodology_authority: true
+
+source_candidate:
+  candidate_id: DF-CANDIDATE-005
+  candidate_manifest_path: .dev-foundry/candidates/DF-CANDIDATE-005/candidate-manifest.yaml
+  candidate_manifest_sha256: 12ecbe461962c174e2ee3a026a67c46c662a38ab665827ffe21857613973a9fc
+
+artifacts:
+  - path: .dev-foundry/releases/2.3.0/authority-index.yaml
+    role: framework-authority-index
+    sha256: ae322e07ad4a7aba76b6c241d5238fd29034b083006cdd69f20d3d4c36f4d998
+  - path: .dev-foundry/releases/2.3.0/docs/00-overview/00 [OVR-001] DF - Framework Overview.md
+    role: framework-overview
+    sha256: b5a7ee5e13a26b0f6902944f2e03b1493dd08a43bf3ba984a38d6d27c49c8b82
+  - path: .dev-foundry/releases/2.3.0/docs/00-overview/00 [OVR-002] DF - Documentation Map and Artifact Taxonomy.md
+    role: framework-overview
+    sha256: 3271e4bcc12cf3ecdc47bba1268a6c4c1902aea5414a826ded661637b1f44a3a
+  - path: .dev-foundry/releases/2.3.0/docs/30-operations/30 [OPS-001] DF - Governed Planning and Delivery Lifecycle.md
+    role: reusable-operations-policy
+    sha256: b39f018cfc5cfbc8029b136500e347e1c9bc30185c3bc6995de7f3dcb75bdd83
+  - path: .dev-foundry/releases/2.3.0/docs/30-operations/30 [OPS-002] DF - Implementation Capability Profiles and Workload Fit.md
+    role: reusable-operations-policy
+    sha256: 6cc86f050bf264f1832c51134be70fe801d3523a279c236651028619359dd532
+  - path: .dev-foundry/releases/2.3.0/docs/30-operations/30 [OPS-003] DF - Roles Responsibilities and Separation of Duties.md
+    role: reusable-operations-policy
+    sha256: 3f4d498bbc1708b21d05049592adfeeef1ee358653296ed752c0003ea4285dc1
+  - path: .dev-foundry/releases/2.3.0/docs/30-operations/30 [OPS-004] DF - Validation Audit Evidence and Corrective Model.md
+    role: reusable-operations-policy
+    sha256: fa6e7c8b0e20a7d0b6ae62469ba3f926d6bf92edc0ff8ac4b5d48216fb058be2
+  - path: .dev-foundry/releases/2.3.0/docs/30-operations/30 [OPS-005] DF - Project Adoption Versioning and Framework Evolution.md
+    role: reusable-operations-policy
+    sha256: ee2185d634e7058ca252e90924a1e7cdf1e2453473164316e69f161b0932e216
+  - path: .dev-foundry/releases/2.3.0/docs/30-operations/30 [OPS-006] DF - Source of Truth Metadata and Frontmatter Policy.md
+    role: reusable-operations-policy
+    sha256: 01cf7f8ca26073069e161fa06f9c8528f175fa12e85b793498321d5626d6439b
+  - path: .dev-foundry/releases/2.3.0/docs/30-operations/30 [OPS-007] DF - Minimal Sufficient Change and Sufficiency Review.md
+    role: reusable-operations-policy
+    sha256: 4263df4214b5591f1f759d2a26a41bdce3be76cff29d8b6bcf668051c4e82a7a
+  - path: .dev-foundry/releases/2.3.0/docs/30-operations/30 [OPS-008] DF - Side Effect Authorization and Promotion Safety.md
+    role: reusable-operations-policy
+    sha256: 9ad8d6526a88798adca23d6ed4d6a8f984a002f2bb6b1e7babd21e5c89a185ad
+  - path: .dev-foundry/releases/2.3.0/docs/30-operations/30 [OPS-009] DF - Actor Profiles Project Bindings and Platform Bootstrap.md
+    role: reusable-operations-policy
+    sha256: 8caaf612f0e9641732aa34d3ae04c79282051868f136f6721134bf01d47f0342
+  - path: .dev-foundry/releases/2.3.0/docs/60-data-contracts/60 [DAT-008] DF - Source of Truth Frontmatter Contract.md
+    role: reusable-data-contract
+    sha256: cc075a8b7446f7dd0e97cce0298a06e0dbc20c91d111fd7f7cc750116b5e90fb
+  - path: .dev-foundry/releases/2.3.0/docs/60-data-contracts/60 [DAT-016] DF - Actor Capability Project Profile and Platform Bootstrap Contracts.md
+    role: reusable-data-contract
+    sha256: d23de83a3690fe71017ce0660a88d179b5b66bfe446da2d8d7b34a75b07aee69
+  - path: .dev-foundry/releases/2.3.0/docs/60-data-contracts/60 [DAT-020] DF - Authority Index Contract.md
+    role: reusable-data-contract
+    sha256: 7e8bcc2c929ec1e0924eab219175e059cb5ba4311f12ab8abd0c915b544e98d3
+  - path: .dev-foundry/releases/2.3.0/docs/60-data-contracts/60 [DAT-021] DF - Framework Candidate and Release Integrity Contracts.md
+    role: reusable-data-contract
+    sha256: e6b5cd503bbf428072dc98a2836d77acc7bc09f57fd71644ab159fd1ba31cc0f
+  - path: .dev-foundry/releases/2.3.0/docs/60-data-contracts/60 [DAT-022] DF - Cross-Platform Operation Interoperability Contracts.md
+    role: reusable-data-contract
+    sha256: b9187860e6feb4e3d96796f7beccac7ac2955a6a8435b50fa6d9cd691da941dc
+  - path: .dev-foundry/releases/2.3.0/actor-profiles/governance-author-v4.yaml
+    role: reusable-actor-profile
+    sha256: 30581e7574b3ad364cac10beccdcf90a8739f5e35885f4541ed4a552dcfc7cbf
+  - path: .dev-foundry/releases/2.3.0/actor-profiles/implementation-executor-v2.yaml
+    role: reusable-actor-profile
+    sha256: 34e351fc1d37fd8af1d81ae74ebc35d2227d23273c0d8a816ce09cb40891cc53
+  - path: .dev-foundry/releases/2.3.0/actor-profiles/mechanical-validator-v2.yaml
+    role: reusable-actor-profile
+    sha256: 3eac152e68ef2447afeacbb0aa6b2aa3d1a38fbea9960e7b661a40c0cf2f541c
+  - path: .dev-foundry/releases/2.3.0/actor-profiles/governance-auditor-v2.yaml
+    role: reusable-actor-profile
+    sha256: fb8fa125f2cd792c49c6e85e987daf43eefdd4ef39f543ea196fdce80d1137e4
+  - path: .dev-foundry/releases/2.3.0/actor-profiles/evidence-custodian-v1.yaml
+    role: reusable-actor-profile
+    sha256: 2e5e698c14638203db472a89c90d578d6336f2b7dc336f4461f63e2773e5dc32
+  - path: .dev-foundry/releases/2.3.0/contracts/DF-INTEROP-001.yaml
+    role: machine-interoperability-contract
+    sha256: ccd8f5cf647f7823c1a4224ea0fe58cbd096ee02712dcd580c923eeefe7e05eb
+  - path: .dev-foundry/releases/2.3.0/conformance/CT-001-015.yaml
+    role: machine-conformance-fixtures
+    sha256: e1d3c344899f0c7e537331a233e034c224f7e5dbf8a8d225bddff413713b87ce
+
+integrity:
+  release_artifacts_hashed_after_materialization: true
+  manifest_self_hash_embedded: false
+  integrity_graph_acyclic: true
+  candidate_snapshot_mutated: false
+  semantic_payload_preserved: true
