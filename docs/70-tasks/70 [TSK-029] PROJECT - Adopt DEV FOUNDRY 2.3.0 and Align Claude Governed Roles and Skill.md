@@ -192,3 +192,136 @@ required independent audits as self-review, adopt incomplete authority,
 alter upstream/consumer repositories, or publish the adapter automatically.
 Report the exact remaining prerequisite when one cannot be satisfied
 with existing authorized capabilities.
+
+
+## 6. Operator acceptance priority — least tokens per correctly finished operation
+
+The Operator authorizes the necessary bounded project and product implementation
+under TSK-029, with **correctly completed governed work per token consumed** as
+the primary operational objective. Token economy is a design/acceptance quality,
+not permission to skip required security, authority, independent separation when
+triggered, mechanical validation or acceptance. No arbitrary static token quota
+or universal target number is imposed.
+
+Governance Author MUST choose the smallest exact SoT slice, make required
+decisions once, produce a precise handoff (objective, current scope/branch,
+role/Actor Profile, relevant authority paths/sections/hashes, authorized effects,
+hard exclusions, necessary proof) and route recoverable caller mistakes to
+one correction instead of repeatedly calling the mini MCP. Absence or conflict
+in mandatory live authority remains blocked. A host-specific Runner resolver
+or handoff must never become a Claude Code consumer dependency.
+
+Implementation Executor MUST consume the directed slice, apply **material
+authorized edits** with the smallest focused regression tests, identify actual
+changed paths and proof, and stop on genuine material scope expansion.
+Successful transport, an empty patch, a test-only run or an unchanged worktree
+does NOT establish implementation acceptance for work requiring code changes.
+The Author owns change/projection reconciliation and any reserved decisions;
+Executor MUST NOT reinvent governance or recursively scan unrelated SoT.
+
+Governance Auditor is dispatched **only when current applicable methodology,
+project policy, external control, material separation, or Operator intent
+actually triggers independent review**. Different model/subagent by itself
+does not establish independence; verify material participation if triggered.
+Preserve frozen independent audit lineage and apply attributable objective
+finding closure rather than routine fresh audits for documentation fixes.
+No replacement audit ceremony may be created by renaming self-assessment.
+
+**Practical acceptance proof:** demonstrate at least one nontrivial, targeted
+Author→Executor handoff with bounded references and changed product behavior
+against the actual consumer MCP/bootstrap/role guidance tests; assess Auditor
+instructions with a triggered and a non-triggered fixture/behavioral case,
+without manufacturing a real audit obligation. Reuse already installed test
+harness and, when actually available, existing telemetry to observe SoT
+read breadth, redundant tool calls, executor output and token consumption.
+Report observed baseline/comparison only when comparable measurements exist;
+otherwise disclose missing measurements rather than fabricating a cost PASS.
+No permanent instrumentation, third MCP tool or telemetry dependency is
+needed solely to satisfy this TSK.
+
+**OPS-007 proportionality / decision:**
+- No-change is insufficient for consumer v3 operation selection: the current
+  `src/governance-mcp/resolver.js` hard-pins `2.1.0`, POP v2 fixed
+  implementations and `src/adopt/activation.js` accepts only v2.
+- Reuse existing stdio two-tool mini MCP, existing role agents, existing
+  bootstrap/activation guard, existing focused tests and telemetry; do not
+  introduce a replacement governance engine.
+- Implement only the actually touched compatibility and role guidance
+  components. Source packaging/adoption and producer POP migration remain
+  distinct Author-owned governance steps; no executor may mutate active POP,
+  Authority Index, versioned immutable releases, task SoT or a consumer repo.
+- Preserve supported v2 consumer behavior; do not infer v3 `READY` merely
+  from an active POP role. Concrete operation capability and attribution need
+  trustworthy evidence, otherwise return an actionable bounded
+  BLOCKED/INDETERMINATE consistent with the supported wire contract.
+- Focused tests and preserved negative security cases precede any necessary
+  independent product validation. Broader tests only when affected integration
+  makes them material; independent Audit only when its real trigger is named.
+- Stop if completion requires a new public capability, a new policy decision,
+  a new service or crossing a hard exclusion; Author reconciles exact evidence
+  and scope, rather than having Executor improvise.
+
+**Sequencing:** The authenticated 2.3.0 release was imported and committed
+unchanged at `1531506fd099bbdf2e0baa356ee58c5eaef4bda3` (25 files,
+24/24 artifact hashes). It is a verified candidate, **not yet the active
+project release**; active producer POP/Authority Index still select 2.1.0.
+The next Executor change must keep producer governance source intact.
+Author-owned explicit POP v3/Bootstrap v3/index switch only after the
+interoperability and installation effects actually required by that migration
+are verified.
+
+## 7. Claude Code native token-economy review (official documentation)
+
+The Operator explicitly required consulting Anthropic's current Claude Code
+best practices and cost/context guidance **before** code implementation.
+Official references reviewed on 2026-10-17 (documentation can evolve):
+- https://code.claude.com/docs/en/best-practices
+- https://code.claude.com/docs/en/costs
+- https://code.claude.com/docs/en/features-overview
+- https://code.claude.com/docs/en/sub-agents
+- https://code.claude.com/docs/en/memory
+
+**Documented native facilities and material consequence for this adapter:**
+
+1. `CLAUDE.md` content is loaded in ordinary sessions and subagents; Anthropic
+   recommends concise always-applicable instructions (roughly under 200 lines),
+   with task-specific reference material in on-demand Skills or path-scoped
+   rules instead. Imports are eagerly expanded, so do not fake economy by
+   importing entire SoT. Preserve a **small** managed governance block that
+   tells Claude where/how to locate *exact* current authority, not the text
+   of that authority.
+2. Skills are invoked on demand; subagents have an **independent context and
+   their own billed usage**. A role subagent does not automatically inherit
+   parent's conversational facts, but it does ordinarily receive Claude.md
+   and other startup configuration. Send an explicit concise handoff with
+   source pointers and bounded proof rather than forcing it to rediscover
+   the project. Do not introduce additional subagents, agent teams, preloaded
+   Skills or new Skill files absent a demonstrated recurring product need.
+3. Claude Code already supplies native file search/edit, CLI, commands,
+   permission controls, sandbox, context inspection/compaction, model and
+   effort selection, and subagent tool restrictions. Reuse them; the existing
+   two-tool stdio mini MCP should focus narrowly on **source-governed role,
+   authority, and predelegation diagnostics**, never duplicate native file
+   access, shell, dispatch, permission enforcement, or monitoring.
+4. Model/effort, compact/clear, focused test verification and structured
+   outcomes are options of the host. Do not add forced model pins, model
+   selection inside mini MCP, global token quotas, blanket context clears,
+   automatic new sessions or a new billing/telemetry subsystem. Existing
+   telemetry can provide comparative observation *if actually accessible*.
+5. A handoff that supplies precise changed targets and runnable focused
+   acceptance checks is preferable to vague repository exploration. Claude
+   Code's documented verification pattern relies on observable behavior,
+   tests/diffs and truthful result, not merely on a success statement.
+6. Hooks are appropriate only for already-proven, absolutely necessary
+   deterministic enforcement; skill/CLAUDE.md instructions do not enforce
+   permissions. Keep existing native authorization/security boundaries and
+   **do not add a hook** to this TSK without a concrete unmet requirement.
+
+**OPS-007 outcome:** No new token-optimization mechanism is justified.
+The necessary delta is to update existing bootstrap/managed guidance, v3
+role/authority resolution and consumer adoption compatibility, and focused
+regressions. Preserve current proven behavior in 2.1.0 consumers. Exclude
+unrelated hooks, agents, Skills, prompt-cache tuning, command wrappers and
+quantitative cost claims not supported by real measurements. The implementation
+executor may use native focused search and tests inside its authorized product
+boundary, with no read/retry loop or blanket preloading of SoT.
