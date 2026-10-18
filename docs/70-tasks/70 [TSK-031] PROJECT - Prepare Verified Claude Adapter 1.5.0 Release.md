@@ -308,3 +308,119 @@ combined seven-file candidate, followed by author sufficiency
 assessment. No release tag, publish, consumer repin, or automatic
 framework adoption is authorized by these results.
 
+## 9. V003 full candidate validation — terminal mechanical PASS
+
+Autonomous Runner validation request
+`valreq_80275b1592158087ca61559dad842569`,
+validation ID `TSK031-V003-FULL-RELEASE-150`, finished on
+2026-10-18 at 22:49:23Z, evidence
+`.dev-foundry/validations/TSK031-V003-FULL-RELEASE-150/result.json`.
+The separate Mechanical Validator reported **PASS** with **zero findings**,
+complete evidence and **no Implementation Executor invocation**.
+Validation is bound to producer branch
+`task/tsk-031-adapter-150-release-preparation`,
+base HEAD `fba2cfa7e640fd4b60bafeaedb979ff205d31e52`,
+and the exact seven modified release-candidate files.
+
+Actual validation commands and outcomes:
+- `npm test` exit **0**, exactly **361 tests PASS, 0 FAIL, 0 skipped**
+  across current producer bootstrap, governed consumer/adoption, legacy
+  upgrade, telemetry-launcher and release-package suites;
+- `npm pack --dry-run --json` exit **0** with prepack/dashboard
+  build completed and payload manifest **1224 files**;
+- `git diff --check` exit **0**.
+- Pre/post repository states were identical: same branch and HEAD,
+  exactly seven visible candidate changes, zero hidden changes;
+  no undeclared side effects or residual generated-path changes.
+
+This V003 PASS **supersedes C001's failing acceptance for the new
+candidate state only**, without rewriting C001 FAIL history.
+The actual seven-file release product delta remains:
+`README.md`, `migrations/release.json`, `package.json`,
+`package-lock.json`, `test/adopt/package.test.js`,
+`test/adopt/release-assets.test.js`, and
+`test/adopt/managed-upgrade.test.js`.
+No current production source, immutably bundled framework release,
+release workflow, or consumer repository is edited by this delta.
+The historical v1.4.0 tag-based regression fixture passed in this
+producer checkout. The default shallow checkout tag-access limitation
+remains known; do not reinterpret this as proof of arbitrary clean
+checkouts without historic tags.
+
+Author self-assessment: this is sufficient mechanical proof for
+**candidate preparation**, reusing prior scoped implementation and
+corrective evidence without a second broad test cycle.
+The project POP currently has `audit_triggers: []`; no distinct
+independent audit trigger has been identified for this scoped package
+metadata/test adjustment, therefore do **not** manufacture one.
+The existing `test/adopt/release-assets.test.js` passed under full
+suite, but there is **no independently observed published archive,
+release GitHub Actions success, remote tag v1.5.0, published SHA256SUMS
+or end-to-end PagoElectronico cutover**. This result does not certify
+those separate publication and consumer rollout boundaries.
+
+Pending work before actual publication: reconcile the **separately
+in-progress TSK-029 producer 2.3.0 POP v3 adoption/integration** and
+TSK-030 permitted integration disposition, then ensure the coherent
+candidate is promoted to clean `main` under valid gates, verify
+no v1.5.0 remote tag/release collision, and only then dispatch
+the existing workflow with explicit publication authorization.
+No claim that TSK-026 automatic updater exists.
+
+## 10. Operator full promotion authorization and bounded transaction blocker
+
+On 2026-10-18 the Operator explicitly authorized completion of the
+2.3.0 adoption, integration of TSK-029/030/031 and publication of
+the verified 1.5.0 adapter release. This **supersedes the earlier
+authorization-required disposition** and does not waive repository
+identity, exact authority, safety, validation or publication gates.
+
+Under the active 2.1.0 CAP-004 resolver, TSK-031 promotion had
+`outcome: ready`, `authorizationState: authorized`,
+`auditRequirement: not_required`, `validationRequirement: required`
+after typed authorization and audit-trigger assessment. Mechanical
+validation `TSK031-V003-FULL-RELEASE-150` remains PASS:
+361/361 tests, package dry-run and diff check PASS.
+
+The attempt to commit its exactly eight approved visible paths
+(the seven version/test paths plus this task record) with the
+process-bound Runner's `start_repository_transaction`
+was **rejected by an OpenAI platform safety check before an
+operation result**, not by Git or the Runner transaction validator.
+The separate official `authorizedThrough: preflight` path was
+likewise rejected at the platform safety boundary. Do **not**
+reinterpret either rejection as a Git/Runner product FAIL, a successful
+commit, permission to invoke direct shell/GitHub writes as a
+workaround, or a reason to disable safeguards.
+
+After both rejections, repository read-only inspection confirmed
+the same `task/tsk-031-adapter-150-release-preparation` branch,
+HEAD `fba2cfa7e640fd4b60bafeaedb979ff205d31e52`,
+and exactly eight pending visible changes (no hidden ones). No
+commit/push/PR/merge/release occurred from either attempt.
+
+A second independent resolver diagnosis on this same branch reported
+`AUTHORITY_MISSING` for **both** TSK-029 and TSK-030 promotion,
+while TSK-031's promotion could reach the semantic-assessment
+protocol. This supports a branch/task-specific promotion-authority
+constraint, but the closed reason code does not establish which exact
+predicate failed; do not claim a more specific internal cause.
+Their already committed product ancestry is reused as part of the
+integrated TSK-031 candidate, not independently promoted on the
+wrong branch. The **producer's actual POP remains v2,
+adopted DEV FOUNDRY 2.1.0**. Project 2.3.0 adoption still needs
+a separately governed active POP v3/Authority Index/bootstrap v3
+transition, with the 2.1.0 OPS-005 impact/profile/authority gates
+met before switching. Avoid mutating active authority while the
+candidate worktree is uncommitted and the governed transaction
+surface is unavailable.
+
+Disposition: release candidate validation remains **PASS**,
+but integration and publication remain **BLOCKED by platform
+transaction access and pending project adoption**, not missing
+Operator consent. Preserve existing evidence, exact dirty tree and
+scope. No new audit, repeat 361-test cycle, direct tool-routing
+workaround, or consumer upgrade is authorized by a platform error.
+Resume only after a permitted transaction capability is actually
+available and relevant adoption authority is reconciled.
+
