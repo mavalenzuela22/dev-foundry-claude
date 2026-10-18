@@ -111,3 +111,37 @@ Do not modify the DIAL mapping in normative SPC-004 or the launcher by
 guessing. Retain TSK-030 IN_PROGRESS for this unresolved exact boundary,
 and leave TSK-029 adoption/promotion separately pending.
 
+## Operator DIAL CLI confirmation (2026-10-18) — source evidence, no new product delta
+
+The Operator executed the actual installed EPAM DIAL binary and supplied the
+terminal transcript (not an automated test or a report from an unrelated DIAL
+project). The binary reports version
+`0.3.0+bb33c24e5024f01f52c8add0951312e6c00fa91f`.
+`dial run --help` advertises `-harness`, `-model`,
+`-print-url`, and `-project`. Its lack of direct `-p` at
+the wrapper level is **not** a defect: the harness receives arguments after
+the literal `--`.
+
+The Operator then invoked
+`dial run --harness claude-code -- -p "hola"`.
+The DIAL session launched and Claude returned
+`¡Hola! ¿En qué te ayudo?`, confirming that this locally installed DIAL
+wrapper **does forward `-p` to Claude Code with the exact existing
+SPC-004 §5.1 syntax**. Do not alter the DIAL mapping. The accompanying
+connectors warning about a pre-existing authentication source and the
+`unrecognized_model` model-telemetry message are not evidence of an argv
+forwarding rejection; neither prevented the prompt response. Omit all
+account identifiers, identity-provider details and tokens from durable
+evidence.
+
+**Acceptance boundary remaining:** this was a direct `dial run` test,
+not `dev-foundry-claude start --runtime dial -- -p "hola"` through the
+packaged consumer entrypoint and telemetry collector. A separate
+`dev-foundry-claude start` invocation with an actual installed adapter
+(or equivalent terminal provenance) is still needed to decide whether a
+stale package/selection or another CLI layer explains the Operator's
+reported original behavior. No additional source edit or Runner validation
+is justified before that observation. Reuse C001's 23/23 PASS and the
+real DIAL forward test. Keep TSK-030 open for narrow launch-path
+acceptance, not a new implementation task.
+
