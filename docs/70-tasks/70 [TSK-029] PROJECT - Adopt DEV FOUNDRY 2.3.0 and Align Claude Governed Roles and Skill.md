@@ -413,3 +413,61 @@ reuse existing relevant focused tests and return actual results.
 No commit/push/promotion or POP adoption by Executor. Preserve the
 first FAIL and its exact evidence unchanged.
 
+## 9. C003 — inherited historical-upgrade regression discovered by release preparation
+
+During governed TSK-031 1.5.0 release-candidate C001
+(request `req_0aea225b36128a2c146f920cdd41224d`,
+execution `execution_1285086cce2f0b7264f182c18e31df42095e2c721df18e457acb0e2578abbe19`)
+the Runner recorded `VALIDATION_FAILED`: `npm test` 354/361 PASS,
+7 FAIL (six subtests plus their group), while `npm pack --dry-run
+--json` and `git diff --check` PASS, path policy PASS, executor
+exit 0. The six version/packaging edits are preserved uncommitted on
+`task/tsk-031-adapter-150-release-preparation` at base
+`3a7f76d656c3cd95b5a5c0cf796616d7087845b1` and must not
+be reset or rewritten by the 2.3.0 corrective.
+
+All failures are in the **unchanged**
+`test/adopt/managed-upgrade.test.js` historical 1.2.2/1.3.0 ->
+synthetic 1.4.0 legacy bridge suite, **not** the new package's 1.5.0
+metadata/assertions. Three prepared cases expected only `.mcp.json`
+and `CLAUDE.md` but now also observe updates to auditor/executor
+agents; three activated cases expected `ready` but get
+`upgrade-ownership-unverified`. Historical Windows 1.2.2 prepared
+case passes. The legacy fixture sets a synthetic 1.4.0 target but
+uses current producer rendering/upgrade logic; TSK-029 changed
+v3 agent templates and dual-framework behavior. The exact
+regression is therefore **historical compatibility evidence
+unreconciled after TSK-029**, not proof that bumping 1.4.2 to 1.5.0
+caused the change. Neither a stale test fixture nor a real v2
+upgrade regression may be dismissed without checking real
+released source identity and correct supported migration boundaries.
+
+Author directs one C003 **diagnose-then-correct** operation as a directly
+necessary TSK-029 backward-compatibility regression, on the existing
+clean-head/dirty-six-file TSK-031 branch. First distinguish
+historical fixture misuse of current v3 templates from an actual
+supported legacy path regression. Preserve exact released 1.2.2/1.3.0
+archives, old evidence, self-pin and ownership validation; NEVER
+change expected outcomes to simply bless failures, remove fail-closed
+checks, relax agent collision rules, or silently enable direct
+1.2.2 -> 1.5.0 upgrades. Where stale test setup causes the
+contradiction, repair only
+`test/adopt/managed-upgrade.test.js` using an existing truthful
+version-bound fixture or explicit historical-context comparison;
+do not fabricate old 1.4.0 package bytes/identity. Only if a
+genuine supported v2 product regression is independently shown,
+a narrowly targeted `src/adopt/{upgrade,plan}.js` corrective is
+conditionally authorized under TSK-029's existing v2 compatibility
+acceptance, with direct mechanical proof and no consumer mutation.
+If such a correction requires unproven source mapping or a wider
+material boundary, STOP and report it instead of guessing.
+
+Reuse C001's versioned package changes unchanged, no new task,
+subagent, test framework, provider dependency, workflow, remote
+release, or consumer repository change. Focus post-execution Runner
+validation on `node --test test/adopt/managed-upgrade.test.js`
+and `git diff --check`, then reuse that proof and only later
+run the full release suite as one final candidate gate.
+The historical 354 PASS observations do not become a full-suite
+PASS until remaining failures are corrected and objectively retested.
+

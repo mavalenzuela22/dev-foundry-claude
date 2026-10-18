@@ -196,3 +196,32 @@ consumer modification. Publication and consumer rollout have their
 own later acceptance and authority boundaries. No claim of
 end-to-end self-update is permitted until TSK-026 is actually
 implemented and tested.
+
+## 6. C001 observed FAIL and reusable evidence
+
+Request `req_0aea225b36128a2c146f920cdd41224d`,
+terminal execution `execution_1285086cce2f0b7264f182c18e31df42095e2c721df18e457acb0e2578abbe19`:
+Executor actually ran and edited exactly six projected version/package paths
+(`README.md`, `migrations/release.json`, `package.json`,
+`package-lock.json`, `test/adopt/package.test.js`,
+`test/adopt/release-assets.test.js`), zero path-policy violations.
+`npm pack --dry-run --json` and `git diff --check` PASS.
+`npm test` returned exit 1: 354/361 PASS, 7 FAIL — exactly
+six historical synthetic 1.4.0 bridge subtests plus their group in
+unchanged `test/adopt/managed-upgrade.test.js`. The observed failure
+is preserved as a historical **FAIL**, not claimed as a passing
+1.5.0 release. The six prepared candidate files remain uncommitted.
+
+Governance Author identified TSK-029's existing v2 backward-compatibility
+acceptance as the proper correction home. Its section 9 governs
+the C003 focused legacy-fixture/product-regression reconciliation
+without changing TSK-031's version-only implementation authorization.
+C003 may distinguish a synthetic historical test invalidated by
+TSK-029 v3 template changes from an actual supported consumer
+migration failure; neither may be assumed. Preserve historical
+released bytes, ownership checks and fail-closed security.
+No new release execution, version bump, publication, consumer
+upgrade, or broad suite until the focused defect is resolved;
+then perform the final release acceptance checks on the
+resulting exact candidate.
+
