@@ -512,10 +512,18 @@ routes:
 
   - id: TSK-028
     path: docs/70-tasks/70 [TSK-028] PROJECT - Adopt DEV FOUNDRY 2.2.0 and Reconcile Governed Operation Skill.md
+    authority_class: historical
+    governs:
+      - historical-tsk-028-2-2-0-adoption-attempt
+    section_id: null
+
+  - id: TSK-029
+    path: docs/70-tasks/70 [TSK-029] PROJECT - Adopt DEV FOUNDRY 2.3.0 and Align Claude Governed Roles and Skill.md
     authority_class: task
     governs:
-      - governed-project-adoption-of-dev-foundry-2-2-0
-      - claude-adapter-compatibility-with-governed-operation-skill
+      - governed-project-adoption-of-dev-foundry-2-3-0
+      - claude-native-governed-operation-skill-alignment
+      - effective-role-handoff-and-minimal-sot-delivery
     section_id: null
 
 bindings:

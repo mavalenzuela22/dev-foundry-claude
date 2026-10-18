@@ -4,8 +4,8 @@ artifact:
   id: TSK-028
   type: TSK
   title: Adopt DEV FOUNDRY 2.2.0 and Reconcile Governed Operation Skill
-  status: IN_PROGRESS
-artifactVersion: "1"
+  status: SUPERSEDED
+artifactVersion: "2"
 authorityScope: tsk-028-framework-220-and-governed-operation-skill-adoption
 ownerRole: governance-author
 canonical: true
@@ -50,13 +50,15 @@ traceability:
   derivedFrom:
     - TSK-027
 lifecycle:
-  phase: in-progress
+  phase: superseded
   blockedBy: []
   promotionRequired: true
 portability: project-specific
 ---
 
 # 70 [TSK-028] PROJECT - Adopt DEV FOUNDRY 2.2.0 and Reconcile Governed Operation Skill
+
+**HISTORICAL — SUPERSEDED by TSK-029 (2026-10-17).** The Operator retired this unfinished 2.2.0 adoption in favor of a direct 2.3.0 adoption. No 2.2.0 adoption, A1 product implementation or audit PASS was achieved. The original request, decisions, diagnostic findings, terminal no-effect Codex dispatch failure and commits remain historical facts, not open gates or active work. TSK-029 is the only active successor for this objective.
 
 ## 1. Operator objective and current authority
 
