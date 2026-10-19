@@ -44,11 +44,11 @@ authority:
     - OPS-008
   supersedes: []
 traceability:
-  dependsOn:
-    - TSK-031
+  dependsOn: []
   derivedFrom:
     - TSK-020
     - TSK-021
+    - TSK-031
 lifecycle:
   phase: in-progress
   blockedBy: []
