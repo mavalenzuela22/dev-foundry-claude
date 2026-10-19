@@ -479,9 +479,9 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
   assert.equal(lock.name, pkg.name);
   assert.equal(lock.version, pkg.version);
   assert.equal(lock.packages[''].version, pkg.version);
-  assert.equal(pkg.version, '1.5.0');
+  assert.equal(pkg.version, '1.5.1');
   const readme = await readFile(path.join(repoRoot, 'README.md'), 'utf8');
-  assert.match(readme, /\*\*Claude Code adapter 1\.5\.0\*\*/);
+  assert.match(readme, /\*\*Claude Code adapter 1\.5\.1\*\*/);
   assert.match(readme.split('## 1. What is DEV FOUNDRY?')[0], /npm install -g[\s\S]*cd <project>[\s\S]*dev-foundry-claude setup[\s\S]*dev-foundry-claude start/);
   assert.ok(!readme.includes('1.2.0') && !readme.includes('1.2.1'));
   const ignoreText = await readFile(path.join(repoRoot, '.gitignore'), 'utf8');
@@ -492,7 +492,7 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
 // adoption/MCP/run regression tests. Its temporary producer tree is deleted.
 test('TSK-016 package ships only dashboard runtime/assets and pins every dashboard byte', async () => {
   const base = await baseline();
-  assert.equal(base.manifest.version, '1.5.0', 'TSK-021 preserves the TSK-016 dashboard payload contract');
+  assert.equal(base.manifest.version, '1.5.1', 'TSK-021 preserves the TSK-016 dashboard payload contract');
   await assert.rejects(lstat(base.tree), /ENOENT/);
   const files = base.info.files.map((file) => file.path);
   for (const name of ['http', 'evidence', 'claude-otel', 'launch']) assert.ok(files.includes(`tools/dashboard/server/${name}.mjs`));
@@ -739,7 +739,7 @@ test('TSK-020 installed CLI explicitly plans/applies compatible upgrade with exa
 
 test('TSK-021 isolated installed package guides fresh and brownfield setup, status, doctor, help and start recovery', async (t) => {
   const base = await baseline();
-  assert.equal(base.manifest.version, '1.5.0');
+  assert.equal(base.manifest.version, '1.5.1');
   for (const file of ['src/consumer/help.js', 'src/consumer/command.js', 'src/telemetry/launch.js']) assert.ok(base.manifest.files.some((entry) => entry.path === file));
   const fresh = await makeConsumer({ governed: false }); t.after(fresh.cleanup);
   const freshBefore = await listTree(fresh.root);
@@ -749,7 +749,7 @@ test('TSK-021 isolated installed package guides fresh and brownfield setup, stat
   const c = await makeConsumer(); t.after(c.cleanup);
   const invoke = (command, args = [], env = {}) => cli(base.installed, [command, ...args], { cwd: c.root, env });
   for (const topic of ['getting-started', 'setup', 'start', 'status', 'upgrade', 'doctor', 'concepts']) {
-    const help = invoke('help', [topic]); assert.equal(help.status, 0); assert.match(help.stdout, /1\.5\.0/);
+    const help = invoke('help', [topic]); assert.equal(help.status, 0); assert.match(help.stdout, /1\.5\.1/);
   }
   const before = await listTree(c.root); const authority = await readSetSnapshot(c.root);
   const setup = invoke('setup'); assert.equal(setup.status, 0); assert.match(setup.stdout, /setup --yes/);
@@ -800,11 +800,11 @@ test('TSK-021 isolated installed package guides fresh and brownfield setup, stat
 
 test('TSK-025 installed 1.4.2 proves compatible pin upgrades and managed refresh from exact historical 1.2.2 packages', async (t) => {
   const base = await baseline();
-  assert.equal(base.manifest.version, '1.5.0');
+  assert.equal(base.manifest.version, '1.5.1');
   assert.equal(selfPin(base.installed).expect, base.pin);
   const material = JSON.parse(await readFile(path.join(base.installed, 'migrations/release.json'), 'utf8'));
   assert.equal(material.selfUpdateBaseline, '1.4.0');
-  assert.equal(material.targetVersion, '1.5.0');
+  assert.equal(material.targetVersion, '1.5.1');
   for (const version of ['1.2.2', '1.2.2-windows']) await t.test(version, async (t) => {
     const { source: oldPackage } = await legacyPackage(t, version);
     const oldPin = selfPin(oldPackage).expect;
