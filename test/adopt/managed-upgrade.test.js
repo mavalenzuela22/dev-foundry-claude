@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { legacyPackage } from './legacy-fixture.js';
-import { cp, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import fsPromises from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
 import test from 'node:test';
 import { createPlan } from '../../src/adopt/plan.js';
 import { createUpgradePlan } from '../../src/adopt/upgrade.js';
@@ -44,8 +46,496 @@ async function historical140(t) {
   ]);
   return { ...planModule, ...upgradeModule, ...applyModule, ...consumerModule };
 }
-const plan = ({ c, source }) => createUpgradePlan({ root: c.root, adapter: target, currentPackageRoot: source });
-const apply = ({ c }, result) => applyPlan({ root: c.root, adapter: target, upgrade: true, planBytes: result.bytes, planSha256: result.hash });
+const plan = ({ c, source, adapter = target, resolutionFile }) => createUpgradePlan({ root: c.root, adapter, currentPackageRoot: source, resolutionFile });
+const apply = ({ c, adapter = target, resolutionFile }, result) => applyPlan({ root: c.root, adapter, upgrade: true, planBytes: result.bytes, planSha256: result.hash, resolutionFile });
+
+// A verified 1.4.2 payload, with managed text that differs from this target.
+async function previous142(t) {
+  const source = await mkdtemp(path.join(os.tmpdir(), 'tsk032-142-'));
+  t.after(() => rm(source, { recursive: true, force: true }));
+  await cp(path.join(repoRoot, 'templates'), path.join(source, 'templates'), { recursive: true });
+  await writeFile(path.join(source, 'package.json'), JSON.stringify({ name: '@dev-foundry/claude-adapter', version: '1.4.2' }));
+  for (const file of ['agents/dev-foundry-executor.md.tmpl', 'claude-md-block.md.tmpl']) {
+    const absolute = path.join(source, 'templates', file);
+    const text = await readFile(absolute, 'utf8');
+    await writeFile(absolute, text.replace(file.startsWith('agents/') ? 'description: ' : '## DEV FOUNDRY Claude adapter',
+      file.startsWith('agents/') ? 'description: Previous release - ' : '## DEV FOUNDRY Claude adapter (previous release)'));
+  }
+  const entries = [];
+  for (const [file, hash] of await listTree(source)) entries.push({ path: file, sha256: hash, size: (await readFile(path.join(source, file))).length });
+  await writeFile(path.join(source, 'payload-manifest.json'), buildManifestBytes({ version: '1.4.2', entries }));
+  const pin = selfPin(source);
+  const old = { version: pin.version, expect: pin.expect, payloadRoot: pin.root };
+  const c = await makeConsumer(); t.after(c.cleanup);
+  const initial = await createPlan({ root: c.root, adapter: old, templatesRoot: path.join(source, 'templates') });
+  assert.equal(initial.plan.status, 'ready');
+  for (const op of initial.ops.writes) await c.put(op.path, op.content);
+  c.commit();
+  return { c, source, old, adapter: { version: '1.5.0', payloadRoot: 'f'.repeat(64), expect: `1.5.0:sha256:${'f'.repeat(64)}` } };
+}
+
+// Build a decision from actual refused consumer bytes and reported fingerprints,
+// never by injecting operations into a fabricated ready plan.
+async function selectResolution(t, fixture, contents) {
+  const refused = await plan({ ...fixture, resolutionFile: undefined });
+  assert.equal(refused.plan.status, 'blocked');
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), 'tsk032-decision-')));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const input = {
+    format: 'dev-foundry.managed-resolution.v1', repository: { root: refused.plan.repository.root, head: refused.plan.repository.head },
+    source: refused.plan.current.expect, target: refused.plan.target.expect,
+    files: Object.entries(contents).map(([file, content]) => {
+      const record = refused.plan.reconciliation.find((item) => item.path === file);
+      assert.equal(record.classification, 'conflict');
+      return { path: file, before_sha256: record.before_sha256, base_sha256: record.base_sha256,
+        current_sha256: record.current_sha256, target_sha256: record.target_sha256,
+        resolved_sha256: sha256(content), resolved_content: content };
+    }),
+  };
+  fixture.resolutionFile = path.join(directory, 'resolution.json');
+  await writeFile(fixture.resolutionFile, canonicalJson(input));
+  return input;
+}
+
+async function conflicting142(t) {
+  const fixture = await previous142(t);
+  const file = '.claude/agents/dev-foundry-executor.md';
+  const content = (await fixture.c.read(file)).replace('Previous release - ', 'Consumer policy - ').replaceAll('\n', '\r\n');
+  await fixture.c.put(file, content); fixture.c.commit();
+  const resolved = content.replace('Consumer policy - ', 'Reviewed consumer policy - ');
+  const input = await selectResolution(t, fixture, { [file]: resolved });
+  return { ...fixture, file, resolved, input };
+}
+
+test('tagged v1.4.2 managed agents and span with legitimate conflicting local policies can be explicitly resolved together', async (t) => {
+  const source = await mkdtemp(path.join(os.tmpdir(), 'tsk032-tagged-142-'));
+  t.after(() => rm(source, { recursive: true, force: true }));
+  // Reconstruct a verified fixture payload from real tagged source bytes. This
+  // exercises released templates, not an invented Previous-release edit or plan.
+  const archive = execFileSync('git', ['archive', 'v1.4.2', 'package.json', 'templates'], { cwd: repoRoot });
+  execFileSync('tar', ['-x', '-C', source], { input: archive });
+  const entries = [];
+  for (const [file, hash] of await listTree(source)) entries.push({ path: file, sha256: hash, size: (await readFile(path.join(source, file))).length });
+  await writeFile(path.join(source, 'payload-manifest.json'), buildManifestBytes({ version: '1.4.2', entries }));
+  const pin = selfPin(source); const old = { version: pin.version, payloadRoot: pin.root, expect: pin.expect };
+  const c = await makeConsumer(); t.after(c.cleanup);
+  const initial = await createPlan({ root: c.root, adapter: old, templatesRoot: path.join(source, 'templates') });
+  assert.equal(initial.plan.status, 'ready');
+  for (const entry of initial.ops.writes) await c.put(entry.path, entry.content);
+  const file = '.claude/agents/dev-foundry-executor.md';
+  const local = (await c.read(file)).replace('description: Execute one explicitly resolved Implementation Executor operation', 'description: Execute one explicitly resolved invoicing operation');
+  const md = (await c.read('CLAUDE.md')).replace('Verify that the current repository is', 'For invoice work, verify that the current repository is');
+  await c.put(file, local); await c.put('CLAUDE.md', md); c.commit();
+  const fixture = { c, source, old, adapter: { version: '1.5.0', payloadRoot: 'f'.repeat(64), expect: `1.5.0:sha256:${'f'.repeat(64)}` } };
+  const resolvedAgent = local.replace('invoicing operation', 'reviewed invoicing operation');
+  const resolvedSpan = md.slice(md.indexOf('<!-- DEV-FOUNDRY-CLAUDE-ADAPTER:BEGIN')).replace('For invoice work,', 'For reviewed invoice work,');
+  await selectResolution(t, fixture, { [file]: resolvedAgent, 'CLAUDE.md': resolvedSpan });
+  const authority = await readSetSnapshot(c.root); const before = await listTree(c.root);
+  const result = await plan(fixture);
+  assert.equal(result.plan.status, 'ready', JSON.stringify(result.plan.blockers));
+  assert.equal(result.plan.reconciliation.filter((item) => item.classification === 'operator-resolved').length, 2);
+  await apply(fixture, result);
+  assert.equal(await c.read(file), resolvedAgent);
+  assert.ok((await c.read('CLAUDE.md')).endsWith(resolvedSpan));
+  assert.deepEqual(await readSetSnapshot(c.root), authority);
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), result.ops.writes.map((item) => item.path).sort());
+});
+
+test('explicit Operator selection resolves a real 1.4.2 consumer conflict with deterministic provenance and CRLF bytes', async (t) => {
+  const fixture = await conflicting142(t); const { c, file, resolved } = fixture;
+  const before = await listTree(c.root); const authority = await readSetSnapshot(c.root);
+  const result = await plan(fixture);
+  assert.equal(result.plan.status, 'ready', JSON.stringify(result.plan.blockers));
+  assert.deepEqual(result.bytes, (await plan(fixture)).bytes);
+  assert.equal(result.plan.resolutionInput.path, fixture.resolutionFile);
+  assert.equal(result.plan.resolutionInput.sha256, sha256(await readFile(fixture.resolutionFile)));
+  const actorProfile = '.dev-foundry/releases/2.1.0/actor-profiles/governance-author-v3.yaml';
+  assert.equal(result.plan.preconditions[actorProfile], sha256(await readFile(path.join(c.root, actorProfile))));
+  const record = result.plan.reconciliation.find((item) => item.path === file);
+  assert.equal(record.classification, 'operator-resolved'); assert.equal(record.after_sha256, sha256(resolved));
+  assert.match(record.current_after_diff, /Reviewed consumer policy/); assert.match(record.target_after_diff, /Reviewed consumer policy/);
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  await apply(fixture, result);
+  assert.equal(await c.read(file), resolved);
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), result.ops.writes.map((item) => item.path).sort());
+  assert.deepEqual(await readSetSnapshot(c.root), authority);
+});
+
+test('resolved CLAUDE span preserves arbitrary outside bytes and binds full-file and span hashes separately', async (t) => {
+  const fixture = await previous142(t); const { c } = fixture;
+  const original = await c.read('CLAUDE.md');
+  const span = original.slice(original.indexOf('<!-- DEV-FOUNDRY-CLAUDE-ADAPTER:BEGIN')).replace('(previous release)', '(consumer policy)').replaceAll('\n', '\r\n');
+  const prefix = Buffer.from([0xff, 0xfe, 13, 10]); const suffix = Buffer.from([10, 0x80, 0, 13, 10]);
+  await c.put('CLAUDE.md', Buffer.concat([prefix, Buffer.from(span), suffix])); c.commit();
+  const resolved = span.replace('(consumer policy)', '(reviewed consumer policy)');
+  await selectResolution(t, fixture, { 'CLAUDE.md': resolved });
+  const before = await listTree(c.root); const result = await plan(fixture);
+  assert.equal(result.plan.status, 'ready', JSON.stringify(result.plan.blockers));
+  const op = result.ops.writes.find((item) => item.path === 'CLAUDE.md');
+  assert.ok(Buffer.isBuffer(op.content));
+  assert.deepEqual(op.content, Buffer.concat([prefix, Buffer.from(resolved), suffix]));
+  const merge = result.plan.merge.find((item) => item.path === 'CLAUDE.md');
+  assert.equal(merge.before_sha256, before.get('CLAUDE.md')); assert.equal(merge.after_sha256, sha256(op.content));
+  await apply(fixture, result);
+  assert.deepEqual(await readFile(path.join(c.root, 'CLAUDE.md')), op.content);
+});
+
+test('resolution apply rejects missing selection, changed/missing file, stale bytes, location and forged plan with zero writes', async (t) => {
+  for (const kind of ['unselected', 'changed bytes', 'missing file', 'stale consumer', 'changed location', 'forged plan', 'authority drift']) await t.test(kind, async (t) => {
+    const fixture = await conflicting142(t); const result = await plan(fixture);
+    assert.equal(result.plan.status, 'ready');
+    let selected = fixture; let supplied = result;
+    if (kind === 'unselected') selected = { ...fixture, resolutionFile: undefined };
+    if (kind === 'changed bytes') await writeFile(fixture.resolutionFile, `${canonicalJson(fixture.input)} `);
+    if (kind === 'missing file') await rm(fixture.resolutionFile);
+    if (kind === 'stale consumer') await fixture.c.put(fixture.file, fixture.resolved + '\r\nLater edit.\r\n');
+    if (kind === 'authority drift') {
+      const profile = '.dev-foundry/releases/2.1.0/actor-profiles/governance-author-v3.yaml';
+      await fixture.c.put(profile, (await fixture.c.read(profile)) + '\n# Changed authority semantics\n');
+    }
+    if (kind === 'changed location') {
+      const other = fixture.resolutionFile + '.copy'; await cp(fixture.resolutionFile, other);
+      selected = { ...fixture, resolutionFile: other };
+    }
+    if (kind === 'forged plan') {
+      const forged = structuredClone(result.plan); forged.merge[0].after_sha256 = 'a'.repeat(64);
+      const bytes = Buffer.from(canonicalJson(forged)); supplied = { bytes, hash: sha256(bytes) };
+    }
+    const before = await listTree(fixture.c.root);
+    await assert.rejects(apply(selected, supplied), { code: 'plan-stale' });
+    assert.deepEqual(diffTrees(before, await listTree(fixture.c.root)), []);
+  });
+});
+
+test('closed resolution schema and exact fingerprints reject mismatches, foreign paths, self-attested approval and identity changes', async (t) => {
+  const cases = [
+    ['hash', (input) => { input.files[0].resolved_sha256 = '0'.repeat(64); }],
+    ...['before_sha256', 'base_sha256', 'current_sha256', 'target_sha256'].map((key) => [key, (input) => { input.files[0][key] = '0'.repeat(64); }]),
+    ['foreign path', (input) => { input.files[0].path = 'src/billing.js'; }],
+    ['traversal', (input) => { input.files[0].path = '../CLAUDE.md'; }],
+    ['authority path', (input) => { input.files[0].path = '.dev-foundry/profiles/project-operating-profile.yaml'; }],
+    ['self-attested authorization', (input) => { input.authorizedBy = 'Operator'; }],
+    ['extra file key', (input) => { input.files[0].approved = true; }],
+    ['duplicate path', (input) => { input.files.push(input.files[0]); }],
+    ['foreign repository', (input) => { input.repository.root += '-foreign'; }],
+    ['stale HEAD', (input) => { input.repository.head = '0'.repeat(40); }],
+    ['source pin', (input) => { input.source = input.target; }],
+    ['target pin', (input) => { input.target = input.source; }],
+    ['changed agent name', (input) => { input.files[0].resolved_content = input.files[0].resolved_content.replace('name: dev-foundry-executor', 'name: other'); input.files[0].resolved_sha256 = sha256(input.files[0].resolved_content); }],
+  ];
+  for (const [name, change] of cases) await t.test(name, async (t) => {
+    const fixture = await conflicting142(t); change(fixture.input);
+    await writeFile(fixture.resolutionFile, canonicalJson(fixture.input));
+    const before = await listTree(fixture.c.root); const denied = await plan(fixture);
+    assert.equal(denied.plan.status, 'blocked', name); assert.deepEqual(denied.ops.writes, []);
+    assert.deepEqual(diffTrees(before, await listTree(fixture.c.root)), []);
+  });
+});
+
+test('selected resolution cannot suppress other conflicts, unknown ownership or configured authority collisions', async (t) => {
+  for (const kind of ['other conflict', 'unknown agent', 'duplicate span', 'configured profile', 'configured agent alias', 'configured symlink alias']) await t.test(kind, async (t) => {
+    const fixture = await conflicting142(t); const { c } = fixture;
+    if (kind === 'other conflict') await c.put('CLAUDE.md', (await c.read('CLAUDE.md')).replace('(previous release)', '(other local conflict)'));
+    if (kind === 'unknown agent') await c.put(fixture.file, (await c.read(fixture.file)).replace('name: dev-foundry-executor', 'name: foreign'));
+    if (kind === 'duplicate span') await c.put('CLAUDE.md', (await c.read('CLAUDE.md')).repeat(2));
+    if (kind === 'configured profile') await c.put('.dev-foundry/profiles/capability-profiles/implementation-executor-claude-code-v2.yaml', 'consumer authority\n');
+    if (kind.startsWith('configured') && kind.endsWith('alias')) {
+      const file = '.dev-foundry/authority-index.yaml';
+      const configured = kind === 'configured symlink alias' ? '.dev-foundry/managed-agent-alias.md' : fixture.file;
+      if (kind === 'configured symlink alias') await symlink(path.join(c.root, fixture.file), path.join(c.root, configured));
+      await c.put(file, (await c.read(file)).replace('bindings:\n', `bindings:\n  - id: configured-agent\n    path: ${configured}\n    authority_class: configured\n`));
+    }
+    c.commit();
+    // Rebind only HEAD so each case tests its real blocker, not a stale decision.
+    fixture.input.repository.head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: c.root, encoding: 'utf8' }).trim();
+    await writeFile(fixture.resolutionFile, canonicalJson(fixture.input));
+    const before = await listTree(c.root); const denied = await plan(fixture);
+    assert.equal(denied.plan.status, 'blocked', kind); assert.deepEqual(denied.ops.writes, []);
+    if (kind === 'other conflict') assert.equal(denied.plan.reconciliation.find((item) => item.path === fixture.file).classification, 'operator-resolved');
+    if (kind.startsWith('configured') && kind.endsWith('alias')) assert.equal(denied.plan.reconciliation.find((item) => item.path === fixture.file).classification, 'ownership-unverified');
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  });
+});
+
+test('consumer upgrade previews decision diffs and applies only with explicit selection and --yes', async (t) => {
+  const fixture = await conflicting142(t); const { c, source, adapter, resolutionFile } = fixture;
+  const presentation = await makePresentationPackage(); t.after(presentation.cleanup);
+  const invoke = async (argv) => {
+    const lines = [];
+    const code = await consumerCommand({ command: 'upgrade', argv, cwd: c.root, packageRoot: presentation.root,
+      getAdapter: () => adapter, executableAvailable: () => true, output: (text) => lines.push(text) });
+    return { code, text: lines.join('\n') };
+  };
+  const before = await listTree(c.root);
+  assert.equal((await invoke(['--from-package', source, '--yes'])).code, 2);
+  const preview = await invoke(['--from-package', source, '--resolution-file', resolutionFile]);
+  assert.equal(preview.code, 0); assert.match(preview.text, /operator-resolved/); assert.match(preview.text, /Reviewed consumer policy/);
+  assert.match(preview.text, /Decision SHA-256:/); assert.match(preview.text, /--resolution-file .* --yes/);
+  const reviewed = /preflight \(plan SHA-256 ([a-f0-9]{64})\)/.exec(preview.text)[1];
+  const unreviewed = await invoke(['--from-package', source, '--resolution-file', resolutionFile, '--yes']);
+  assert.equal(unreviewed.code, 2); assert.match(unreviewed.text, /Application refused/);
+  const original = await readFile(resolutionFile);
+  await writeFile(resolutionFile, Buffer.concat([original, Buffer.from(' ')]));
+  const changed = await invoke(['--from-package', source, '--resolution-file', resolutionFile, '--plan-sha256', reviewed, '--yes']);
+  assert.equal(changed.code, 2); assert.match(changed.text, /reviewed plan is missing or changed/);
+  await writeFile(resolutionFile, original);
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  const applied = await invoke(['--from-package', source, '--resolution-file', resolutionFile, '--plan-sha256', reviewed, '--yes', '--json']);
+  assert.equal(applied.code, 0); const output = JSON.parse(applied.text);
+  assert.ok(output.applied.written > 0); assert.equal(output.plan.status, 'ready');
+  assert.equal(await c.read(fixture.file), fixture.resolved);
+});
+
+test('resolution cannot introduce a second span, outside text, unneeded decisions or duplicate JSON keys', async (t) => {
+  for (const kind of ['second span', 'outside text', 'changed marker', 'unneeded decision', 'duplicate JSON key', 'symlink decision']) await t.test(kind, async (t) => {
+    const fixture = await previous142(t); const { c } = fixture;
+    const md = (await c.read('CLAUDE.md')).replace('(previous release)', '(local choice)');
+    await c.put('CLAUDE.md', md); c.commit();
+    const span = md.slice(md.indexOf('<!-- DEV-FOUNDRY-CLAUDE-ADAPTER:BEGIN'));
+    const input = await selectResolution(t, fixture, { 'CLAUDE.md': span });
+    if (kind === 'second span') input.files[0].resolved_content = span + span;
+    if (kind === 'outside text') input.files[0].resolved_content = span + 'outside the span\n';
+    if (kind === 'changed marker') input.files[0].resolved_content = span.replace('managed block; do not edit', 'other ownership');
+    if (kind === 'unneeded decision') input.files[0].path = '.claude/agents/dev-foundry-auditor.md';
+    input.files[0].resolved_sha256 = sha256(input.files[0].resolved_content);
+    let bytes = canonicalJson(input);
+    if (kind === 'duplicate JSON key') bytes = bytes.replace('"format":', '"format": "forged", "format":');
+    await writeFile(fixture.resolutionFile, bytes);
+    if (kind === 'symlink decision') {
+      const link = fixture.resolutionFile + '.link'; await symlink(fixture.resolutionFile, link); fixture.resolutionFile = link;
+    }
+    const before = await listTree(c.root); const denied = await plan(fixture);
+    assert.equal(denied.plan.status, 'blocked', kind); assert.deepEqual(denied.ops.writes, []);
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  });
+});
+
+test('explicit resolution retains staged-write failure cleanup and exact local bytes', async (t) => {
+  const fixture = await conflicting142(t); const { c } = fixture;
+  await mkdir(path.join(c.root, `.mcp.json.dfc-stage-${process.pid}`));
+  await c.put(`.mcp.json.dfc-stage-${process.pid}/keep`, 'occupied\n');
+  const result = await plan(fixture); assert.equal(result.plan.status, 'ready');
+  const before = await listTree(c.root);
+  await assert.rejects(apply(fixture, result), { code: 'apply-failed' });
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+});
+
+test('resolution drift during staging and later rename failure leave no installed or shadow writes', async (t) => {
+  for (const kind of ['decision drift', 'source package drift', 'rename failure']) await t.test(kind, async (t) => {
+    const fixture = await conflicting142(t); const result = await plan(fixture);
+    assert.equal(result.plan.status, 'ready');
+    const before = await listTree(fixture.c.root);
+    const write = fsPromises.writeFile; const rename = fsPromises.rename;
+    let changed = false; let renames = 0;
+    if (kind === 'rename failure') t.mock.method(fsPromises, 'rename', async (...args) => {
+      if (++renames === 2) throw new Error('injected rename failure');
+      return rename(...args);
+    });
+    else t.mock.method(fsPromises, 'writeFile', async (file, ...args) => {
+      const written = await write(file, ...args);
+      if (!changed && String(file).includes('.dfc-stage-')) {
+        changed = true;
+        if (kind === 'decision drift') await write(fixture.resolutionFile, canonicalJson(fixture.input) + ' ');
+        else await write(path.join(fixture.source, 'package.json'), '{}');
+      }
+      return written;
+    });
+    syncBuiltinESMExports();
+    t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
+    await assert.rejects(apply(fixture, result), { code: kind === 'rename failure' ? 'apply-failed' : 'plan-stale' });
+    assert.deepEqual(diffTrees(before, await listTree(fixture.c.root)), []);
+  });
+});
+
+test('verified 1.4.2 agent CRLF drift reconciles without semantic loss', async (t) => {
+  const fixture = await previous142(t); const { c } = fixture;
+  const file = '.claude/agents/dev-foundry-executor.md';
+  await c.put(file, (await c.read(file)).replaceAll('\n', '\r\n')); c.commit();
+  const before = await listTree(c.root);
+  const result = await plan(fixture);
+  assert.equal(result.plan.status, 'ready', JSON.stringify(result.plan.blockers));
+  assert.equal(result.plan.reconciliation.find((item) => item.path === file).classification, 'line-endings-only');
+  assert.deepEqual(result.bytes, (await plan(fixture)).bytes);
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  await apply(fixture, result);
+  assert.doesNotMatch(await c.read(file), /Previous release -|\r/);
+});
+
+test('verified 1.4.2 non-overlapping local agent edit survives target refresh', async (t) => {
+  const fixture = await previous142(t); const { c } = fixture;
+  const file = '.claude/agents/dev-foundry-executor.md';
+  const note = '\nConsumer instruction: run invoice rounding checks.\n';
+  await c.put(file, (await c.read(file)) + note); c.commit();
+  const authority = await readSetSnapshot(c.root); const before = await listTree(c.root);
+  const result = await plan(fixture);
+  assert.equal(result.plan.status, 'ready', JSON.stringify(result.plan.blockers));
+  assert.equal(result.plan.reconciliation.find((item) => item.path === file).classification, 'local-edits-preserved');
+  assert.deepEqual(result.bytes, (await plan(fixture)).bytes);
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  await apply(fixture, result);
+  assert.ok((await c.read(file)).endsWith(note));
+  assert.doesNotMatch(await c.read(file), /Previous release -/);
+  assert.deepEqual(await readSetSnapshot(c.root), authority);
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), result.ops.writes.map((item) => item.path).sort());
+});
+
+test('verified 1.4.2 CLAUDE span preserves semantic edits, CRLF and exact outside bytes', async (t) => {
+  for (const crlf of [false, true]) await t.test(crlf ? 'CRLF' : 'LF', async (t) => {
+    const fixture = await previous142(t); const { c } = fixture;
+    const note = 'Consumer instruction: check invoice rounding before delivery.\n';
+    const footer = '\nConsumer footer, with mixed endings.\r\n';
+    let md = (await c.read('CLAUDE.md')).replace('<!-- DEV-FOUNDRY-CLAUDE-ADAPTER:END -->', `${note}<!-- DEV-FOUNDRY-CLAUDE-ADAPTER:END -->`);
+    if (crlf) md = md.replaceAll('\n', '\r\n');
+    await c.put('CLAUDE.md', md + footer); c.commit();
+    const result = await plan(fixture);
+    assert.equal(result.plan.status, 'ready', JSON.stringify(result.plan.blockers));
+    const record = result.plan.reconciliation.find((item) => item.path === 'CLAUDE.md');
+    assert.equal(record.classification, 'local-edits-preserved');
+    assert.equal(record.scope, 'managed-block');
+    const start = md.indexOf('<!-- DEV-FOUNDRY-CLAUDE-ADAPTER:BEGIN');
+    await apply(fixture, result);
+    const after = await c.read('CLAUDE.md');
+    assert.equal(after.slice(0, start), md.slice(0, start));
+    assert.ok(after.endsWith(footer));
+    assert.ok(after.includes(crlf ? note.replaceAll('\n', '\r\n') : note));
+    assert.doesNotMatch(after, /previous release/);
+  });
+});
+
+test('verified 1.4.2 disjoint replacements and deletions preserve local agent content', async (t) => {
+  const fixture = await previous142(t); const { c } = fixture;
+  const file = '.claude/agents/dev-foundry-executor.md';
+  const before = await c.read(file);
+  const edited = before.replace('Make the authorized code changes with native tools.', 'Make the authorized code changes and check invoice rounding.')
+    .replace(/\nPreserve unrelated work[^\n]*\n$/, '\n');
+  assert.notEqual(edited, before);
+  await c.put(file, edited.replaceAll('\n', '\r\n')); c.commit();
+  const result = await plan(fixture);
+  assert.equal(result.plan.status, 'ready', JSON.stringify(result.plan.blockers));
+  await apply(fixture, result);
+  assert.equal(await c.read(file), edited.replace('Previous release - ', '').replaceAll('\n', '\r\n'));
+});
+
+test('unresolved 1.4.2 overlap exposes fingerprints and all three diffs with zero writes', async (t) => {
+  for (const file of ['.claude/agents/dev-foundry-executor.md', 'CLAUDE.md']) await t.test(file, async (t) => {
+    const fixture = await previous142(t); const { c } = fixture;
+    const current = (await c.read(file)).replace(file === 'CLAUDE.md' ? '(previous release)' : 'Previous release -', 'Consumer override');
+    await c.put(file, current); c.commit();
+    const before = await listTree(c.root); const result = await plan(fixture);
+    assert.equal(result.plan.status, 'blocked');
+    assert.deepEqual(result.ops, { writes: [], deletes: [] });
+    const record = result.plan.reconciliation.find((item) => item.path === file);
+    assert.equal(record.classification, 'conflict');
+    for (const key of ['base_sha256', 'current_sha256', 'target_sha256']) assert.match(record[key], /^[a-f0-9]{64}$/);
+    assert.equal(record.after_sha256, null);
+    for (const key of ['base_current_diff', 'base_target_diff', 'current_target_diff']) assert.match(record[key], /@@ /);
+    assert.match(result.plan.blockers.map((item) => item.message).join('\n'), /resolve explicitly/);
+    assert.deepEqual(result.bytes, (await plan(fixture)).bytes);
+    await assert.rejects(apply(fixture, result), { code: 'plan-not-ready' });
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  });
+});
+
+test('1.4.2 reconciliation retains ownership, dirty path, symlink and configured authority gates', async (t) => {
+  const agent = '.claude/agents/dev-foundry-executor.md';
+  for (const [name, change] of [
+    ['foreign identity', async ({ c }) => c.put(agent, (await c.read(agent)).replace('name: dev-foundry-executor', 'name: foreign-executor'))],
+    ['unknown bytes', async ({ c }) => c.put(agent, 'consumer custom instructions\n')],
+    ['missing agent', async ({ c }) => rm(path.join(c.root, agent))],
+    ['missing span', async ({ c }) => c.put('CLAUDE.md', '# Consumer instructions only\n')],
+    ['missing POP', async ({ c }) => rm(path.join(c.root, '.dev-foundry/profiles/project-operating-profile.yaml'))],
+    ['malformed span', async ({ c }) => c.put('CLAUDE.md', (await c.read('CLAUDE.md')).replace('<!-- DEV-FOUNDRY-CLAUDE-ADAPTER:END -->', ''))],
+    ['authority collision', async ({ c }) => c.put('.dev-foundry/profiles/capability-profiles/implementation-executor-claude-code-v2.yaml', 'id: consumer-authority\n')],
+    ['dirty agent', async ({ c }) => c.put(agent, (await c.read(agent)) + '\nConsumer instruction.\n')],
+    ['symlink', async ({ c, source }) => { await rm(path.join(c.root, agent)); await symlink(path.join(source, 'templates/agents/dev-foundry-executor.md.tmpl'), path.join(c.root, agent)); }],
+  ]) await t.test(name, async (t) => {
+    const fixture = await previous142(t); await change(fixture);
+    if (name !== 'dirty agent') fixture.c.commit();
+    const before = await listTree(fixture.c.root); const result = await plan(fixture);
+    assert.equal(result.plan.status, 'blocked', name); assert.deepEqual(result.ops, { writes: [], deletes: [] });
+    if (name === 'dirty agent') assert.ok(result.plan.blockers.some((item) => item.code === 'dirty-working-tree'));
+    await assert.rejects(apply(fixture, result), { code: 'plan-not-ready' });
+    assert.deepEqual(diffTrees(before, await listTree(fixture.c.root)), []);
+  });
+});
+
+test('reconciled 1.4.2 plans reject package, source, plan, target and repository tampering', async (t) => {
+  for (const kind of ['package', 'pin', 'plan', 'target', 'local drift']) await t.test(kind, async (t) => {
+    const fixture = await previous142(t); const { c, source } = fixture;
+    const file = '.claude/agents/dev-foundry-executor.md';
+    await c.put(file, (await c.read(file)) + '\nConsumer instruction.\n'); c.commit();
+    const result = await plan(fixture); assert.equal(result.plan.status, 'ready');
+    let supplied = result; let adapter = fixture.adapter;
+    if (kind === 'package') await writeFile(path.join(source, 'templates/agents/dev-foundry-executor.md.tmpl'), 'tampered');
+    if (kind === 'pin') {
+      const mcp = JSON.parse(await c.read('.mcp.json'));
+      mcp.mcpServers['dev-foundry-governance'].args[2] = `1.4.2:sha256:${'b'.repeat(64)}`;
+      await c.put('.mcp.json', JSON.stringify(mcp)); c.commit();
+    }
+    if (kind === 'plan') {
+      const forged = structuredClone(result.plan);
+      forged.reconciliation[0].after_sha256 = 'a'.repeat(64);
+      forged.resolution = { content: 'forged approval' };
+      const bytes = Buffer.from(canonicalJson(forged)); supplied = { bytes, hash: sha256(bytes) };
+    }
+    if (kind === 'target') adapter = { ...adapter, payloadRoot: 'e'.repeat(64), expect: `1.5.0:sha256:${'e'.repeat(64)}` };
+    if (kind === 'local drift') await c.put(file, (await c.read(file)) + '\nDrift.\n');
+    const before = await listTree(c.root);
+    await assert.rejects(applyPlan({ root: c.root, adapter, upgrade: true, planBytes: supplied.bytes, planSha256: supplied.hash }), { code: 'plan-stale' });
+    if (kind === 'package' || kind === 'pin') {
+      const denied = await plan(fixture); assert.equal(denied.plan.status, 'blocked'); assert.deepEqual(denied.ops.writes, []);
+    }
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  });
+});
+
+test('reconciled 1.4.2 staged write failure preserves local bytes and authority', async (t) => {
+  const fixture = await previous142(t); const { c } = fixture;
+  await c.put('.claude/agents/dev-foundry-executor.md', (await c.read('.claude/agents/dev-foundry-executor.md')) + '\nConsumer instruction.\n'); c.commit();
+  // Force a later stage to fail after the merged agent was already staged.
+  await mkdir(path.join(c.root, `.mcp.json.dfc-stage-${process.pid}`));
+  await c.put(`.mcp.json.dfc-stage-${process.pid}/keep`, 'occupied\n');
+  const before = await listTree(c.root); const authority = await readSetSnapshot(c.root);
+  const result = await plan(fixture); assert.equal(result.plan.status, 'ready');
+  await assert.rejects(apply(fixture, result), { code: 'apply-failed' });
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  assert.deepEqual(await readSetSnapshot(c.root), authority);
+});
+
+test('1.4.2 reconciliation requires the exact prior payload even when current bytes match the target', async (t) => {
+  const fixture = await previous142(t); const { c, old, source, adapter } = fixture;
+  const noSource = await createUpgradePlan({ root: c.root, adapter });
+  assert.equal(noSource.plan.status, 'blocked'); assert.deepEqual(noSource.ops.writes, []);
+  for (const file of ['.claude/agents/dev-foundry-executor.md', 'CLAUDE.md']) {
+    await c.put(file, (await c.read(file)).replace('Previous release - ', '').replace(' (previous release)', ''));
+  }
+  c.commit();
+  assert.equal((await createPlan({ root: c.root, adapter: old })).plan.status, 'noop');
+  await writeFile(path.join(source, 'package.json'), '{}');
+  const before = await listTree(c.root); const denied = await plan(fixture);
+  assert.equal(denied.plan.status, 'blocked');
+  assert.ok(denied.plan.blockers.some((item) => item.code === 'upgrade-ownership-unverified'));
+  assert.deepEqual(denied.ops.writes, []);
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+});
+
+test('1.4.2 identical upstream edits converge and unchanged target files retain local bytes', async (t) => {
+  const fixture = await previous142(t); const { c } = fixture;
+  const executor = '.claude/agents/dev-foundry-executor.md';
+  const auditor = '.claude/agents/dev-foundry-auditor.md';
+  const note = '\nConsumer instruction.\n';
+  await c.put(executor, (await c.read(executor)).replace('Previous release - ', '') + note);
+  const auditorBytes = (await c.read(auditor)) + '\r\nConsumer instruction with mixed endings.\n';
+  await c.put(auditor, auditorBytes); c.commit();
+  const result = await plan(fixture);
+  assert.equal(result.plan.status, 'ready', JSON.stringify(result.plan.blockers));
+  assert.ok(result.plan.noop.includes(auditor));
+  assert.ok(!result.ops.writes.some((item) => item.path === auditor));
+  await apply(fixture, result);
+  assert.equal(await c.read(auditor), auditorBytes);
+  assert.ok((await c.read(executor)).endsWith(note));
+  assert.doesNotMatch(await c.read(executor), /Previous release/);
+});
 
 test('exact released legacy bridge is deterministic, exact-hash enforced, bounded and preserves authority/product/outside block', async (t) => {
   const historical = await historical140(t);
