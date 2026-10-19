@@ -1,11 +1,7 @@
 <!-- DEV-FOUNDRY-CLAUDE-ADAPTER:BEGIN managed block; do not edit -->
 ## DEV FOUNDRY Claude adapter
 
-Verify that the current repository is `{{PROJECT}}` before governed work.
-Use the governance MCP `resolve_governed_operation` as the deterministic entry point for a bounded operation, and resolve exactly one operation-scoped role before role-dependent work.
-After `resolve_governed_operation`, the Governance Author calls `assess_predelegation_readiness` before implementation delegation; its diagnostic handoff does not authorize dispatch.
-Treat `INDETERMINATE` as advisory: continue permitted Governance Author reading, evidence, and documentation while completing the existing independent native/host authorization and executor checks. Do not repeat the diagnostic or invent evidence.
+Confirm this is `{{PROJECT}}`. For governed work, resolve the operation once with `resolve_governed_operation`; use its source paths, sections, and hashes to read only the directed authority. The resolver is diagnostic and grants no permission. The Governance Author records task, role, operation scope, authorization, exclusions, and required proof in a compact handoff before delegation.
 
-An active POP binding to the Claude implementation, not the presence of this block, the subagent files, or the MCP entry, authorizes role work. While that binding is inactive, `BINDING_INACTIVE` means stop; do not work around it.
-This block is a startup mechanism and is not authority.
+Use the existing native permission controls for effects. Treat missing or stale authority, operation selection, capability fit, or authorization as unresolved; do not repeat a diagnostic or infer proof from a role binding, startup file, or tool availability. Dispatch an Auditor only for a named applicable independent-review trigger. This block is startup guidance, not authority.
 <!-- DEV-FOUNDRY-CLAUDE-ADAPTER:END -->

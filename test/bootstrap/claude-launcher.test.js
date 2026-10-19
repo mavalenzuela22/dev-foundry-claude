@@ -37,7 +37,7 @@ test('launch plans are exact for the three runtimes', () => {
   assert.deepEqual([...RUNTIMES], ['direct', 'dial', 'codemie']);
   assert.deepEqual(buildLaunchPlan('direct', ['-p', 'x']), { executable: 'claude', args: ['-p', 'x'] });
   assert.deepEqual(buildLaunchPlan('dial', ['-p', 'x']), { executable: 'dial', args: ['run', '--harness', 'claude-code', '--', '-p', 'x'] });
-  assert.deepEqual(buildLaunchPlan('codemie', ['-p', 'x']), { executable: 'codemie-claude', args: ['--', '-p', 'x'] });
+  assert.deepEqual(buildLaunchPlan('codemie', ['-p', 'x']), { executable: 'codemie-claude', args: ['-p', 'x'] });
   assert.deepEqual(buildLaunchPlan('direct', []), { executable: 'claude', args: [] });
   assert.throws(() => buildLaunchPlan('other', []));
 });
@@ -50,6 +50,26 @@ test('claude arguments are preserved exactly after the first boundary', () => {
     assert.deepEqual(plan.args.slice(-tricky.length), tricky);
   }
   assert.deepEqual(parseLauncherArgs(['--runtime', 'direct', '--']), { runtime: 'direct', claudeArgs: [] });
+});
+
+test('fake child receives runtime-specific argv with literal CLI payload intact', async (t) => {
+  const projectRoot = await temporaryDirectory(t);
+  const payload = ['-p', 'prompt with "quotes" and spaces', '--model', 'claude-test', '--', '--flag=value'];
+  const expected = {
+    direct: ['claude', payload],
+    dial: ['dial', ['run', '--harness', 'claude-code', '--', ...payload]],
+    codemie: ['codemie-claude', payload],
+  };
+  const startFake = async () => ({ port: 40000, host: '127.0.0.1', close: async () => {} });
+  for (const runtime of RUNTIMES) {
+    const { spawn, calls } = fakeSpawn();
+    const code = await runLauncher({ argv: ['--runtime', runtime, '--', ...payload], projectRoot, spawn, startCollector: startFake, env: {} });
+    assert.equal(code, 0);
+    assert.equal(calls[0].executable, expected[runtime][0]);
+    assert.deepEqual(calls[0].args, expected[runtime][1]);
+    assert.equal(calls[0].options.shell, false);
+    assert.equal(calls[0].options.stdio, 'inherit');
+  }
 });
 
 test('unknown runtime and malformed launcher syntax reject', () => {

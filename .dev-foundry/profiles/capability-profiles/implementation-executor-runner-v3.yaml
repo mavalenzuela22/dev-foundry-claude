@@ -42,12 +42,12 @@ environment_constraints:
   - process_bound_repository_must_be_dev_foundry_claude
   - runner_must_be_available
   - codex_cli_executor_must_be_available
-  - active_pop_must_bind_implementation_executor_to_this_profile
+  - v2_pop_must_bind_implementation_executor_to_this_profile_or_v3_operation_selection_must_prove_matching_executor_capability
   - task_authority_must_exist_be_active_or_in_progress_and_be_explicitly_authorized_for_implementation
   - exact_execution_contract_must_bind_branch_prompt_paths_and_validation
 stop_conditions:
   - missing_or_conflicting_task_authority
-  - profile_is_not_the_active_pop_binding_for_implementation_executor
+  - v2_pop_binding_mismatch_or_v3_operation_selection_lacks_matching_executor_capability_proof
   - execution_contract_requests_claude_code_for_producer_maintenance
   - task_requires_governance_mutation_by_executor
   - task_requires_consumer_repository_mutation

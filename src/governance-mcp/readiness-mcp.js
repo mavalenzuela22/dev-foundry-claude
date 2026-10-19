@@ -51,6 +51,7 @@ const ACTIONS = {
   GIT_STATE_UNVERIFIED: 'Check the actual repository, branch, and exact HEAD through the existing host workflow.',
   EXECUTION_CONTRACT_UNVERIFIED: 'Validate the exact execution contract and complete its required preflight through the existing authorized workflow.',
   PROFILE_FIT_UNVERIFIED: 'Complete the existing source-directed capability fit assessment for the selected profile.',
+  OPERATION_SELECTION_UNRESOLVED: 'Resolve and record one concrete implementation selection for this operation outside the POP role binding; the MCP cannot authenticate that selection.',
   VALIDATION_AVAILABILITY_UNVERIFIED: 'Confirm every required validation prerequisite in the current host environment.',
   EXECUTOR_AVAILABILITY_UNVERIFIED: 'Confirm current executor availability once through the existing Claude Code native/host workflow.',
   PRIOR_EFFECTS_UNVERIFIED: 'Reconcile actual prior execution effects to a terminal state through the existing host evidence before any retry.',
@@ -121,6 +122,13 @@ export async function assessPredelegationReadiness(input, { projectRoot } = {}) 
   }
   const { resolution } = resolved;
   if (unresolvedEffect) return output(unresolvedEffect.outcome, unresolvedEffect.reasonCodes, resolution.contextFingerprint);
+
+  // POP v3 intentionally carries stable role policy, not a concrete executor
+  // binding. This MCP has no authenticated operation-selection or host channel;
+  // caller observations therefore cannot establish that missing proof.
+  if (resolution.frameworkVersion === '2.3.0' || resolution.role.operationSelection === 'unresolved') {
+    return output('INDETERMINATE', ['OPERATION_SELECTION_UNRESOLVED', 'CAPABILITY_FIT_UNVERIFIED', ...unresolvedExternalReasons], resolution.contextFingerprint);
+  }
   if (!request.observations) return output('INDETERMINATE', ['EVIDENCE_REQUIRED', ...unresolvedExternalReasons], resolution.contextFingerprint);
 
   const authority = resolution.authority.map(({ path, sha256 }) => ({ path, sha256 }));

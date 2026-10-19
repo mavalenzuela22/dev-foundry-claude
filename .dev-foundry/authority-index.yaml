@@ -3,19 +3,19 @@ id: DFC-AUTHORITY-INDEX
 title: dev-foundry-claude Repository Authority Index
 kind: authority-index
 status: active
-artifact_version: "2.1.0-local.46"
+artifact_version: "2.3.0-local.1"
 canonical: false
 
 subject:
   kind: project
   id: dev-foundry-claude
   version: null
-  base_version: "2.1.0"
+  base_version: "2.3.0"
   manifest: null
 
 routes:
   - id: active-framework
-    path: .dev-foundry/releases/2.1.0/authority-index.yaml
+    path: .dev-foundry/releases/2.3.0/authority-index.yaml
     authority_class: methodology
     governs:
       - reusable-dev-foundry-methodology
@@ -508,6 +508,39 @@ routes:
     authority_class: configured
     governs:
       - tsk-027-producer-operability-terminal-disposition
+    section_id: null
+
+  - id: TSK-028
+    path: docs/70-tasks/70 [TSK-028] PROJECT - Adopt DEV FOUNDRY 2.2.0 and Reconcile Governed Operation Skill.md
+    authority_class: historical
+    governs:
+      - historical-tsk-028-2-2-0-adoption-attempt
+    section_id: null
+
+  - id: TSK-029
+    path: docs/70-tasks/70 [TSK-029] PROJECT - Adopt DEV FOUNDRY 2.3.0 and Align Claude Governed Roles and Skill.md
+    authority_class: task
+    governs:
+      - governed-project-adoption-of-dev-foundry-2-3-0
+      - claude-native-governed-operation-skill-alignment
+      - effective-role-handoff-and-minimal-sot-delivery
+    section_id: null
+
+  - id: TSK-030
+    path: docs/70-tasks/70 [TSK-030] PROJECT - Restore Runtime CLI Argument Forwarding.md
+    authority_class: task
+    governs:
+      - runtime-cli-argument-forwarding-correctness
+      - launcher-pass-through-regression-recovery
+    section_id: null
+  - id: TSK-031
+    path: docs/70-tasks/70 [TSK-031] PROJECT - Prepare Verified Claude Adapter 1.5.0 Release.md
+    authority_class: task
+    governs:
+      - adapter-150-candidate-version-and-migration-identity
+      - integrated-tsk-029-and-tsk-030-release-candidate
+      - nonpublished-verified-release-package-proof
+      - governed-main-only-adapter-release-publication-handoff
     section_id: null
 
 bindings:

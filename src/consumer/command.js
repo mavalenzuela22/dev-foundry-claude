@@ -179,7 +179,7 @@ export async function consumerCommand({ command, argv = [], packageRoot, cwd = p
     const nextAction = applied || result.plan.status === 'noop' ? after.nextAction : `${cli} setup --yes${explicitInputs}`;
     const summary = applied ? `${result.plan.mode === 'initial-bootstrap' ? 'DEV FOUNDRY setup is complete.' : 'Claude integration files were prepared.'} ${after.summary}` : view.summary;
     emit({ ...publicView(after), summary, nextAction, applied, plan: result.plan, planSha256: result.hash },
-      `${summary}${result.plan.bootstrap ? `\nProject: ${result.plan.bootstrap.project}\nClassification: ${result.plan.bootstrap.classification}\nHuman Operator: ${result.plan.bootstrap.operator}\nSelected framework: DEV FOUNDRY 2.1.0` : ''}\nManaged/configured files ${applied ? 'prepared' : 'planned'}:\n${changes(result.plan).map((file) => `  ${file}`).join('\n') || '  none'}\nApplication files affected: 0.\nNext: ${nextAction}`);
+      `${summary}${result.plan.bootstrap ? `\nProject: ${result.plan.bootstrap.project}\nClassification: ${result.plan.bootstrap.classification}\nHuman Operator: ${result.plan.bootstrap.operator}\nSelected framework: DEV FOUNDRY ${String(result.plan.framework.version ?? 'unknown')}` : ''}\nManaged/configured files ${applied ? 'prepared' : 'planned'}:\n${changes(result.plan).map((file) => `  ${file}`).join('\n') || '  none'}\nApplication files affected: 0.\nNext: ${nextAction}`);
     return 0;
   }
   if (command === 'upgrade') {

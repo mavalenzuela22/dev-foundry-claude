@@ -75,7 +75,8 @@ export async function cutoverState(root) {
 
 export const POP_PATH = '.dev-foundry/profiles/project-operating-profile.yaml';
 export const INDEX_PATH = '.dev-foundry/authority-index.yaml';
-export const SUPPORTED_FRAMEWORK = '2.1.0';
+export const SUPPORTED_FRAMEWORK = '2.3.0';
+export const SUPPORTED_FRAMEWORK_VERSIONS = new Set(['2.1.0', '2.3.0']);
 export const ROLES = ['governance-author', 'implementation-executor', 'governance-auditor', 'mechanical-validator', 'evidence-custodian'];
 
 export const AGENT_PATHS = {

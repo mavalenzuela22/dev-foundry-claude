@@ -1,0 +1,180 @@
+---
+schemaVersion: dev-foundry.sot-document.v2
+artifact:
+  id: TSK-030
+  type: TSK
+  title: Restore Runtime CLI Argument Forwarding
+  status: IN_PROGRESS
+artifactVersion: "1"
+authorityScope: tsk-030-runtime-cli-argument-forwarding
+ownerRole: governance-author
+canonical: true
+scope:
+  owns:
+    - runtime-cli-argument-forwarding-correctness
+    - launcher-pass-through-regression-recovery
+  appliesTo:
+    components:
+      - consumer-start-cli
+      - telemetry-launcher
+      - direct-dial-codemie-runtime-adapters
+      - exact-cli-argument-regression-tests
+  excludes:
+    - mutation-of-upstream-framework-release
+    - mutation-of-project-pop-or-platform-bootstrap
+    - consumer-repository-or-other-project-changes
+    - model-provider-authentication-or-credential-changes
+    - rewriting-tsk-029-implementation-or-validation-evidence
+    - new-runtimes-new-launchers-or-new-external-services
+    - publication-or-promotion-without-separate-acceptance
+authority:
+  governedBy:
+    - SPC-004
+    - SPC-007
+    - OPS-001
+    - OPS-003
+    - OPS-004
+    - OPS-005
+    - OPS-007
+    - OPS-008
+  supersedes: []
+traceability:
+  derivedFrom:
+    - TSK-010
+    - TSK-029
+lifecycle:
+  phase: in-progress
+  blockedBy: []
+  promotionRequired: true
+portability: project-specific
+---
+
+# TSK-030 — Restore Runtime CLI Argument Forwarding
+
+## Operator defect and acceptance
+The Operator reported that `dev-foundry-claude start --runtime dial -- -p "esto no va a jalar"` does not recognize/forward Claude arguments; similar behavior was reported with `direct` and `codemie`. Restore correct **literal, lossless** forwarding of flags/values passed after the one user-facing `--` boundary to the selected underlying Claude runtime while preserving secure telemetry startup and process/exit handling. Distinguish CLI-wrapper argument recognition from Claude Code native flags and runtime/provider errors. A passing mock of our own current faulty argv shape is **not** enough: test against actual runtime-specific documented or locally inspected CLI semantics where available.
+
+## Observed source facts
+- Active producer POP remains DEV FOUNDRY 2.1.0 until separately adopted under TSK-029.
+- `src/consumer/command.js` `optionsFor('start', argv)` preserves tokens following `--` and passes them to the packaged `runLauncher` in `src/telemetry/launch.js`.
+- `buildLaunchPlan` currently maps direct => `claude <args>`, dial => `dial run --harness claude-code -- <args>`, and codemie => `codemie-claude -- <args>`. The last two mappings also appear literally in active `SPC-004` §5.1 and in launcher tests.
+- Official Claude Code CLI documentation supports `claude -p "prompt"`. CodeMie CLI public command documentation demonstrates `codemie-claude -p "prompt"` with **no mandatory inserted** `--`. The installed DIAL CLI's argument contract is not yet independently verified and must **not** be guessed from an unrelated product sharing the DIAL name.
+- Current tests assert that our internal plan preserves suffix arrays but do not test wrapper-level interpretation. The reported DIAL failure is not disproved by those tests.
+
+## Minimal sufficient correction — OPS-007
+1. Reproduce the argument-handling difference without launching paid Claude requests. Read only the relevant `src/consumer/command.js`, `src/telemetry/launch.js`, `test/adopt/consumer.test.js`, `test/bootstrap/claude-launcher.test.js`, and their directly necessary harness definitions. Where available, inspect **local CLI help** for DIAL and CodeMie to verify pass-through syntax; do not use interactive authentication or remote-paid prompts for diagnosis.
+2. Correct existing runtime-specific argv planning **only where evidenced**. Keep the user-facing `--` separator, exact argument tokens/quoting, environment, stdio, collector lifecycle, signal forwarding, return codes, runtime selection, security limits and read-only governed project authority. No shell interpolation, rewritten prompts, extra CLI tool, hook, service, model pin or additional runtime.
+3. If an existing **normative** `SPC-004` §5.1 mapping is contradicted by observed runtime semantics, Governance Author must reconcile that project authority (and only its exact affected mapping) with concrete evidence before/alongside implementation. The Code Executor does **not** independently rewrite SoT, extrapolate another runtime's semantics, or silently override a closed authority requirement.
+4. Add focused end-to-end argv regression coverage for `start --runtime <direct|dial|codemie> -- -p "..." --model ...`, including whitespace/special arguments and `--` after the boundary, using existing fake spawn/runtime wrapper harness and no actual model calls. Verify that missing/invalid CLI flags fail at the correct layer with actionable diagnostics, not a misleading successful invocation. Reuse current tests and existing telemetry infrastructure. No new fixtures/tools if those are sufficient.
+5. Run affected focused Node tests and `git diff --check`; reconcile actual changed paths and tested behavior under OPS-007. Do not repeat unrelated 2.3.0 adoption tests without a direct regression boundary. No independent Governance Audit solely from the existence of this defect; apply only actual triggers in current authority.
+
+## Isolation and lineage
+The change is independently bounded from TSK-029's framework/role adoption, which has its own **committed candidate checkpoint**
+`310c50e59dc61a269bdbf60212f641262f64349e`. This task uses
+`task/tsk-030-runtime-cli-argument-forwarding` branched from that clean
+checkpoint; no active implementation was running at branch creation.
+Do not reopen or overwrite C001/C002 immutable history. TSK-029 still
+owns eventual producer adoption and promotion; stacking of commit ancestry
+does not authorize automatic promotion of either task.
+
+## C001 terminal result — implementation PASS, DIAL acceptance still unverified
+
+The Runner completion wakeup for request
+`req_fa7e9beaf8208718c6368617414ad541` was corroborated once with
+terminal execution `execution_49b3f69f7df158e35801e88a48c6eacc177dda803cd4a5b48d34886d2a6fd0e6`.
+Terminal status `passed`, executor invoked and returned 0, path policy
+PASS (three exact product/test paths), mechanical validation
+`node --test test/bootstrap/claude-launcher.test.js test/adopt/consumer.test.js`
+**23/23 PASS**, and `git diff --check` PASS. Readable packet and actual diff
+were inspected. The three changed files are only
+`src/telemetry/launch.js`, `test/adopt/consumer.test.js`,
+`test/bootstrap/claude-launcher.test.js`. Product commit
+`63d8ff69f4dc3f2e7fff310a3adee10ad87f7910` preserves this candidate.
+
+The demonstrated actual fix is CodeMie removing the extra injected
+`--` and forwarding literal Claude arguments directly. Direct
+`claude <args>` and DIAL `dial run --harness claude-code -- <args>`
+were unchanged; unit/fake-spawn tests validate **constructed child argv**,
+not that installed provider wrappers accept all flags. In particular the
+Operator's concrete `--runtime dial -- -p "esto no va a jalar"`
+case is **not demonstrated fixed** by the terminal PASS. There is no
+readable supported artifact proving the local EPAM DIAL wrapper's exact
+version/help passthrough semantics; therefore do not assert a DIAL
+compatibility PASS or close the reported multi-runtime defect.
+
+OPS-007 conclusion: reuse the valid state-bound C001 proof and avoid
+new infrastructure, repeated validation, full-suite runs or independent
+audits without a real trigger. Complete remaining DIAL acceptance only
+after obtaining direct local wrapper help/argv or the exact observed
+error from the installed runtime, **without paid model invocations**.
+Do not modify the DIAL mapping in normative SPC-004 or the launcher by
+guessing. Retain TSK-030 IN_PROGRESS for this unresolved exact boundary,
+and leave TSK-029 adoption/promotion separately pending.
+
+## Operator DIAL CLI confirmation (2026-10-18) — source evidence, no new product delta
+
+The Operator executed the actual installed EPAM DIAL binary and supplied the
+terminal transcript (not an automated test or a report from an unrelated DIAL
+project). The binary reports version
+`0.3.0+bb33c24e5024f01f52c8add0951312e6c00fa91f`.
+`dial run --help` advertises `-harness`, `-model`,
+`-print-url`, and `-project`. Its lack of direct `-p` at
+the wrapper level is **not** a defect: the harness receives arguments after
+the literal `--`.
+
+The Operator then invoked
+`dial run --harness claude-code -- -p "hola"`.
+The DIAL session launched and Claude returned
+`¡Hola! ¿En qué te ayudo?`, confirming that this locally installed DIAL
+wrapper **does forward `-p` to Claude Code with the exact existing
+SPC-004 §5.1 syntax**. Do not alter the DIAL mapping. The accompanying
+connectors warning about a pre-existing authentication source and the
+`unrecognized_model` model-telemetry message are not evidence of an argv
+forwarding rejection; neither prevented the prompt response. Omit all
+account identifiers, identity-provider details and tokens from durable
+evidence.
+
+**Acceptance boundary remaining:** this was a direct `dial run` test,
+not `dev-foundry-claude start --runtime dial -- -p "hola"` through the
+packaged consumer entrypoint and telemetry collector. A separate
+`dev-foundry-claude start` invocation with an actual installed adapter
+(or equivalent terminal provenance) is still needed to decide whether a
+stale package/selection or another CLI layer explains the Operator's
+reported original behavior. No additional source edit or Runner validation
+is justified before that observation. Reuse C001's 23/23 PASS and the
+real DIAL forward test. Keep TSK-030 open for narrow launch-path
+acceptance, not a new implementation task.
+
+## Operator telemetry-launcher DIAL confirmation (2026-10-18)
+
+The Operator executed from the producer repository checkout:
+
+`node ./scripts/telemetry/claude.mjs --runtime dial -- -p "hola"`
+
+The actual locally configured DIAL wrapper launched the Claude Code harness
+and Claude returned `¡Hola! ¿En qué te ayudo?`. This is **direct
+user-observed end-to-end acceptance of the telemetry launcher through DIAL
+and Claude for the exact `-p` argument**, not merely an internal fake-spawn
+assertion. The observed output did not independently expose telemetry
+collector readiness or recorded metrics, so telemetry ingestion is not
+independently claimed. The existing C001 terminal mechanical proof
+(23/23 PASS, path policy PASS) remains reusable and unchanged. Authentication
+and model/connector warnings did not prevent prompt handling. Do not
+persist account identifiers, identity provider URLs or tokens.
+
+A separate attempt to run `node ./bin/dev-foundry-claude.js start ...` from
+the **unreleased development checkout** returned the installed adapter
+integrity preflight refusal, before runtime launch. This is expected
+fail-closed product behavior on an unverified package, not evidence
+against `-p` forwarding and not justification to weaken `selfPin()`.
+Therefore the observed DIAL argv-routing problem is satisfied at the
+launcher boundary; a complete installed-package `start` acceptance remains
+**not observed** and should be exercised naturally during governed
+integration/release acceptance with a verifiable package, rather than
+creating a new paid synthetic run or additional control under OPS-007.
+
+No new product edits, runtime mapping changes, repeated validation or audit
+were required by this new evidence. TSK-030's remaining integration/promotion
+disposition stays subject to the current adopted methodology and the
+related TSK-029 release workflow.
+

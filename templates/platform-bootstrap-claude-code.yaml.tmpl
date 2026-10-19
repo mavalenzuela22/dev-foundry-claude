@@ -1,4 +1,4 @@
-schema_version: dev-foundry.platform-bootstrap.v2
+schema_version: dev-foundry.platform-bootstrap.v3
 id: {{PREFIX}}-PLATFORM-BOOTSTRAP-CLAUDE-CODE
 title: {{PROJECT}} Claude Code Platform Bootstrap
 kind: platform-bootstrap
@@ -36,19 +36,19 @@ platform:
     - start governed work from the {{PROJECT}} repository root
     - load project instruction files only as startup guidance, never as authority
     - retrieve the active POP and Authority Index before role-dependent work
-    - require the project-scoped dev-foundry-governance MCP and resolve_governed_operation for governed role resolution
+    - use one scoped resolve_governed_operation call for current source-bound role and task authority
     - workspace trust and project MCP approval remain explicit Operator-side provider security mechanics
-    - repository identity authority state and required capability mismatches fail closed
+    - operation-specific implementation selection, capability fit, and authorization must be evidenced outside the POP role binding
+    - repository identity, stale authority, and missing operation evidence fail closed
 
 constraints:
   - active reusable methodology is sourced only from the POP-selected immutable canonical framework release
-  - concrete implementation bindings are owned by the Project Operating Profile
+  - v3 POP role bindings contain policy and capability requirements, not concrete implementation identity
+  - bootstrap platform identity describes startup only and grants no role or operation
   - capability does not grant authority
   - role selection is operation-scoped
   - conversational continuity does not transfer authority or satisfy independence
-  - claude-main-agent is not the Implementation Executor or Governance Auditor implementation
-  - implementation-executor dispatches explicitly to dev-foundry-executor only after applicable role resolution
-  - governance-auditor dispatches explicitly to dev-foundry-auditor only when the bounded operation requires that role and its independence preconditions are satisfied
-  - mechanical-validator is separately bound to claude-code-native-validation
+  - the Governance Author delegates implementation only with a current compact handoff and existing native permission checks
+  - the Auditor is selected only when a named independent-review trigger applies and eligibility is evidenced
   - project instruction files and the project governance MCP are startup mechanisms and not repository authority
   - repository configuration must not bypass workspace trust or silently pre-approve the project MCP

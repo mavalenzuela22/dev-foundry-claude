@@ -1,0 +1,87 @@
+schema_version: dev-foundry.interoperability-contract.v1
+id: DF-INTEROP-001
+status: active
+contract_version: "0.1.0"
+framework_base: "2.1.0"
+authority_owner: DAT-022
+provider_neutral: true
+mandatory_transport: null
+mandatory_platform_registry: false
+sections:
+  INT-001:
+    title: structured-diagnostics
+    required_fields: [code, stage, category, cause, next_action, retry_policy, side_effect_status, evidence]
+    enums:
+      category: [invalid_contract, missing_capability, missing_authority, unverified_identity, inconsistent_repository_state, transport_error, environment_error, validation_nonconformance, validation_mechanism_error, indeterminate_effect, other]
+      retry_policy: [never, after_correction, after_reobservation, safe_immediate]
+      side_effect_status: [none, confirmed, indeterminate]
+    invariants:
+      - code_stage_cause_and_next_action_nonempty
+      - retry_safe_immediate_forbidden_for_indeterminate_effect
+      - evidence_is_array
+      - diagnosis_is_not_a_pass_verdict
+  INT-002:
+    title: execution-readiness
+    required_fields: [state, verified_prerequisites, missing_prerequisites, unknown_prerequisites, state_binding, diagnosis]
+    enums:
+      state: [READY, BLOCKED, INDETERMINATE]
+    invariants:
+      - known_missing_critical_prerequisite_implies_BLOCKED
+      - unknown_critical_prerequisite_implies_INDETERMINATE
+      - blocked_or_indeterminate_prohibits_expensive_dispatch
+      - readiness_does_not_grant_operation_authorization
+  INT-003:
+    title: operation-outcomes
+    required_fields: [transport, implementation, acceptance, validation, audit, side_effect_status, evidence]
+    enums:
+      transport: [completed, failed, indeterminate]
+      implementation: [not_started, completed, incomplete, failed, indeterminate]
+      acceptance: [not_evaluated, pass, fail, blocked, incomplete]
+      validation: [not_run, pass, fail, error, blocked, incomplete]
+      audit: [not_required, not_run, pass, fail, blocked]
+      side_effect_status: [none, confirmed, indeterminate]
+    invariants:
+      - transport_completed_does_not_imply_implementation_completed
+      - implementation_completed_does_not_imply_acceptance_pass
+      - validator_mechanism_failure_is_error_not_product_fail
+      - required_empty_implementation_cannot_pass
+      - required_evidence_missing_cannot_pass
+      - audit_verdict_requires_authorized_independent_participation_when_triggered
+      - objective_finding_closure_does_not_rewrite_original_audit_fail
+      - verified_complete_finding_closure_can_satisfy_gate_without_fresh_audit
+      - unresolved_material_semantic_judgment_requires_independent_bounded_review
+  INT-004:
+    title: capability-authorization-separation
+    required_fields: [role, actor_profile, task_boundary, implementation_identity, identity_evidence, capabilities, applicable_capability_profiles, authority_reference, hard_exclusions, repository_binding]
+    invariants:
+      - operation_attribution_sufficient_for_applicable_role_and_boundary
+      - capability_cannot_self_attest_authority
+      - capability_profiles_reusable_across_tasks_if_still_applicable
+      - hard_exclusions_always_enforced
+      - platform_selection_operation_scoped
+      - independence_requires_actual_material_participation_review
+      - role_or_platform_alias_alone_cannot_prove_independence
+      - insufficient_required_independence_evidence_blocks_dependent_audit_only
+  INT-005:
+    title: cross-platform-continuation
+    required_fields: [repository_identity, active_framework, project_authority, branch, head, visible_changes, hidden_changes, task_boundary, previous_implementation_participation, proposed_implementation, authorization, prior_effects, reused_evidence, rejected_evidence, next_safe_action]
+    invariants:
+      - reobserve_authority_and_repository_state
+      - predecessor_evidence_retains_versioned_semantics
+      - evidence_reuse_requires_provenance_state_and_applicability
+      - indeterminate_effect_must_be_reconciled_before_retry
+      - platform_change_alone_does_not_mutate_POP
+      - platform_change_alone_does_not_prove_audit_independence
+      - recovered_audit_lineage_requires_durable_original_snapshot_and_frozen_findings
+      - objective_finding_verification_does_not_require_a_second_independent_auditor
+      - independent_semantic_corrective_review_requires_eligible_reviewer_and_bound_delta
+      - documentary_author_correction_does_not_require_implementation_executor
+      - fixture_positive_expectation_is_not_a_real_audit_verdict
+compatibility:
+  legacy_pop_schema: dev-foundry.project-operating-profile.v2
+  legacy_bootstrap_schema: dev-foundry.platform-bootstrap.v2
+  new_pop_schema: dev-foundry.project-operating-profile.v3
+  new_bootstrap_schema: dev-foundry.platform-bootstrap.v3
+  transition: explicit_project_adoption_and_bounded_reconciliation
+  existing_evidence_rewritten: false
+  v2_in_place_reinterpretation: prohibited

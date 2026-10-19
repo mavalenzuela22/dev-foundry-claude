@@ -5,7 +5,7 @@ request into unrelated changes, or call work finished before it has been checked
 DEV FOUNDRY keeps project decisions, work limits and required checks in the
 repository so each session can pick up from the same agreed starting point.
 
-The **Claude Code adapter 1.4.2**, `dev-foundry-claude`, connects those project
+The **Claude Code adapter 1.5.0**, `dev-foundry-claude`, connects those project
 rules to Claude and provides guided setup, launch, diagnostics and upgrades.
 
 ## 60-second Quick Start
@@ -25,7 +25,7 @@ prints the next action. If it offers a managed-file plan, review it and run
 `dev-foundry-claude setup --yes` to prepare the integration.
 
 For a project with no DEV FOUNDRY authority, `setup --yes` explicitly confirms
-adoption of the packaged DEV FOUNDRY 2.1.0 release and establishes the first
+adoption of the packaged DEV FOUNDRY 2.3.0 release and establishes the first
 active Claude integration. `start` launches once runtime preflight passes. For an explanation at any
 point, run `dev-foundry-claude help setup`.
 

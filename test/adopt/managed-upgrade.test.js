@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { legacyPackage } from './legacy-fixture.js';
-import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import { createPlan } from '../../src/adopt/plan.js';
 import { createUpgradePlan } from '../../src/adopt/upgrade.js';
@@ -15,11 +17,14 @@ const target = { version: '1.4.0', payloadRoot: 'f'.repeat(64), expect: `1.4.0:s
 // Real released 1.2.2 templates and exact verified historical payload.
 async function legacy(t, active = false, version = '1.2.2') {
   const { source, old } = await legacyPackage(t, version);
+  // Consumer bytes must come from the exact producer package, including its
+  // planner semantics, rather than current checkout code with old templates.
+  const { createPlan: createLegacyPlan } = await import(pathToFileURL(path.join(source, 'src/adopt/plan.js')).href);
   const c = await makeConsumer(); t.after(c.cleanup);
   await c.put('.dev-foundry/executions/TSK-HISTORICAL/evidence-packet.md', '# Completed work\nHistorical result under the original framework; retain its meaning.\n');
   await c.put('.dev-foundry/validations/historical/result.json', '{"verdict":"pass","framework":"2.1.0"}\n');
   c.commit();
-  const planned = await createPlan({ root: c.root, adapter: old, templatesRoot: path.join(source, 'templates') });
+  const planned = await createLegacyPlan({ root: c.root, adapter: old, templatesRoot: path.join(source, 'templates') });
   assert.equal(planned.plan.status, 'ready');
   // Materialize the old release's generated surface as fixture data.
   for (const entry of planned.ops.writes) await c.put(entry.path, entry.content);
@@ -27,35 +32,50 @@ async function legacy(t, active = false, version = '1.2.2') {
   if (active) { await applyProposal(c.root, planned.plan.cutover_proposal); c.commit(); }
   return { c, source, old };
 }
+
+async function historical140(t) {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'tsk031-v140-source-')); t.after(() => rm(root, { recursive: true, force: true }));
+  const archive = execFileSync('git', ['archive', 'v1.4.0'], { cwd: repoRoot, maxBuffer: 100 * 1024 * 1024 });
+  execFileSync('tar', ['-x', '-C', root], { input: archive });
+  await symlink(path.join(repoRoot, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+  const load = async (relative) => import(pathToFileURL(path.join(root, relative)).href);
+  const [planModule, upgradeModule, applyModule, consumerModule] = await Promise.all([
+    load('src/adopt/plan.js'), load('src/adopt/upgrade.js'), load('src/adopt/apply.js'), load('src/consumer/command.js'),
+  ]);
+  return { ...planModule, ...upgradeModule, ...applyModule, ...consumerModule };
+}
 const plan = ({ c, source }) => createUpgradePlan({ root: c.root, adapter: target, currentPackageRoot: source });
 const apply = ({ c }, result) => applyPlan({ root: c.root, adapter: target, upgrade: true, planBytes: result.bytes, planSha256: result.hash });
 
 test('exact released legacy bridge is deterministic, exact-hash enforced, bounded and preserves authority/product/outside block', async (t) => {
+  const historical = await historical140(t);
   for (const version of ['1.2.2', '1.2.2-windows', '1.3.0', '1.3.0-public']) for (const active of version === '1.2.2-windows' ? [false] : [false, true]) await t.test(`${version} ${active ? 'active' : 'prepared'}`, async (t) => {
     const fixture = await legacy(t, active, version); const { c, old } = fixture;
     await c.put('CLAUDE.md', (await c.read('CLAUDE.md')) + '\nConsumer footer: keep this byte for byte.\n'); c.commit();
     const before = await listTree(c.root); const authority = await readSetSnapshot(c.root);
-    const withoutSource = await createUpgradePlan({ root: c.root, adapter: target });
+    const withoutSource = await historical.createUpgradePlan({ root: c.root, adapter: target });
     assert.equal(withoutSource.plan.status, 'blocked'); assert.deepEqual(withoutSource.ops.writes, []);
-    const result = await plan(fixture);
+    const result = await historical.createUpgradePlan({ root: c.root, adapter: target, currentPackageRoot: fixture.source });
     assert.equal(result.plan.status, 'ready', JSON.stringify(result.plan.blockers));
     assert.equal(result.plan.upgradeKind, 'legacy-bridge'); assert.deepEqual(result.plan.current, old);
-    assert.deepEqual(result.bytes, (await plan(fixture)).bytes);
+    assert.deepEqual(result.bytes, (await historical.createUpgradePlan({ root: c.root, adapter: target, currentPackageRoot: fixture.source })).bytes);
     assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
-    const changed = version === '1.2.2-windows' ? ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md'] : ['.mcp.json', 'CLAUDE.md'];
+    // The tagged 1.4.0 bridge refreshes only the runtime pin for LF packages;
+    // CLAUDE.md is preserved byte for byte, including the consumer footer.
+    const changed = version === '1.2.2-windows' ? ['.claude/agents/dev-foundry-auditor.md', '.claude/agents/dev-foundry-executor.md', '.mcp.json', 'CLAUDE.md'] : ['.mcp.json'];
     assert.deepEqual(result.ops.writes.map((item) => item.path).sort(), changed);
-    await assert.rejects(apply(fixture, { ...result, hash: '0'.repeat(64) }), { code: 'plan-hash-mismatch' });
+    await assert.rejects(historical.applyPlan({ root: c.root, adapter: target, upgrade: true, planBytes: result.bytes, planSha256: '0'.repeat(64) }), { code: 'plan-hash-mismatch' });
     const presentationPackage = await makePresentationPackage(); t.after(presentationPackage.cleanup);
     const output = [];
-    await consumerCommand({ command: 'upgrade', argv: ['--from-package', fixture.source], cwd: c.root, packageRoot: presentationPackage.root,
+    await historical.consumerCommand({ command: 'upgrade', argv: ['--from-package', fixture.source], cwd: c.root, packageRoot: presentationPackage.root,
       getAdapter: () => target, executableAvailable: () => true, output: (text) => output.push(text) });
     assert.match(output.join('\n'), /managed files need to be refreshed/); assert.doesNotMatch(output.join('\n'), /upgrade-migration-required|agent-file-collision/);
     assert.match(output.join('\n'), /Application files affected: 0/);
-    assert.deepEqual(await apply(fixture, result), { written: changed.length, deleted: 0 });
+    assert.deepEqual(await historical.applyPlan({ root: c.root, adapter: target, upgrade: true, planBytes: result.bytes, planSha256: result.hash }), { written: changed.length, deleted: 0 });
     assert.deepEqual(diffTrees(before, await listTree(c.root)), result.ops.writes.map((item) => item.path).sort());
     assert.deepEqual(await readSetSnapshot(c.root), authority);
     assert.match(await c.read('CLAUDE.md'), /^# Acme billing/); assert.ok((await c.read('CLAUDE.md')).endsWith('\nConsumer footer: keep this byte for byte.\n'));
-    c.commit(); assert.equal((await createPlan({ root: c.root, adapter: target })).plan.status, 'noop');
+    c.commit(); assert.equal((await historical.createPlan({ root: c.root, adapter: target })).plan.status, 'noop');
   });
 });
 

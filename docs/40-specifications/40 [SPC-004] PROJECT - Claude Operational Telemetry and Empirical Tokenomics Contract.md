@@ -5,7 +5,7 @@ artifact:
   type: SPC
   title: Claude Operational Telemetry and Empirical Tokenomics Contract
   status: ACTIVE
-artifactVersion: "2"
+artifactVersion: "3"
 authorityScope: claude-operational-telemetry-and-empirical-tokenomics
 ownerRole: governance-author
 canonical: true
@@ -131,7 +131,7 @@ The single launcher `scripts/telemetry/claude.mjs` accepts
 
 - `direct` -> `claude <claude args>`;
 - `dial` -> `dial run --harness claude-code -- <claude args>`;
-- `codemie` -> `codemie-claude -- <claude args>`.
+- `codemie` -> `codemie-claude <claude args>` (the launcher consumes the user-facing `--`; the CodeMie wrapper receives the CLI flags directly).
 
 Unknown runtimes and malformed launcher syntax fail closed before any collector
 or child process starts. Mode-specific launcher copies are not authorized. A

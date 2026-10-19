@@ -1,9 +1,9 @@
-schema_version: dev-foundry.project-operating-profile.v2
+schema_version: dev-foundry.project-operating-profile.v3
 id: DFC-PROJECT-OPERATING-PROFILE
 title: dev-foundry-claude Project Operating Profile
 kind: project-operating-profile
 status: active
-artifact_version: "2.1.0-local.18"
+artifact_version: "2.3.0-local.1"
 canonical: false
 
 repository:
@@ -12,9 +12,9 @@ repository:
   authority_index: .dev-foundry/authority-index.yaml
 
 framework:
-  adopted_version: "2.1.0"
-  selected_authority_index: .dev-foundry/releases/2.1.0/authority-index.yaml
-  selected_manifest: .dev-foundry/releases/2.1.0/release-integrity-manifest.yaml
+  adopted_version: "2.3.0"
+  selected_authority_index: .dev-foundry/releases/2.3.0/authority-index.yaml
+  selected_manifest: .dev-foundry/releases/2.3.0/release-integrity-manifest.yaml
   adoption_status: active
 
 operator:
@@ -23,46 +23,39 @@ operator:
 
 actor_bindings:
   governance-author:
-    profile: .dev-foundry/releases/2.1.0/actor-profiles/governance-author-v3.yaml
-    implementation:
-      kind: agent
-      identity: operator-assisted-dev-foundry-copilot
-      platform: chatgpt-project
-    capability_profiles:
-      - .dev-foundry/profiles/capability-profiles/governance-author-producer-maintenance-v1.yaml
+    profile: .dev-foundry/releases/2.3.0/actor-profiles/governance-author-v4.yaml
+    selection:
+      mode: operation-scoped
+      required_capabilities: []
+      eligibility_policy: operator-and-actor-fit
     status: active
   governance-auditor:
-    profile: .dev-foundry/releases/2.1.0/actor-profiles/governance-auditor-v2.yaml
-    implementation:
-      kind: agent
-      identity: operator-assisted-dev-foundry-copilot
-      platform: chatgpt-project
-    capability_profiles: []
+    profile: .dev-foundry/releases/2.3.0/actor-profiles/governance-auditor-v2.yaml
+    selection:
+      mode: operation-scoped
+      required_capabilities: []
+      eligibility_policy: operator-and-actor-fit
     status: active
   implementation-executor:
-    profile: .dev-foundry/releases/2.1.0/actor-profiles/implementation-executor-v2.yaml
-    implementation:
-      kind: tool
-      identity: process-bound-runner-code-executor
-      platform: chatgpt-project
-    capability_profiles:
-      - .dev-foundry/profiles/capability-profiles/implementation-executor-runner-v3.yaml
+    profile: .dev-foundry/releases/2.3.0/actor-profiles/implementation-executor-v2.yaml
+    selection:
+      mode: operation-scoped
+      required_capabilities: []
+      eligibility_policy: operator-and-actor-fit
     status: active
   mechanical-validator:
-    profile: .dev-foundry/releases/2.1.0/actor-profiles/mechanical-validator-v2.yaml
-    implementation:
-      kind: tool
-      identity: process-bound-runner
-      platform: chatgpt-project
-    capability_profiles: []
+    profile: .dev-foundry/releases/2.3.0/actor-profiles/mechanical-validator-v2.yaml
+    selection:
+      mode: operation-scoped
+      required_capabilities: []
+      eligibility_policy: operator-and-actor-fit
     status: active
   evidence-custodian:
-    profile: .dev-foundry/releases/2.1.0/actor-profiles/evidence-custodian-v1.yaml
-    implementation:
-      kind: agent
-      identity: operator-assisted-dev-foundry-copilot
-      platform: chatgpt-project
-    capability_profiles: []
+    profile: .dev-foundry/releases/2.3.0/actor-profiles/evidence-custodian-v1.yaml
+    selection:
+      mode: operation-scoped
+      required_capabilities: []
+      eligibility_policy: operator-and-actor-fit
     status: active
 
 platform_bootstraps:

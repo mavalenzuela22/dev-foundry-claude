@@ -21,7 +21,7 @@ export function buildLaunchPlan(runtime, claudeArgs = []) {
   if (!RUNTIMES.includes(runtime) || !Array.isArray(claudeArgs)) throw new UsageError('Invalid launcher arguments.');
   if (runtime === 'direct') return { executable: 'claude', args: [...claudeArgs] };
   if (runtime === 'dial') return { executable: 'dial', args: ['run', '--harness', 'claude-code', '--', ...claudeArgs] };
-  return { executable: 'codemie-claude', args: ['--', ...claudeArgs] };
+  return { executable: 'codemie-claude', args: [...claudeArgs] };
 }
 
 export async function runLauncher({

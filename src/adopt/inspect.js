@@ -1,6 +1,6 @@
 import { readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
-import { INDEX_PATH, POP_PATH, ROLES, SUPPORTED_FRAMEWORK, isObject, parseYamlStrict, readContained } from './common.js';
+import { INDEX_PATH, POP_PATH, ROLES, SUPPORTED_FRAMEWORK_VERSIONS, isObject, parseYamlStrict, readContained } from './common.js';
 import { git } from './ignore.js';
 import { sha256 } from './pin.js';
 
@@ -25,7 +25,7 @@ export async function inspect(rootArgument, { project, idPrefix } = {}) {
   const indexBytes = await readContained(root, INDEX_PATH);
   const pop = popBytes && parseYamlStrict(popBytes);
   const index = indexBytes && parseYamlStrict(indexBytes);
-  const popValid = Boolean(pop) && pop.schema_version === 'dev-foundry.project-operating-profile.v2' && pop.status === 'active' &&
+  const popValid = Boolean(pop) && ['dev-foundry.project-operating-profile.v2', 'dev-foundry.project-operating-profile.v3'].includes(pop.schema_version) && pop.status === 'active' &&
     isObject(pop.repository) && typeof pop.repository.name === 'string' && isObject(pop.framework) &&
     typeof pop.framework.adopted_version === 'string' && typeof pop.framework.selected_authority_index === 'string' &&
     pop.framework.adoption_status === 'active' && isObject(pop.actor_bindings);
@@ -41,8 +41,8 @@ export async function inspect(rootArgument, { project, idPrefix } = {}) {
   if (pop.repository.name !== index.subject.id || index.subject.kind !== 'project') facts.blockers.push(blocker('identity-mismatch', 'Project identity disagrees between POP and Authority Index.'));
   if (project !== undefined && project !== pop.repository.name) facts.blockers.push(blocker('identity-mismatch', 'The asserted project does not equal the POP repository name.'));
   if (pop.repository.authority_index !== undefined && pop.repository.authority_index !== INDEX_PATH) facts.blockers.push(blocker('nonstandard-authority-path', 'The Authority Index is not at the standard path.'));
-  if (pop.framework.adopted_version !== SUPPORTED_FRAMEWORK || index.subject.base_version !== pop.framework.adopted_version ||
-      release.subject.version !== SUPPORTED_FRAMEWORK) facts.blockers.push(blocker('unsupported-framework', 'The adopted framework version is not supported by the adapter.'));
+  if (!SUPPORTED_FRAMEWORK_VERSIONS.has(pop.framework.adopted_version) || index.subject.base_version !== pop.framework.adopted_version ||
+      release.subject.version !== pop.framework.adopted_version) facts.blockers.push(blocker('unsupported-framework', 'The adopted framework version is not supported by the adapter.'));
   const frameworkRoutes = index.routes.filter((route) => isObject(route) && Array.isArray(route.governs) && route.governs.includes('reusable-dev-foundry-methodology'));
   if (frameworkRoutes.length !== 1 || frameworkRoutes[0].path !== pop.framework.selected_authority_index) facts.blockers.push(blocker('authority-ambiguous', 'The framework release route is ambiguous or contradicts the POP.'));
 

@@ -42,7 +42,7 @@ proof_capabilities:
 environment_constraints:
   - process_bound_repository_must_be_dev_foundry_claude
   - adopted_framework_authority_must_be_verified
-  - active_pop_must_bind_governance_author_to_this_profile
+  - v2_pop_must_bind_governance_author_to_this_profile_or_v3_operation_selection_must_prove_matching_governance_author_capability
   - operator_authorization_required_for_governance_mutation
   - implementation_executor_requires_separate_active_binding
 

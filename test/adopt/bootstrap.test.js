@@ -6,6 +6,7 @@ import test, { after } from 'node:test';
 import { parse } from 'yaml';
 import { createPlan } from '../../src/adopt/plan.js';
 import { applyPlan } from '../../src/adopt/apply.js';
+import { evaluateActivation } from '../../src/adopt/activation.js';
 import { frameworkFiles, ONBOARDING_TASK, ONBOARDING_OVERVIEW } from '../../src/adopt/bootstrap.js';
 import { canonicalJson, sha256 } from '../../src/adopt/pin.js';
 import { resolveGovernedOperation } from '../../src/governance-mcp/resolver.js';
@@ -26,11 +27,34 @@ async function empty(t, configured = true) {
   return { root, put, read: (file) => readFile(path.join(root, file), 'utf8') };
 }
 
-test('framework bundle exactly equals producer immutable release file set and bytes', async () => {
-  const files = await frameworkFiles();
-  const before = await listTree(path.join(repoRoot, '.dev-foundry/releases/2.1.0'));
-  assert.deepEqual([...files.keys()].map((file) => file.replace('.dev-foundry/releases/2.1.0/', '')), [...before.keys()].sort());
-  for (const [file, bytes] of files) assert.deepEqual(bytes, await readFile(path.join(repoRoot, file)));
+test('2.3.0 bundle exactly equals the canonical producer release; preserved 2.1.0 bundle remains exact', async () => {
+  for (const version of ['2.3.0', '2.1.0']) {
+    const files = await frameworkFiles(version);
+    const before = await listTree(path.join(repoRoot, `.dev-foundry/releases/${version}`));
+    assert.deepEqual([...files.keys()].map((file) => file.replace(`.dev-foundry/releases/${version}/`, '')), [...before.keys()].sort());
+    for (const [file, bytes] of files) assert.deepEqual(bytes, await readFile(path.join(repoRoot, file)));
+  }
+});
+
+test('fresh bootstrap applies exact 2.3.0 POP v3 policy and activates only the v3 startup binding', async (t) => {
+  const c = await empty(t);
+  const preview = await planFor(c, { project: 'fixture-v3', classification: 'greenfield', operator: 'Human Owner' });
+  assert.equal(preview.plan.status, 'ready', JSON.stringify(preview.plan.blockers));
+  await apply(c, preview);
+  const pop = parse(await c.read('.dev-foundry/profiles/project-operating-profile.yaml'));
+  assert.equal(pop.framework.adopted_version, '2.3.0');
+  assert.equal(pop.schema_version, 'dev-foundry.project-operating-profile.v3');
+  for (const [role, binding] of Object.entries(pop.actor_bindings)) {
+    assert.deepEqual(Object.keys(binding).sort(), ['profile', 'selection', 'status']);
+    assert.equal(binding.selection.mode, 'operation-scoped');
+    assert.equal(binding.selection.eligibility_policy, 'operator-and-actor-fit');
+    assert.deepEqual(binding.selection.required_capabilities, []);
+  }
+  assert.equal((await evaluateActivation(c.root)).overall, 'active');
+  const resolved = await resolveGovernedOperation({ requestedAction: 'author', targetProject: 'fixture-v3', taskId: 'TSK-001' }, { projectRoot: c.root });
+  assert.equal(resolved.ok, true, JSON.stringify(resolved));
+  assert.equal(resolved.resolution.frameworkVersion, '2.3.0');
+  assert.equal(resolved.resolution.role.operationSelection, 'unresolved');
 });
 
 test('zero-to-governed preview/apply: inferred greenfield and explicit brownfield; resolver usable, no application mutations, idempotent', async (t) => {
@@ -47,7 +71,7 @@ test('zero-to-governed preview/apply: inferred greenfield and explicit brownfiel
     assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
     const output = [];
     await consumerCommand({ command: 'setup', cwd: c.root, packageRoot: presentationPackage.root, getAdapter: () => adapter, executableAvailable: () => true, output: (line) => output.push(line), argv: Object.entries(inputs).flatMap(([key,value]) => [`--${key}`, value]) });
-    assert.match(output.join('\n'), /Human Operator:/); assert.match(output.join('\n'), /Selected framework: DEV FOUNDRY 2.1.0/); assert.match(output.join('\n'), /Application files affected: 0/);
+    assert.match(output.join('\n'), /Human Operator:/); assert.match(output.join('\n'), /Selected framework: DEV FOUNDRY 2.3.0/); assert.match(output.join('\n'), /Application files affected: 0/);
     assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
     await assert.rejects(apply(c, { ...preview, hash: '0'.repeat(64) }), { code: 'plan-hash-mismatch' });
     await apply(c, preview);
@@ -56,6 +80,14 @@ test('zero-to-governed preview/apply: inferred greenfield and explicit brownfiel
     for (const [file, hash] of before) if (!['CLAUDE.md', '.mcp.json', '.dev-foundry/.gitignore'].includes(file)) assert.equal(after.get(file), hash, file);
     assert.ok(preview.plan.declaredInitialAuthorityPaths.includes(ONBOARDING_TASK));
     const pop = parse(await c.read('.dev-foundry/profiles/project-operating-profile.yaml'));
+    assert.equal(pop.schema_version, 'dev-foundry.project-operating-profile.v3');
+    assert.equal(pop.framework.adopted_version, '2.3.0');
+    assert.equal(pop.actor_bindings['governance-author'].selection.mode, 'operation-scoped');
+    assert.equal(Object.hasOwn(pop.actor_bindings['implementation-executor'], 'implementation'), false);
+    const bootstrap = parse(await c.read('.dev-foundry/platform-bootstrap-claude-code.yaml'));
+    assert.equal(bootstrap.schema_version, 'dev-foundry.platform-bootstrap.v3');
+    assert.equal(bootstrap.platform.id, 'claude-code');
+    assert.equal((await evaluateActivation(c.root)).overall, 'active');
     assert.equal(pop.operator.identity, preview.plan.bootstrap.operator);
     assert.equal(pop.repository.classification, preview.plan.bootstrap.classification);
     const index = parse(await c.read('.dev-foundry/authority-index.yaml'));
@@ -102,8 +134,8 @@ test('startup projection tolerates normal task/index authoring; runtime cutovers
   for (const [name, mutate] of [
     ['pin', async () => { const mcp = JSON.parse(await c.read('.mcp.json')); mcp.mcpServers['dev-foundry-governance'].args[2] = `1.4.1:sha256:${'a'.repeat(64)}`; await c.put('.mcp.json', JSON.stringify(mcp)); }],
     ['framework', async () => { const pop = parse(await c.read('.dev-foundry/profiles/project-operating-profile.yaml')); pop.framework.adopted_version = '2.2.0'; await c.put('.dev-foundry/profiles/project-operating-profile.yaml', (await import('yaml')).stringify(pop)); }],
-    ['binding', async () => { const pop = parse(await c.read('.dev-foundry/profiles/project-operating-profile.yaml')); pop.actor_bindings['governance-author'].implementation.identity = 'successor-main-agent'; await c.put('.dev-foundry/profiles/project-operating-profile.yaml', (await import('yaml')).stringify(pop)); }],
-    ['capability', async () => { const file = '.dev-foundry/profiles/capability-profiles/implementation-executor-claude-code-v2.yaml'; const data = parse(await c.read(file)); data.limits.implementation_identity = 'successor-executor'; await c.put(file, (await import('yaml')).stringify(data)); }],
+    ['binding', async () => { const pop = parse(await c.read('.dev-foundry/profiles/project-operating-profile.yaml')); pop.actor_bindings['governance-author'].selection.eligibility_policy = 'changed-policy'; await c.put('.dev-foundry/profiles/project-operating-profile.yaml', (await import('yaml')).stringify(pop)); }],
+    ['actor-profile', async () => { const file = '.dev-foundry/releases/2.3.0/actor-profiles/implementation-executor-v2.yaml'; const data = parse(await c.read(file)); data.id = 'successor-executor'; await c.put(file, (await import('yaml')).stringify(data)); }],
     ['bootstrap', async () => { const file = '.dev-foundry/platform-bootstrap-claude-code.yaml'; const data = parse(await c.read(file)); data.artifact_version = 'successor'; await c.put(file, (await import('yaml')).stringify(data)); }],
   ]) await t.test(name, async () => {
     const current = await listTree(c.root); const originals = new Map();
