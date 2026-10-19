@@ -16,7 +16,7 @@ export class ConsumerUsageError extends Error { constructor(message) { super(mes
 function optionsFor(command, argv) {
   const allowed = new Set(['--root', '--verbose', ...(command === 'start' ? ['--runtime'] : ['--json']),
     ...(['setup', 'upgrade'].includes(command) ? ['--yes', '--apply'] : []),
-    ...(command === 'setup' ? ['--project', '--classification', '--operator'] : []), ...(command === 'upgrade' ? ['--from-package'] : []), ...(command === 'doctor' ? ['--runtime'] : [])]);
+    ...(command === 'setup' ? ['--project', '--classification', '--operator'] : []), ...(command === 'upgrade' ? ['--from-package', '--resolution-file', '--plan-sha256'] : []), ...(command === 'doctor' ? ['--runtime'] : [])]);
   const boolean = new Set(['--verbose', '--json', '--yes', '--apply']);
   const options = { claudeArgs: [] };
   for (let index = 0; index < argv.length; index += 1) {
@@ -184,19 +184,33 @@ export async function consumerCommand({ command, argv = [], packageRoot, cwd = p
   }
   if (command === 'upgrade') {
     if (!view.repository) { emit(publicView(view), humanView(view)); return 2; }
-    const result = await createUpgradePlan({ root: view.repository, adapter, currentPackageRoot: options['--from-package'] ? path.resolve(cwd, options['--from-package']) : undefined });
+    const resolutionFile = options['--resolution-file'] ? path.resolve(cwd, options['--resolution-file']) : undefined;
+    const result = await createUpgradePlan({ root: view.repository, adapter, currentPackageRoot: options['--from-package'] ? path.resolve(cwd, options['--from-package']) : undefined, resolutionFile });
     const plan = result.plan;
     const refresh = ['managed-refresh', 'legacy-bridge'].includes(plan.upgradeKind) || plan.blockers.some((item) => item.code === 'upgrade-migration-required');
-    const blocked = plan.status === 'blocked';
+    const applying = options['--yes'] || options['--apply'];
+    const reviewRequired = plan.status !== 'blocked' && applying &&
+      ((plan.resolutionInput && !options['--plan-sha256']) ||
+        (options['--plan-sha256'] && options['--plan-sha256'] !== result.hash));
+    const blocked = plan.status === 'blocked' || reviewRequired;
     let applied = null;
-    if (!blocked && (options['--yes'] || options['--apply'])) applied = await applyPlan({ root: view.repository, adapter, upgrade: true, planBytes: result.bytes, planSha256: result.hash });
+    const review = plan.reconciliation?.length ? `\nManaged reconciliation preflight (plan SHA-256 ${result.hash}):\nRepository: ${plan.repository.root}\nHEAD: ${plan.repository.head}\nSource pin: ${plan.current.expect}\nTarget pin: ${plan.target.expect}\n${plan.resolutionInput ? `Decision input: ${plan.resolutionInput.path}\nDecision SHA-256: ${plan.resolutionInput.sha256}\nAuthorization: explicit selection plus --plan-sha256 and --yes for this reviewed plan.\n` : ''}${plan.reconciliation.map((item) =>
+      `${item.path} (${item.scope}): ${item.classification}\nBefore file: ${item.before_sha256}\nBase: ${item.base_sha256}\nCurrent: ${item.current_sha256}\nTarget: ${item.target_sha256}\nAfter: ${item.after_sha256 ?? 'unresolved'}\n${item.base_current_diff}${item.base_target_diff}${item.current_target_diff}${item.current_after_diff ?? ''}${item.target_after_diff ?? ''}`).join('\n')}` : '';
+    if (!blocked && applying) {
+      // Human output precedes any write so explicit application includes the
+      // same reviewable preflight. JSON returns the full plan in one response.
+      if (!json && review) output(review.trimStart());
+      applied = await applyPlan({ root: view.repository, adapter, upgrade: true, planBytes: result.bytes, planSha256: result.hash, resolutionFile });
+    }
     const governed = plan.blockers.some((item) => item.code === 'governed-migration-required');
     const unsupported = plan.blockers.some((item) => item.code === 'legacy-source-unsupported');
-    const nextAction = applied && plan.activation?.overall === 'active' ? `${cli} start` : governed ? plan.nextAction : blocked ? refresh || unsupported ? `${cli} help upgrade` : `${cli} doctor` : applied || plan.status === 'noop' ? `${cli} status` : `${cli} upgrade${options['--from-package'] ? ` --from-package ${quotedPath(path.resolve(cwd, options['--from-package']))}` : ''} --yes`;
-    const summary = unsupported ? 'This exact legacy build has no proven bridge. Keep the current runtime and obtain the exact previous release and its provenance.' : governed ? 'This release changes project governance configuration. Continue the upgrade in your current governed Claude session.' : blocked ? refresh ? 'Some DEV FOUNDRY-managed files need to be refreshed. The one-time legacy bridge requires the exact previous package to verify ownership before applying.' : 'Upgrade could not be planned safely. Review the current project configuration.'
+    const resolutionIssue = plan.blockers.some((item) => /resolution|reconciliation/.test(item.code));
+    const applyAction = `${cli} upgrade${options['--from-package'] ? ` --from-package ${quotedPath(path.resolve(cwd, options['--from-package']))}` : ''}${resolutionFile ? ` --resolution-file ${quotedPath(resolutionFile)} --plan-sha256 ${result.hash}` : ''} --yes`;
+    const nextAction = reviewRequired ? applyAction : applied && plan.activation?.overall === 'active' ? `${cli} start` : governed ? plan.nextAction : blocked ? refresh || unsupported || resolutionIssue ? `${cli} help upgrade` : `${cli} doctor` : applied || plan.status === 'noop' ? `${cli} status` : applyAction;
+    const summary = reviewRequired ? 'Application refused: review this preflight and supply its exact --plan-sha256 with --yes. The reviewed plan is missing or changed.' : unsupported ? 'This exact legacy build has no proven bridge. Keep the current runtime and obtain the exact previous release and its provenance.' : governed ? 'This release changes project governance configuration. Continue the upgrade in your current governed Claude session.' : blocked ? resolutionIssue ? 'Managed-file reconciliation is blocked. Review the conflict diffs and the exact resolution-file requirements in help upgrade.' : refresh ? 'Some DEV FOUNDRY-managed files need to be refreshed. The one-time legacy bridge requires the exact previous package to verify ownership before applying.' : 'Upgrade could not be planned safely. Review the current project configuration.'
       : applied ? 'DEV FOUNDRY upgrade applied.' : plan.status === 'noop' ? 'This project already selects the installed adapter.' : refresh ? 'Some DEV FOUNDRY-managed files need to be refreshed.' : 'A compatible runtime pin upgrade is available.';
     emit({ summary, nextAction, applied, plan, planSha256: result.hash, applicationFilesAffected: 0 },
-      `${summary}\nAdapter: ${plan.current?.version ?? 'unknown'} -> ${plan.target.version}\nManaged files ${applied ? 'changed' : 'planned'}: ${blocked ? 'none (plan refused)' : changes(plan).join(', ') || 'none'}\nYour application code will not be changed. Application files affected: 0.\nNext: ${nextAction}`);
+      `${summary}\nAdapter: ${plan.current?.version ?? 'unknown'} -> ${plan.target.version}\nManaged files ${applied ? 'changed' : 'planned'}: ${blocked ? 'none (plan refused)' : changes(plan).join(', ') || 'none'}${applied ? '' : review}\nYour application code will not be changed. Application files affected: 0.\nNext: ${nextAction}`);
     return blocked ? 2 : 0;
   }
   throw new ConsumerUsageError(`Unknown command. Next: ${cli} help`);

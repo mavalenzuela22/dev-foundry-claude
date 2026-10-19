@@ -1,15 +1,48 @@
 import path from 'node:path';
 import { currentMigrationMaterial, legacyVersion, migrationRequiresGovernedSession } from './migration.js';
-import { readFile, realpath } from 'node:fs/promises';
-import { AGENT_PATHS, CLAUDE_MD, MCP_FILE, MCP_SERVER_NAME, POP_PATH, isObject, readContained, readYamlContained } from './common.js';
+import { lstat, readFile, realpath } from 'node:fs/promises';
+import { AGENT_PATHS, CLAUDE_MD, MCP_FILE, MCP_SERVER_NAME, POP_PATH, isObject, parseYamlStrict, pathHasSymlink, readContained, readYamlContained } from './common.js';
 import { makeUnifiedDiff } from './diff.js';
 import { git } from './ignore.js';
 import { createPlan } from './plan.js';
 import { canonicalJson, parseExpect, selfPin, sha256 } from './pin.js';
 
+const exactKeys = (value, keys) => isObject(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+const hash = (value) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+
+// This is Operator-selected candidate data, not a self-attesting authorization.
+// Explicit application of the reviewed exact plan is the authorization boundary.
+async function readResolution(file, root, source, target) {
+  const location = path.resolve(file);
+  const relative = path.relative(root, location);
+  if (relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative)) ||
+      await pathHasSymlink(path.parse(location).root, location.slice(path.parse(location).root.length).split(path.sep).join('/')) ||
+      !(await lstat(location)).isFile()) throw new Error();
+  const bytes = await readFile(location);
+  const input = JSON.parse(bytes.toString('utf8'));
+  // Also reject duplicate JSON keys and invalid UTF-8 rather than reinterpret them.
+  if (!bytes.equals(Buffer.from(bytes.toString('utf8'))) || !parseYamlStrict(bytes) ||
+      !exactKeys(input, ['format', 'repository', 'source', 'target', 'files']) ||
+      input.format !== 'dev-foundry.managed-resolution.v1' ||
+      !exactKeys(input.repository, ['root', 'head']) || input.repository.root !== root ||
+      input.repository.head !== git(root, ['rev-parse', 'HEAD']).stdout.trim() ||
+      input.source !== source || input.target !== target || !Array.isArray(input.files) || !input.files.length) throw new Error();
+  const allowed = new Set([...Object.values(AGENT_PATHS), CLAUDE_MD]);
+  const seen = new Set();
+  for (const item of input.files) {
+    if (!exactKeys(item, ['path', 'before_sha256', 'base_sha256', 'current_sha256', 'target_sha256', 'resolved_sha256', 'resolved_content']) ||
+        !allowed.has(item.path) || seen.has(item.path) ||
+        !['before_sha256', 'base_sha256', 'current_sha256', 'target_sha256', 'resolved_sha256'].every((key) => hash(item[key])) ||
+        typeof item.resolved_content !== 'string' || !item.resolved_content || /[\u0000\ufffd]/.test(item.resolved_content) ||
+        Buffer.from(item.resolved_content).toString('utf8') !== item.resolved_content || sha256(item.resolved_content) !== item.resolved_sha256) throw new Error();
+    seen.add(item.path);
+  }
+  return { files: input.files, provenance: { path: location, sha256: sha256(bytes), source: 'operator-selected-file', authorization: 'explicit-reviewed-plan-apply-required' } };
+}
+
 // Both upgrade forms use adoption's rendering, collision checks and apply model.
 // A refresh additionally proves ownership against the exact pinned old payload.
-export async function createUpgradePlan({ root: rootArgument, adapter, currentPackageRoot }) {
+export async function createUpgradePlan({ root: rootArgument, adapter, currentPackageRoot, resolutionFile }) {
   const plan = {
     planFormat: 'dev-foundry.upgrade-plan.v1', mode: 'upgrade', status: 'blocked',
     current: null, target: adapter, repository: null, activation: null,
@@ -62,30 +95,46 @@ export async function createUpgradePlan({ root: rootArgument, adapter, currentPa
     }
   }
 
+  let resolution;
+  if (resolutionFile !== undefined) {
+    try {
+      if (!currentPackageRoot) throw new Error();
+      resolution = await readResolution(resolutionFile, root, plan.current.expect, adapter.expect);
+      plan.resolutionInput = resolution.provenance;
+    } catch {
+      block('upgrade-resolution-invalid', 'The explicitly selected resolution file must have the closed schema, exact repository/source/target and content hashes, and only managed conflict paths.');
+      return finish();
+    }
+  }
   // Keep the current pin while comparing managed bytes through adoption.
   let compatible = await createPlan({ root, adapter: plan.current });
-  if ((legacy || compatible.plan.status !== 'noop') && currentPackageRoot) {
+  if (currentPackageRoot) {
     try {
       const source = await realpath(path.resolve(currentPackageRoot));
       if (selfPin(source).expect !== plan.current.expect) throw new Error();
       const relative = path.relative(root, source);
       if (relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))) throw new Error();
       if (JSON.parse(await readFile(path.join(source, 'package.json'), 'utf8')).name !== '@dev-foundry/claude-adapter') throw new Error();
-      const previous = await createPlan({ root, adapter: plan.current, templatesRoot: path.join(source, 'templates') });
-      if (previous.plan.status !== 'noop') throw new Error();
-      compatible = await createPlan({ root, adapter: plan.current, managedRefreshHashes: previous.plan.preconditions });
-      const allowed = new Set([...Object.values(AGENT_PATHS), CLAUDE_MD]);
-      if (compatible.plan.status === 'blocked' || compatible.plan.create.length || compatible.plan.delete.length ||
-          compatible.ops.writes.some((item) => !allowed.has(item.path))) throw new Error();
+      compatible = await createPlan({ root, adapter: plan.current, managedBaseTemplatesRoot: path.join(source, 'templates'), managedResolutions: resolution?.files });
+      if (selfPin(source).expect !== plan.current.expect) throw new Error();
+      plan.reconciliation = compatible.plan.reconciliation;
       plan.currentPackageRoot = source;
+      if (resolution?.files.some((item) => !plan.reconciliation?.some((record) => record.path === item.path && record.classification === 'operator-resolved'))) {
+        block('upgrade-resolution-unused', 'Every selected resolution must match an existing verified managed conflict and its exact fingerprints.');
+      }
+      const allowed = new Set([...Object.values(AGENT_PATHS), CLAUDE_MD]);
+      if (!['noop', 'ready'].includes(compatible.plan.status) || compatible.plan.create.length || compatible.plan.delete.length ||
+          compatible.ops.writes.some((item) => !allowed.has(item.path))) throw new Error();
       plan.upgradeKind = legacy ? 'legacy-bridge' : 'managed-refresh';
     } catch {
-      block('upgrade-ownership-unverified', 'The previous package must match the project pin and every existing managed file. Restore the original managed files or provide the exact previous package with --from-package.');
+      block('upgrade-ownership-unverified', 'The previous package must match the project pin. Only verified managed agents and the CLAUDE.md span may be reconciled; resolve ownership, content or authority collisions before replanning.');
     }
   }
   plan.activation = compatible.plan.activation;
   plan.preconditions = compatible.plan.preconditions;
   plan.guaranteed_untouched = compatible.plan.guaranteed_untouched;
+  plan.noop = compatible.plan.noop;
+  plan.blockers.push(...compatible.plan.blockers);
   const head = git(root, ['rev-parse', 'HEAD']);
   const drift = git(root, ['diff', 'HEAD', '--binary']);
   const status = git(root, ['status', '--porcelain', '--untracked-files=all']);
@@ -94,7 +143,6 @@ export async function createUpgradePlan({ root: rootArgument, adapter, currentPa
   }
   plan.repository = { root, head: head.stdout.trim(), diffSha256: sha256(drift.stdout), statusSha256: sha256(status.stdout) };
   if (compatible.plan.status !== 'noop' && !['managed-refresh', 'legacy-bridge'].includes(plan.upgradeKind)) {
-    plan.blockers.push(...compatible.plan.blockers);
     block('upgrade-migration-required', 'Some DEV FOUNDRY-managed files need to be refreshed. Supply the exact previous installed package with --from-package to verify ownership. Your application code will not be changed.');
   }
   if (plan.blockers.length) return finish();
@@ -110,6 +158,7 @@ export async function createUpgradePlan({ root: rootArgument, adapter, currentPa
   }
   entry.args[2] = adapter.expect;
   const after = `${JSON.stringify(config, null, 2)}\n`;
+  plan.noop = plan.noop.filter((file) => file !== MCP_FILE);
   plan.merge = [...compatible.plan.merge, { path: MCP_FILE, before_sha256: sha256(before), after_sha256: sha256(after), diff: makeUnifiedDiff(MCP_FILE, before.toString('utf8'), after) }].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
   ops.writes.push(...compatible.ops.writes);
   ops.writes.push({ path: MCP_FILE, content: after });

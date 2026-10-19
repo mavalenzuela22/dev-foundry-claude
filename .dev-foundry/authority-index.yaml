@@ -543,6 +543,14 @@ routes:
       - governed-main-only-adapter-release-publication-handoff
     section_id: null
 
+  - id: TSK-032
+    path: docs/70-tasks/70 [TSK-032] PROJECT - Reconcile Modified Managed Artifacts in Governed Consumer Upgrades.md
+    authority_class: task
+    governs:
+      - verified-managed-artifact-reconciliation-on-upgrade
+      - minimal-corrective-release-after-adapter-150
+    section_id: null
+
 bindings:
   - id: governance-author-capability-producer-maintenance-v1
     path: .dev-foundry/profiles/capability-profiles/governance-author-producer-maintenance-v1.yaml
