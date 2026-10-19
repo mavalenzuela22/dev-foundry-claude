@@ -1,9 +1,9 @@
-schema_version: dev-foundry.platform-bootstrap.v2
+schema_version: dev-foundry.platform-bootstrap.v3
 id: DFC-PLATFORM-BOOTSTRAP
 title: dev-foundry-claude Platform Bootstrap
 kind: platform-bootstrap
 status: active
-artifact_version: "2.1.0-local.6"
+artifact_version: "2.3.0-local.1"
 canonical: false
 methodology_authority: false
 
@@ -18,19 +18,20 @@ sources:
 actor_resolution:
   mode: governed-project-bindings
   eligible_profiles:
-    - .dev-foundry/releases/2.1.0/actor-profiles/governance-author-v3.yaml
-    - .dev-foundry/releases/2.1.0/actor-profiles/governance-auditor-v2.yaml
-    - .dev-foundry/releases/2.1.0/actor-profiles/evidence-custodian-v1.yaml
+    - .dev-foundry/releases/2.3.0/actor-profiles/governance-author-v4.yaml
+    - .dev-foundry/releases/2.3.0/actor-profiles/governance-auditor-v2.yaml
+    - .dev-foundry/releases/2.3.0/actor-profiles/evidence-custodian-v1.yaml
   fixed_profile: null
   default_role: governance-author
   rule: >
-    Resolve exactly one eligible role/profile before each role-dependent bounded
-    operation. Explicit Operator role intent wins only when the POP binding is
-    active and applicable separation-of-duty and independence rules are
-    satisfied. The Implementation Executor is separately bound to the
-    process-bound-runner-code-executor and is not self-selected by this
-    governance implementation. The Mechanical Validator is separately bound to
-    the process-bound-runner.
+    Resolve one role and versioned Actor Profile from the active POP v3 for each
+    bounded operation; select the concrete implementation only for that operation
+    after verifying identity, capability fit, Operator authorization and the
+    applicable separation-of-duty or independent-audit rules. The previously
+    configured producer-maintenance author capability, process-bound Runner
+    Code Executor and mechanical validator are eligible candidates only when
+    their operation-scoped proof and constraints actually fit. Neither the
+    bootstrap nor mere tool availability grants role authority.
 
 platform:
   id: chatgpt-project
@@ -43,13 +44,13 @@ platform:
 constraints:
   - this bootstrap establishes ChatGPT-project producer maintenance for dev-foundry-claude under ADR-004
   - active reusable methodology is sourced only from the POP-selected immutable canonical framework release
-  - concrete implementation bindings are owned by the Project Operating Profile
+  - POP v3 owns stable role policy; concrete implementations and Capability Profiles are proven and selected per operation
   - capability does not grant authority
   - role selection is operation-scoped
   - independent audit eligibility is established from actual prior participation and active separation-of-duty rules
   - runner runtime state and product mechanics are not reusable methodology
-  - the Implementation Executor is separately bound in the POP to the process-bound-runner-code-executor through the active producer-maintenance Capability Profile and is not self-selected by this governance implementation
-  - the Mechanical Validator is separately bound in the POP to the process-bound-runner
+  - the Implementation Executor is separately selected per operation and must prove fit to the existing implementation-executor-runner-v3 Capability Profile where applicable; governance author does not self-select that role
+  - the Mechanical Validator is separately selected with trustworthy process-bound Runner evidence for the actual operation
   - Claude Code is the adapter target runtime and is not the active producer platform
   - root CLAUDE.md, .mcp.json, .claude and Claude Capability Profiles are product and distribution surface and do not bind any producer role
   - consumer repositories are never read or modified by producer governance and consume only explicit adapter releases

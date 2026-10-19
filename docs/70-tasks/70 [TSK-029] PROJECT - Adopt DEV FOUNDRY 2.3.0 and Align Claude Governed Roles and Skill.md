@@ -484,3 +484,89 @@ directions describe causal lineage only and authorize **no future
 TSK-029 executor dispatch** on this branch. TSK-029's 2.3.0
 adoption/promotion remains separately pending.
 
+## 10. Adopted 2.3.0 project configuration — integrated PR #55 candidate
+
+After the Operator authorized completion of the whole adoption/release
+chain on 2026-10-18, the verified TSK-031 product candidate was
+committed and pushed by the Operator at
+`bd08efe39c152c6aaf9cabf25f5f05a85ef170f7` on
+`task/tsk-031-adapter-150-release-preparation`; PR #55 was opened at
+`https://github.com/mavalenzuela22/dev-foundry-claude/pull/55`.
+This commit carried **exactly** the eight previously observed release
+metadata/test/task paths, with no change to source product runtime.
+The precommit release validation `TSK031-V003-FULL-RELEASE-150`
+remains a 361/361 PASS on the exact seven product candidate files.
+
+A separately authorized, Governance-Author-owned adoption delta is
+prepared **on the same branch after that clean commit**, touching
+only the three active project authority entries and the two already
+configured project Capability Profiles:
+
+- `.dev-foundry/profiles/project-operating-profile.yaml`: v2 ->
+  `dev-foundry.project-operating-profile.v3`, adopted canonical
+  framework `2.3.0`, unchanged project identity/operator/roles,
+  exact 2.3.0 Role Profiles (Governance Author v4), and
+  `operation-scoped` selection using the explicitly adopted stable
+  `operator-and-actor-fit` policy with no synthetic provider/model
+  allowlist or mandatory extra capability identifier.
+- `.dev-foundry/platform-bootstrap.yaml`: v2 -> v3, same source
+  paths/platform/repository, versioned 2.3.0 eligible role profiles,
+  selecting role, actor and implementation with actual operation
+  identity/permission/capability evidence rather than v2 static
+  implementation bindings.
+- `.dev-foundry/authority-index.yaml`: project index remains
+  `dev-foundry.authority-index.v2` (contract still supported) and
+  routes the adopted methodology explicitly to immutable
+  `.dev-foundry/releases/2.3.0/authority-index.yaml`; subject
+  base_version advances to 2.3.0.
+- Existing `governance-author-producer-maintenance-v1.yaml` and
+  `implementation-executor-runner-v3.yaml` project Capability
+  Profiles: replace **only** stale v2-only static-POP-binding
+  prerequisites with equivalently restrictive v2-static / v3-
+  operation-selected capability evidence rules. Keep actor-specific
+  prohibitions, process-bound repository, Code Executor separation,
+  approvals and other restrictions intact. Original v2-based
+  operations retain their historical meaning and proof.
+
+Source identities are reused from the TSK-029 upstream provenance
+check and canonical copied bundle. No immutable release byte was
+changed, and no alternate framework version is adopted. The
+production Runner's read-only
+`resolve_governed_operation_v2(inspect, TSK-029)` observed
+`framework.adoptedVersion=2.3.0`,
+`compatibility=compatible`, `resolution=READY` with no
+diagnostic. The Runner's exact-path change-set verifier will be used
+for the final authority change manifest. This is evidence that the
+**branch's** adopted authority resolves, not that PR #55 has merged
+or a release is published.
+
+### Governance Author necessity, risk and sufficiency assessment
+
+The original 2.1.0 static binding cannot serve as an active 2.3.0 POP
+v3 role policy: DAT-016 §§8–10 explicitly requires removal of
+permanent `implementation` and `capability_profiles` from POP v3
+role entries, with concrete implementation selected per operation.
+The two active project Capability Profiles previously demanded the
+removed v2 static POP binding and therefore required the minimal
+v3-compatible operation-selection alternative. A new permanent role
+registry, new project Capability Profiles, new services, runner
+changes, independent auditor by default, repeated 361-test suite
+or framework source modifications would exceed OPS-007 necessity.
+
+Preserved: operator authority, implemented producer product, 2.1.0
+historical bundle and evidence, roles and separation, exact 2.3.0
+canonical bundle, consumer repository boundaries, original
+published 1.4.2 assets and pin behavior. This is the explicit
+project 2.1.0 -> 2.3.0 adoption candidate. It shall only be
+represented as **promoted/active on main** once the final five-path
+authority delta is committed to PR #55, merged under the approved
+integration boundary, and reobserved on main. Until that event the
+project main branch still has its previous adoption.
+
+The ChatGPT Project's deployed system prompt is a non-authoritative
+derivative of its Platform Bootstrap. It must be refreshed to reflect
+POP/bootstrap v3 after promotion; it cannot be automatically mutated
+from this governed repository operation. That required host
+configuration alignment is distinct from the shipped consumer
+adapter; no old session is reinterpreted as v3.
+
