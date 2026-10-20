@@ -10,10 +10,22 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const runnerV1Path = '.dev-foundry/profiles/capability-profiles/implementation-executor-runner-v1.yaml';
 const runnerPath = '.dev-foundry/profiles/capability-profiles/implementation-executor-runner-v2.yaml';
 const runnerV3Path = '.dev-foundry/profiles/capability-profiles/implementation-executor-runner-v3.yaml';
+const authorPath = '.dev-foundry/profiles/capability-profiles/governance-author-producer-maintenance-v1.yaml';
 const historicalClaudePath = '.dev-foundry/profiles/capability-profiles/implementation-executor-claude-code-v1.yaml';
 const claudePath = '.dev-foundry/profiles/capability-profiles/implementation-executor-claude-code-v2.yaml';
 const auditorPath = '.dev-foundry/profiles/capability-profiles/governance-auditor-claude-code-v1.yaml';
 const contractPath = 'docs/40-specifications/40 [SPC-002] PROJECT - Claude-Native Cutover Binding Contract.md';
+const producerActors = [
+  ['governance-author', 'governance-author-v4'],
+  ['governance-auditor', 'governance-auditor-v2'],
+  ['evidence-custodian', 'evidence-custodian-v1'],
+  ['implementation-executor', 'implementation-executor-v2'],
+  ['mechanical-validator', 'mechanical-validator-v2'],
+];
+const producerCapabilities = [
+  [authorPath, 'governance-author-capability-producer-maintenance-v1'],
+  [runnerV3Path, 'implementation-executor-capability-producer-maintenance'],
+];
 
 async function readProjectFile(path) {
   const absolute = resolve(root, path);
@@ -45,25 +57,48 @@ async function assertAbsent(path) {
     `${path} must remain absent in the Claude-native topology`);
 }
 
-function assertProducerCapabilityIndex(pop, index) {
-  const activePaths = Object.values(pop.actor_bindings)
-    .filter((binding) => binding.status === 'active')
-    .flatMap((binding) => binding.capability_profiles);
-  const active = new Set(activePaths);
-  assert.equal(active.size, activePaths.length, 'Active producer capabilities must not be duplicated');
-  for (const path of [historicalClaudePath, claudePath, auditorPath]) {
-    assert.ok(!active.has(path), `Claude consumer capability must not be bound to the producer: ${path}`);
+function assertProducerRoleSelection(pop) {
+  assert.equal(pop.schema_version, 'dev-foundry.project-operating-profile.v3');
+  assert.equal(pop.framework.adopted_version, '2.3.0');
+  assert.equal(pop.framework.adoption_status, 'active');
+  assert.equal(pop.framework.selected_authority_index, '.dev-foundry/releases/2.3.0/authority-index.yaml');
+  assert.equal(pop.framework.selected_manifest, '.dev-foundry/releases/2.3.0/release-integrity-manifest.yaml');
+  assert.deepEqual(Object.keys(pop.actor_bindings).sort(), producerActors.map(([role]) => role).sort());
+  for (const [role, profile] of producerActors) {
+    const binding = pop.actor_bindings[role];
+    assert.equal(binding.status, 'active', role);
+    assert.equal(binding.profile, `.dev-foundry/releases/2.3.0/actor-profiles/${profile}.yaml`, role);
+    assert.deepEqual(binding.selection, {
+      mode: 'operation-scoped',
+      required_capabilities: [],
+      eligibility_policy: 'operator-and-actor-fit',
+    }, `Producer role requires operation-scoped selection, not a Claude consumer capability binding: ${role}`);
+    assert.ok(!Object.hasOwn(binding, 'implementation'), `Concrete implementation is selected per operation: ${role}`);
+    assert.ok(!Object.hasOwn(binding, 'capability_profiles'), `Capability fit is proven per operation: ${role}`);
   }
-  for (const path of active) {
+}
+
+function assertProducerCapabilityIndex(pop, index) {
+  assertProducerRoleSelection(pop);
+  assert.equal(index.status, 'active');
+  assert.equal(index.rules.runtime_capability_grants_authority, false);
+  // Configured capability routes are fit candidates, not POP role assignments.
+  const active = new Set(producerCapabilities.map(([path]) => path));
+  for (const [path, id] of producerCapabilities) {
     const bindings = index.bindings.filter((binding) => binding.path === path);
     assert.equal(bindings.length, 1, `Expected exactly one active capability binding: ${path}`);
+    assert.equal(bindings[0].id, id, `Active capability route must retain its configured identity: ${path}`);
+    assert.equal(index.bindings.filter((binding) => binding.id === id).length, 1, `Capability route ID must be unique: ${id}`);
     assert.equal(bindings[0].kind, 'capability-profile', path);
     assert.equal(bindings[0].authority_class, 'configured', path);
     assert.equal(bindings[0].required, true, `Active producer capability must be required: ${path}`);
   }
   for (const binding of index.bindings.filter((entry) => entry.kind === 'capability-profile')) {
+    assert.equal(binding.authority_class, 'configured', binding.path);
+    assert.equal(index.bindings.filter((entry) => entry.path === binding.path).length, 1,
+      `Capability route must be unique: ${binding.path}`);
     assert.equal(binding.required, active.has(binding.path),
-      `Only active POP capabilities may be required: ${binding.path}`);
+      `Only active producer capability routes may be required: ${binding.path}`);
   }
   for (const path of [runnerV1Path, runnerPath, historicalClaudePath, claudePath, auditorPath]) {
     const bindings = index.bindings.filter((binding) => binding.path === path);
@@ -155,46 +190,29 @@ test('active POP has exactly the ChatGPT-project producer-maintenance role bindi
     path: '.dev-foundry/platform-bootstrap.yaml',
     status: 'active',
   });
-  const expected = [
-    ['governance-author', 'governance-author-v3', 'agent', 'operator-assisted-dev-foundry-copilot'],
-    ['governance-auditor', 'governance-auditor-v2', 'agent', 'operator-assisted-dev-foundry-copilot'],
-    ['evidence-custodian', 'evidence-custodian-v1', 'agent', 'operator-assisted-dev-foundry-copilot'],
-    ['implementation-executor', 'implementation-executor-v2', 'tool', 'process-bound-runner-code-executor'],
-    ['mechanical-validator', 'mechanical-validator-v2', 'tool', 'process-bound-runner'],
-  ];
-  assert.deepEqual(Object.keys(pop.actor_bindings).sort(), expected.map(([role]) => role).sort());
-  for (const [role, profile, kind, identity] of expected) {
-    const binding = pop.actor_bindings[role];
-    assert.equal(binding.status, 'active', role);
-    assert.equal(binding.profile, `.dev-foundry/releases/2.1.0/actor-profiles/${profile}.yaml`, role);
-    assert.deepEqual(binding.implementation, { kind, identity, platform: 'chatgpt-project' }, role);
-    assert.ok(Array.isArray(binding.capability_profiles), role);
-    if (role === 'governance-author') {
-      assert.ok(binding.capability_profiles.length > 0, 'Author must retain governed capabilities');
-    } else if (role === 'implementation-executor') {
-      assert.equal(binding.capability_profiles.length, 1, 'Producer must have exactly one bound executor capability');
-      assert.deepEqual(binding.capability_profiles, [runnerV3Path], 'Producer Executor must bind the active runner V3 capability');
+  assertProducerCapabilityIndex(pop, await readYaml('.dev-foundry/authority-index.yaml'));
+  for (const [path, id, identity] of [
+    [authorPath, 'DFC-GOVERNANCE-AUTHOR-PRODUCER-MAINTENANCE-V1', 'operator-assisted-dev-foundry-copilot'],
+    [runnerV3Path, 'DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V3', 'process-bound-runner-code-executor'],
+  ]) {
+    const capability = await readYaml(path);
+    assert.equal(capability.id, id, path);
+    assert.equal(capability.status, 'active', path);
+    assert.equal(capability.implementation_class, identity, path);
+    assert.equal(capability.limits.repository, 'dev-foundry-claude', path);
+    if (path === runnerV3Path) {
+      assert.equal(capability.limits.hosting_purpose, 'chatgpt-governed-producer-maintenance', path);
+      assert.equal(capability.limits.execution_provider, 'codex-cli', path);
+      assert.ok(capability.prohibited_actions.includes('invoke_claude_code_as_executor_for_producer_maintenance'), path);
     } else {
-      assert.deepEqual(binding.capability_profiles, [], role);
-    }
-    for (const path of binding.capability_profiles) {
-      assert.ok(path.startsWith('.dev-foundry/profiles/capability-profiles/'), path);
-      const capability = await readYaml(path);
-      assert.equal(capability.status, 'active', path);
-      assert.equal(capability.implementation_class, identity, path);
-      assert.equal(capability.limits.repository, 'dev-foundry-claude', path);
-      if (role === 'implementation-executor') {
-        assert.equal(capability.limits.hosting_purpose, 'chatgpt-governed-producer-maintenance', path);
-        assert.equal(capability.limits.execution_provider, 'codex-cli', path);
-        assert.ok(capability.prohibited_actions.some((action) =>
-          /^invoke_claude_code_as_(?:executor_for_producer_maintenance|producer_(?:implementation_)?executor)$/.test(action)), path);
-      }
+      assert.equal(capability.limits.platform, 'chatgpt-project', path);
+      assert.equal(capability.limits.task_binding, 'operation_scoped_explicit_authority', path);
+      assert.equal(capability.limits.implementation, 'prohibited', path);
     }
   }
-  assertProducerCapabilityIndex(pop, await readYaml('.dev-foundry/authority-index.yaml'));
 });
 
-test('Authority Index requires exactly the active POP capabilities and retains historical/consumer profiles as non-required', async () => {
+test('Authority Index requires exactly the active producer capabilities and retains historical/consumer profiles as non-required', async () => {
   const pop = await readYaml('.dev-foundry/profiles/project-operating-profile.yaml');
   const index = await readYaml('.dev-foundry/authority-index.yaml');
   assertProducerCapabilityIndex(pop, index);
@@ -222,14 +240,21 @@ test('producer capability checks reject missing, duplicate, non-required, and un
       const unboundRequired = structuredClone(index);
       unboundRequired.bindings.find((entry) => entry.path === binding.path).required = true;
       assert.throws(() => assertProducerCapabilityIndex(pop, unboundRequired),
-        /Only active POP capabilities may be required/, `Unbound required: ${binding.path}`);
+        /Only active producer capability routes may be required/, `Unbound required: ${binding.path}`);
     }
   }
   for (const path of [historicalClaudePath, claudePath, auditorPath]) {
     const claudeBound = structuredClone(pop);
-    claudeBound.actor_bindings['implementation-executor'].capability_profiles = [path];
+    claudeBound.actor_bindings['implementation-executor'].selection.required_capabilities = [path];
     assert.throws(() => assertProducerCapabilityIndex(claudeBound, index),
-      /Claude consumer capability must not be bound to the producer/, path);
+      /Producer role requires operation-scoped selection, not a Claude consumer capability binding/, path);
+  }
+  for (const [path] of producerCapabilities) {
+    for (const [key, value] of [['authority_class', 'methodology'], ['kind', 'actor-profile'], ['id', 'wrong-capability-route']]) {
+      const misrouted = structuredClone(index);
+      misrouted.bindings.find((entry) => entry.path === path)[key] = value;
+      assert.throws(() => assertProducerCapabilityIndex(pop, misrouted), { code: 'ERR_ASSERTION' }, `${key}: ${path}`);
+    }
   }
 });
 
@@ -242,15 +267,15 @@ test('runner V2 remains unmodified pre-cutover history', async () => {
   assert.equal(runner.limits.hosting_phase, 'chatgpt-governed-pre-cutover');
 });
 
-test('runner V3 binds the producer Executor to the ChatGPT-governed process-bound runner', async () => {
+test('runner V3 requires matching operation-scoped executor capability proof for POP v3 and preserves v2 compatibility', async () => {
   const profile = await readYaml(runnerV3Path);
   assert.equal(profile.id, 'DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V3');
   assert.equal(profile.implementation_class, 'process-bound-runner-code-executor');
   assert.equal(profile.limits.hosting_purpose, 'chatgpt-governed-producer-maintenance');
   assert.equal(profile.limits.execution_provider, 'codex-cli');
   assert.ok(!Object.hasOwn(profile.limits, 'hosting_phase'));
-  assert.ok(profile.environment_constraints.includes('active_pop_must_bind_implementation_executor_to_this_profile'));
-  assert.ok(profile.stop_conditions.includes('profile_is_not_the_active_pop_binding_for_implementation_executor'));
+  assert.ok(profile.environment_constraints.includes('v2_pop_must_bind_implementation_executor_to_this_profile_or_v3_operation_selection_must_prove_matching_executor_capability'));
+  assert.ok(profile.stop_conditions.includes('v2_pop_binding_mismatch_or_v3_operation_selection_lacks_matching_executor_capability_proof'));
   for (const action of [
     'invoke_claude_code_as_executor_for_producer_maintenance',
     'mutate_any_consumer_repository',
@@ -271,18 +296,21 @@ test('ADR-004 is routed and ACCEPTED, SPC-005 is routed and ACTIVE', async () =>
   }
 });
 
-test('active ChatGPT-project Platform Bootstrap permits Author, Auditor, and Custodian and separately binds the runner', async () => {
+test('active ChatGPT-project Platform Bootstrap permits Author, Auditor, and Custodian and requires separate runner selection', async () => {
   const bootstrap = await readYaml('.dev-foundry/platform-bootstrap.yaml');
+  assert.equal(bootstrap.schema_version, 'dev-foundry.platform-bootstrap.v3');
   assert.equal(bootstrap.status, 'active');
+  assert.equal(bootstrap.methodology_authority, false);
   assert.equal(bootstrap.repository.expected_name, 'dev-foundry-claude');
+  assert.equal(bootstrap.repository.workspace_binding, 'process-bound-repository');
   assert.equal(bootstrap.platform.id, 'chatgpt-project');
   assert.equal(bootstrap.sources.project_operating_profile, '.dev-foundry/profiles/project-operating-profile.yaml');
   assert.equal(bootstrap.sources.authority_index, '.dev-foundry/authority-index.yaml');
   assert.equal(bootstrap.actor_resolution.mode, 'governed-project-bindings');
   assert.deepEqual(bootstrap.actor_resolution.eligible_profiles, [
-    '.dev-foundry/releases/2.1.0/actor-profiles/governance-author-v3.yaml',
-    '.dev-foundry/releases/2.1.0/actor-profiles/governance-auditor-v2.yaml',
-    '.dev-foundry/releases/2.1.0/actor-profiles/evidence-custodian-v1.yaml',
+    '.dev-foundry/releases/2.3.0/actor-profiles/governance-author-v4.yaml',
+    '.dev-foundry/releases/2.3.0/actor-profiles/governance-auditor-v2.yaml',
+    '.dev-foundry/releases/2.3.0/actor-profiles/evidence-custodian-v1.yaml',
   ]);
   assert.equal(bootstrap.actor_resolution.fixed_profile, null);
   assert.equal(bootstrap.actor_resolution.default_role, 'governance-author');
@@ -293,33 +321,37 @@ test('active ChatGPT-project Platform Bootstrap permits Author, Auditor, and Cus
     ...bootstrap.constraints,
   ].map((rule) => rule.replace(/\s+/g, ' ').trim());
   const text = rules.join('\n');
-  assert.match(text, /Implementation[- ]Executor[^.\n]*(?:separately )?bound[^.\n]*process-bound[- ]runner[- ]code[- ]executor/i);
+  assert.match(text, /Resolve one role and versioned Actor Profile from the active POP v3 for each bounded operation/i);
+  assert.match(text, /select the concrete implementation only for that operation after verifying identity, capability fit, Operator authorization and the applicable separation-of-duty or independent-audit rules/i);
+  assert.match(text, /concrete implementations and Capability Profiles are proven and selected per operation/i);
   const pop = await readYaml(bootstrap.sources.project_operating_profile);
   const index = await readYaml(bootstrap.sources.authority_index);
   assertProducerCapabilityIndex(pop, index);
   const executor = pop.actor_bindings['implementation-executor'];
   assert.equal(executor.status, 'active');
-  assert.deepEqual(executor.implementation, {
-    kind: 'tool', identity: 'process-bound-runner-code-executor', platform: 'chatgpt-project',
-  });
+  assert.equal(executor.selection.mode, 'operation-scoped');
   assert.ok(!bootstrap.actor_resolution.eligible_profiles.includes(executor.profile),
     'Governance implementation must not self-select the Executor');
-  assert.equal(executor.capability_profiles.length, 1);
-  const capabilityPath = executor.capability_profiles[0];
-  const routes = index.bindings.filter((binding) => binding.path === capabilityPath);
-  assert.equal(routes.length, 1);
-  const capability = await readYaml(routes[0].path);
-  assert.match(capability.id, /^DFC-IMPLEMENTATION-EXECUTOR-[A-Z0-9-]+$/,
-    'The active POP-bound, routed capability must identify the producer Executor');
+  const validator = pop.actor_bindings['mechanical-validator'];
+  assert.equal(validator.selection.mode, 'operation-scoped');
+  assert.ok(!bootstrap.actor_resolution.eligible_profiles.includes(validator.profile),
+    'Mechanical Validator requires separate operation selection');
+  const routes = index.bindings.filter((binding) => binding.path === runnerV3Path);
+  assert.deepEqual(routes, [{
+    id: 'implementation-executor-capability-producer-maintenance',
+    path: runnerV3Path, kind: 'capability-profile', authority_class: 'configured', required: true,
+  }]);
+  const capability = await readYaml(runnerV3Path);
+  assert.equal(capability.id, 'DFC-IMPLEMENTATION-EXECUTOR-RUNNER-V3');
   assert.equal(capability.status, 'active', capability.id);
-  assert.equal(capability.implementation_class, executor.implementation.identity, capability.id);
+  assert.equal(capability.implementation_class, 'process-bound-runner-code-executor', capability.id);
   assert.equal(capability.limits.hosting_purpose, 'chatgpt-governed-producer-maintenance', capability.id);
   assert.equal(capability.limits.execution_provider, 'codex-cli', capability.id);
-  assert.match(text, /Implementation[- ]Executor[^.\n]*separately bound in the POP[^.\n]*through the active (?:task-specific |producer-maintenance )?Capability Profile/i);
-  assert.match(text, /Implementation[- ]Executor[^.\n]*not (?:be )?self-selected|not self-selected[^.\n]*Implementation[- ]Executor/i);
-  assert.match(text, /Mechanical[- ]Validator[^.\n]*(?:separately )?bound[^.\n]*process-bound[- ]runner/i);
+  assert.match(text, /Implementation Executor is separately selected per operation and must prove fit to the existing implementation-executor-runner-v3 Capability Profile where applicable/i);
+  assert.match(text, /governance author does not self-select that role/i);
+  assert.match(text, /Mechanical Validator is separately selected with trustworthy process-bound Runner evidence for the actual operation/i);
   assert.match(text, /Claude Code[^.\n]*target runtime[^.\n]*not[^.\n]*active producer platform/i);
-  assert.match(text, /separation-of-duty and independence rules are satisfied/i);
+  assert.match(text, /independent audit eligibility is established from actual prior participation and active separation-of-duty rules/i);
   assert.match(text, /repository identity authority state and required capability mismatches fail closed/i);
   assert.match(text, /capability (?:does not|never) grants? authority|capabilit[^.\n]*not grant authority|does not grant authority/i);
   for (const clause of rules.flatMap((rule) => rule.split(/[.;]\s+/))) {

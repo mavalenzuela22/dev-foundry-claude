@@ -119,6 +119,34 @@ test('Claude subagent definitions and profiles are consistent and are not active
   const pop = await readYaml('.dev-foundry/profiles/project-operating-profile.yaml');
   assert.equal(pop.repository.name, 'dev-foundry-claude');
   assert.equal(pop.status, 'active');
+  assert.equal(pop.schema_version, 'dev-foundry.project-operating-profile.v3');
+  assert.equal(pop.framework.adopted_version, '2.3.0');
+  const producerActors = {
+    'governance-author': 'governance-author-v4',
+    'governance-auditor': 'governance-auditor-v2',
+    'implementation-executor': 'implementation-executor-v2',
+    'mechanical-validator': 'mechanical-validator-v2',
+    'evidence-custodian': 'evidence-custodian-v1',
+  };
+  assert.deepEqual(Object.keys(pop.actor_bindings).sort(), Object.keys(producerActors).sort());
+  for (const [role, profile] of Object.entries(producerActors)) {
+    const binding = pop.actor_bindings[role];
+    assert.equal(binding.status, 'active', role);
+    assert.equal(binding.profile, `.dev-foundry/releases/2.3.0/actor-profiles/${profile}.yaml`, role);
+    assert.deepEqual(binding.selection, {
+      mode: 'operation-scoped', required_capabilities: [], eligibility_policy: 'operator-and-actor-fit',
+    }, role);
+    assert.ok(!Object.hasOwn(binding, 'implementation'), role);
+    assert.ok(!Object.hasOwn(binding, 'capability_profiles'), role);
+  }
+  const index = await readYaml('.dev-foundry/authority-index.yaml');
+  for (const profile of ['implementation-executor-claude-code-v1.yaml', ...roles.map(({ profile }) => profile)]) {
+    const bindings = index.bindings.filter((binding) => binding.path === `${profileDirectory}${profile}`);
+    assert.equal(bindings.length, 1, profile);
+    assert.equal(bindings[0].kind, 'capability-profile', profile);
+    assert.equal(bindings[0].authority_class, 'configured', profile);
+    assert.equal(bindings[0].required, false, profile);
+  }
   const definitions = await agentFiles();
   for (const { role, name, profile, id, tools } of roles) {
     assert.ok(definitions.includes(`.claude/agents/${name}.md`), name);
@@ -130,10 +158,6 @@ test('Claude subagent definitions and profiles are consistent and are not active
     assert.deepEqual(metadata.tools, tools);
     assert.equal(capability.id, id);
     assert.ok(capability.environment_constraints.includes(`active_pop_must_bind_${role.replaceAll('-', '_')}_to_this_profile`));
-    const binding = pop.actor_bindings[role];
-    assert.equal(binding.implementation.platform, 'chatgpt-project', role);
-    assert.notEqual(binding.implementation.identity, name, role);
-    assert.ok(!binding.capability_profiles.includes(`${profileDirectory}${profile}`), role);
   }
   const config = JSON.parse(await readProjectFile('.mcp.json'));
   assert.ok(Object.hasOwn(config.mcpServers, 'dev-foundry-governance'));

@@ -1,17 +1,17 @@
 import { createBootstrapPlan } from './bootstrap.js';
-import { readdir, realpath } from 'node:fs/promises';
+import { lstat, readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { evaluateActivation } from './activation.js';
 import {
   AGENT_PATHS, BOOTSTRAP_KEY, BOOTSTRAP_PATH, CLAUDE_MD, IGNORE_FILE, INDEX_PATH, MCP_FILE, MCP_SERVER_NAME, POP_PATH,
-  PROFILE_PATHS, cutoverState, isObject, parseYamlStrict, pathHasSymlink, readContained,
+  PROFILE_PATHS, RECONCILIATION_FILE, RECONCILIATION_KEY, cutoverState, isObject, parseYamlStrict, pathHasSymlink, readContained, safeRelativePath,
 } from './common.js';
 import { buildCutoverProposal } from './cutover.js';
 import { makeUnifiedDiff } from './diff.js';
 import { git, planIgnore } from './ignore.js';
 import { inspect, shaOrAbsent } from './inspect.js';
-import { canonicalJson, sha256 } from './pin.js';
+import { canonicalJson, parseExpect, sha256 } from './pin.js';
 import {
   BLOCK_BEGIN, BLOCK_END, renderAgents, renderBootstrap, renderClaudeBlock, renderMcpEntry, renderProfiles, templateParams,
 } from './render.js';
@@ -37,6 +37,97 @@ function blockSpan(content) {
 
 const lf = (value) => value.replaceAll('\r\n', '\n');
 const lines = (value) => value.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+
+// This commitment is carried by the explicitly selected runtime configuration.
+// The receipt alone is never an approval, a replacement pin or project authority.
+// Like --expect, this detects drift relative to that selection; it is not a
+// signature against a local actor replacing the selection and its evidence.
+export function surfaceHash(file, bytes) {
+  if (bytes === null) return 'absent';
+  if (file === MCP_FILE) {
+    const config = JSON.parse(bytes.toString('utf8'));
+    const entry = config.mcpServers?.[MCP_SERVER_NAME];
+    if (isObject(entry?.env)) {
+      delete entry.env[RECONCILIATION_KEY];
+      if (!Object.keys(entry.env).length) delete entry.env;
+    }
+    return sha256(canonicalJson(config));
+  }
+  if (file === CLAUDE_MD) {
+    const span = blockSpan(bytes.toString('utf8'));
+    return span && span.end >= 0 ? sha256(bytes.toString('utf8').slice(span.start, span.end)) : 'absent';
+  }
+  return sha256(bytes);
+}
+
+// No HEAD/worktree hash here: subsequent product work must not invalidate an
+// unchanged governed surface. The apply plan still binds the full Git snapshot.
+export async function reconciliationSurface(root, preconditions, writes = [], excluded = new Set()) {
+  const state = {};
+  const paths = new Set(Object.keys(preconditions).filter((file) => file !== RECONCILIATION_FILE));
+  const inventory = async (directory) => {
+    if (await pathHasSymlink(root, directory)) throw new Error('unsafe reconciliation inventory');
+    let entries;
+    try { entries = await readdir(path.join(root, directory), { withFileTypes: true }); }
+    catch (error) { if (error.code === 'ENOENT') return; throw error; }
+    for (const entry of entries) {
+      const file = `${directory}/${entry.name}`;
+      if (excluded.has(file)) continue;
+      if (!safeRelativePath(file) || entry.isSymbolicLink()) throw new Error('unsafe reconciliation inventory');
+      if (entry.isDirectory()) await inventory(file);
+      else if (entry.isFile()) paths.add(file);
+      else throw new Error('unsafe reconciliation inventory');
+    }
+  };
+  await inventory('.claude/agents');
+  await inventory('.dev-foundry/profiles/capability-profiles');
+  for (const file of [...paths].sort()) {
+    if (!safeRelativePath(file) || await pathHasSymlink(root, file)) throw new Error('unsafe reconciliation path');
+    try { if (!(await lstat(path.join(root, file))).isFile()) throw new Error('unsafe reconciliation path'); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    const write = writes.find((item) => item.path === file);
+    state[file] = surfaceHash(file, write ? Buffer.from(write.content) : await readContained(root, file));
+  }
+  return { files: state, cutover: await cutoverState(root) };
+}
+
+async function reconciliationReceipt(root, adapter, facts) {
+  const bytes = await readContained(root, RECONCILIATION_FILE);
+  let config;
+  try { config = JSON.parse((await readContained(root, MCP_FILE))?.toString('utf8') ?? '{}'); }
+  catch (error) { if (bytes === null) return null; throw error; }
+  const anchor = config.mcpServers?.[MCP_SERVER_NAME]?.env?.[RECONCILIATION_KEY];
+  if (await pathHasSymlink(root, RECONCILIATION_FILE)) throw new Error();
+  try { if (!(await lstat(path.join(root, RECONCILIATION_FILE))).isFile()) throw new Error(); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  if (bytes === null && anchor === undefined) return null;
+  const receipt = JSON.parse(bytes?.toString('utf8'));
+  const hash = (value) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+  const keys = ['format', 'repository', 'project', 'source', 'target', 'previousPlanSha256', 'resolutionSha256', 'files', 'state'];
+  if (!isObject(receipt) || Object.keys(receipt).length !== keys.length || !keys.every((key) => Object.hasOwn(receipt, key)) ||
+      receipt.format !== 'dev-foundry.upgrade-reconciliation.v1' || !bytes.equals(Buffer.from(canonicalJson(receipt))) ||
+      !hash(anchor) || sha256(bytes) !== anchor || receipt.repository !== root ||
+      !isDeepStrictEqual(receipt.project, { name: facts.project, idPrefix: facts.prefix }) ||
+      receipt.target !== adapter.expect || config.mcpServers?.[MCP_SERVER_NAME]?.args?.[2] !== receipt.target ||
+      !hash(receipt.previousPlanSha256) || (receipt.resolutionSha256 !== null && !hash(receipt.resolutionSha256)) ||
+      !Array.isArray(receipt.files) || !receipt.files.length || !isObject(receipt.state)) throw new Error();
+  // Closed path set; persisted records can describe only previously reconciled
+  // surfaces, never extend the configured authority/write boundary.
+  const allowed = new Set([...Object.values(AGENT_PATHS), CLAUDE_MD, ...Object.values(PROFILE_PATHS), BOOTSTRAP_PATH]);
+  const seen = new Set();
+  parseExpect(receipt.source);
+  parseExpect(receipt.target);
+  for (const record of receipt.files) {
+    const recordKeys = ['path', 'scope', 'classification', 'before_sha256', 'base_sha256', 'current_sha256', 'target_sha256', 'after_sha256'];
+    const scope = record?.path === CLAUDE_MD ? 'managed-block' : Object.values(AGENT_PATHS).includes(record?.path) ? 'file' : 'configured-file';
+    if (!isObject(record) || Object.keys(record).length !== recordKeys.length || !recordKeys.every((key) => Object.hasOwn(record, key)) ||
+        !allowed.has(record.path) || seen.has(record.path) || record.scope !== scope ||
+        !['base_sha256', 'current_sha256', 'target_sha256', 'after_sha256', 'before_sha256'].every((key) => hash(record[key])) ||
+        !['operator-resolved', 'local-edits-preserved', 'already-target', 'line-endings-only'].includes(record.classification)) throw new Error();
+    seen.add(record.path);
+  }
+  return { receipt, sha256: anchor };
+}
 
 // Reuse the existing deterministic line diff. Coordinates refer to the verified
 // base, so only disjoint edits can be combined; boundary insertions conflict.
@@ -80,6 +171,30 @@ function reconcileManaged(base, current, target, owned) {
 function agentName(content) {
   const header = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(lf(content));
   return header ? parseYamlStrict(Buffer.from(header[1]))?.name : undefined;
+}
+
+// A dirty exception is per tracked regular agent, never a worktree-wide waiver.
+// Recheck the bytes here; apply also replans and checks the full Git snapshot.
+export async function hasUnresolvedDirtyPaths(root, paths, reconciliation = []) {
+  for (const file of new Set(paths)) {
+    const status = git(root, ['status', '--porcelain', '--untracked-files=all', '--', file]);
+    if (status.status !== 0) return true;
+    const record = Object.values(AGENT_PATHS).includes(file)
+      ? reconciliation.find((item) => item.path === file && item.classification === 'operator-resolved') : undefined;
+    // Ignored untracked agents can be invisible to status; a resolution still
+    // needs a tracked predecessor even when status emits no line.
+    if (!status.stdout.trim() && !record) continue;
+    const current = await readContained(root, file);
+    const tracked = git(root, ['ls-tree', 'HEAD', '--', file]);
+    const prior = git(root, ['show', `HEAD:${file}`]);
+    const changes = status.stdout.split('\n').filter(Boolean);
+    if (!Object.values(AGENT_PATHS).includes(file) || !record || current === null ||
+        await pathHasSymlink(root, file) || sha256(current) !== record.before_sha256 || sha256(current) !== record.current_sha256 ||
+        tracked.status !== 0 || !/^100(?:644|755) blob /.test(tracked.stdout) ||
+        prior.status !== 0 || agentName(prior.stdout) !== agentName(current.toString('utf8')) ||
+        changes.length > 1 || (changes.length === 1 && ![' M', 'M ', 'MM'].includes(changes[0].slice(0, 2)))) return true;
+  }
+  return false;
 }
 
 async function actorProfileId(root, profilePath) {
@@ -136,9 +251,21 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
   const profiles = renderProfiles(params, templatesRoot);
   const bootstrap = renderBootstrap(params, templatesRoot, { legacyV2: facts.pop.schema_version === 'dev-foundry.project-operating-profile.v2' });
   const block = renderClaudeBlock(params, templatesRoot);
+  let evidence;
+  try { evidence = await reconciliationReceipt(root, adapter, facts); }
+  catch {
+    plan.blockers.push(blocker('upgrade-reconciliation-invalid', 'Upgrade reconciliation evidence or its selected runtime commitment is missing, changed or unsafe.'));
+    return finish();
+  }
+  const accepted = (file, current, target) => !remove && !managedBaseTemplatesRoot && evidence?.receipt.files.some((record) =>
+    record.path === file && record.after_sha256 === sha256(current) && record.target_sha256 === sha256(target));
   // Only the upgrade planner supplies this root, after verifying the exact pin.
   const baseAgents = managedBaseTemplatesRoot ? renderAgents(params, managedBaseTemplatesRoot) : null;
   const baseBlock = managedBaseTemplatesRoot ? renderClaudeBlock(params, managedBaseTemplatesRoot) : null;
+  const baseConfigured = managedBaseTemplatesRoot ? {
+    ...renderProfiles(params, managedBaseTemplatesRoot),
+    ...renderBootstrap(params, managedBaseTemplatesRoot, { legacyV2: facts.pop.schema_version === 'dev-foundry.project-operating-profile.v2' }),
+  } : null;
   if (baseAgents) plan.reconciliation = [];
   const entry = renderMcpEntry(params, templatesRoot);
   const touched = [];
@@ -150,11 +277,11 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
     ...[...(facts.index.routes ?? []), ...(facts.index.bindings ?? [])].filter((item) => item?.authority_class === 'configured').map((item) => item.path),
   ].filter((item) => typeof item === 'string').map((item) => path.resolve(root, item));
   const authorityPaths = new Set([...configuredPaths, ...await Promise.all(configuredPaths.map((file) => realpath(file).catch(() => file)))]);
-  if (baseAgents) for (const file of new Set(configuredPaths)) {
+  if (baseAgents || evidence) for (const file of new Set(configuredPaths)) {
     const relative = path.relative(root, file).split(path.sep).join('/');
     if (relative && relative !== '..' && !relative.startsWith('../') && !path.isAbsolute(relative)) {
       pre[relative] = shaOrAbsent(await readContained(root, relative));
-    }
+    } else plan.blockers.push(blocker('reconciliation-authority-unsafe', 'Reconciliation requires every configured authority path to remain inside the project.'));
   }
   const addCreate = (filePath, content) => { plan.create.push({ path: filePath, sha256: sha256(Buffer.from(content, 'utf8')), content }); ops.writes.push({ path: filePath, content }); touched.push(filePath); };
   const addMerge = (filePath, before, after) => {
@@ -163,17 +290,25 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
     touched.push(filePath);
   };
   const addDelete = (filePath, bytes) => { plan.delete.push({ path: filePath, sha256: sha256(bytes) }); ops.deletes.push(filePath); touched.push(filePath); };
-  const reconcile = (filePath, base, current, target, owned) => {
-    const proven = owned && !authorityPaths.has(path.resolve(root, filePath)) && !current.includes('\u0000') && !current.includes('\ufffd');
-    let result = reconcileManaged(base, current, target, proven);
-    if (filePath !== CLAUDE_MD && result.content !== null && agentName(result.content) !== agentName(base)) {
+  const reconcile = (filePath, base, current, target, owned, configured = false) => {
+    const proven = owned && (configured || !authorityPaths.has(path.resolve(root, filePath))) && !current.includes('\u0000') && !current.includes('\ufffd');
+    // Configured YAML is never automatically merged. Only verified source or
+    // target semantics are decidable here; novel project policy stays blocked.
+    const baseData = configured ? parseYamlStrict(Buffer.from(base)) : null;
+    const targetData = configured ? parseYamlStrict(Buffer.from(target)) : null;
+    const knownSemantics = (content) => {
+      const data = parseYamlStrict(Buffer.from(content));
+      return data && [baseData, targetData].some((expected) => isDeepStrictEqual(data, expected));
+    };
+    let result = configured ? { classification: proven ? 'conflict' : 'ownership-unverified', content: null } : reconcileManaged(base, current, target, proven);
+    if (!configured && filePath !== CLAUDE_MD && result.content !== null && agentName(result.content) !== agentName(base)) {
       result = { classification: 'conflict', content: null };
     }
     const decision = managedResolutions.find((item) => item.path === filePath);
     if (decision) {
       const resolved = decision.resolved_content;
       const span = blockSpan(resolved);
-      const identity = filePath === CLAUDE_MD
+      const identity = configured ? knownSemantics(resolved) : filePath === CLAUDE_MD
         ? span?.start === 0 && span.end === resolved.length && resolved.indexOf(BLOCK_BEGIN, BLOCK_BEGIN.length) < 0 &&
           resolved.indexOf(BLOCK_END, resolved.indexOf(BLOCK_END) + BLOCK_END.length) < 0 &&
           lf(resolved).split('\n')[0] === lf(base).split('\n')[0]
@@ -188,10 +323,13 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
       }
     }
     plan.reconciliation.push({
-      path: filePath, scope: filePath === CLAUDE_MD ? 'managed-block' : 'file', classification: result.classification,
+      path: filePath, scope: configured ? 'configured-file' : filePath === CLAUDE_MD ? 'managed-block' : 'file', classification: result.classification,
       before_sha256: pre[filePath],
       base_sha256: sha256(base), current_sha256: sha256(current), target_sha256: sha256(target),
       after_sha256: result.content === null ? null : sha256(result.content),
+      ...(configured && result.content !== null ? {
+        current_semantics_preserved: isDeepStrictEqual(parseYamlStrict(Buffer.from(current)), parseYamlStrict(Buffer.from(result.content))),
+      } : {}),
       base_current_diff: makeUnifiedDiff(filePath, base, current), base_target_diff: makeUnifiedDiff(filePath, base, target),
       current_target_diff: makeUnifiedDiff(filePath, current, target),
       ...(decision && result.content !== null ? { current_after_diff: makeUnifiedDiff(filePath, current, result.content), target_after_diff: makeUnifiedDiff(filePath, target, result.content) } : {}),
@@ -214,7 +352,8 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
         else if (after !== null) addMerge(filePath, current, after);
       } else if (baseAgents) reconcile(filePath, baseAgents[filePath], '', content, false);
       else if (existing === null) addCreate(filePath, content);
-      else if (existing.toString('utf8') === content) plan.noop.push(filePath);
+      else if (existing.toString('utf8') === content ||
+          (accepted(filePath, existing, content) && agentName(existing.toString('utf8')) === agentName(content))) plan.noop.push(filePath);
       else plan.blockers.push(blocker('agent-file-collision', 'An agent file exists and is not byte-identical to the rendered output.'));
     } else if (existing === null) plan.noop.push(filePath);
     else if (existing.toString('utf8') === content) addDelete(filePath, existing);
@@ -252,7 +391,7 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
             else if (mdBytes[end] === 10) end += 1;
             addMerge(CLAUDE_MD, mdBytes, Buffer.concat([mdBytes.subarray(0, start), Buffer.from(after), mdBytes.subarray(end)]));
           }
-        } else if (md.slice(span.start, span.end) === block) plan.noop.push(CLAUDE_MD);
+        } else if (md.slice(span.start, span.end) === block || accepted(CLAUDE_MD, md.slice(span.start, span.end), block)) plan.noop.push(CLAUDE_MD);
         else plan.blockers.push(blocker('managed-block-modified', 'The managed CLAUDE.md block was modified.'));
       } else addMerge(CLAUDE_MD, md, `${md}${md.endsWith('\n') ? '' : '\n'}\n${block}`);
     } else if (!span) plan.noop.push(CLAUDE_MD);
@@ -277,8 +416,13 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
   if (mcpUsable) {
     const servers = config?.mcpServers ?? {};
     const existingEntry = servers[MCP_SERVER_NAME];
+    const comparableEntry = structuredClone(existingEntry);
+    if (evidence && isObject(comparableEntry?.env)) {
+      delete comparableEntry.env[RECONCILIATION_KEY];
+      if (!Object.keys(comparableEntry.env).length) delete comparableEntry.env;
+    }
     const adapterShaped = isObject(existingEntry) && existingEntry.command === 'dev-foundry-claude' && Array.isArray(existingEntry.args) && existingEntry.args[0] === 'mcp' && existingEntry.args[1] === '--expect';
-    if (existingEntry !== undefined && isDeepStrictEqual(existingEntry, entry)) {
+    if (existingEntry !== undefined && isDeepStrictEqual(comparableEntry, entry)) {
       if (!remove) plan.noop.push(MCP_FILE);
     } else if (existingEntry !== undefined && adapterShaped) {
       plan.blockers.push(blocker('adapter-runtime-mismatch', 'The existing runtime pin does not match the installed adapter.'));
@@ -321,13 +465,32 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
       const existing = await readContained(root, filePath);
       pre[filePath] = shaOrAbsent(existing);
       if (existing === null) adds[filePath] = content;
-      else if (existing.toString('utf8') !== content) plan.blockers.push(blocker('artifact-collision', 'A proposed new path collides with an existing different artifact.'));
+      else if (existing.toString('utf8') !== content) {
+        if (!baseConfigured && accepted(filePath, existing, content)) plan.noop.push(filePath);
+        else if (!baseConfigured) plan.blockers.push(blocker('artifact-collision', `${filePath}: a proposed path collides with an existing different artifact.`));
+        else {
+          const base = baseConfigured[filePath];
+          const current = existing.toString('utf8');
+          const baseData = parseYamlStrict(Buffer.from(base));
+          const targetData = parseYamlStrict(Buffer.from(content));
+          const currentData = parseYamlStrict(existing);
+          const stable = baseData && targetData && baseData.id === targetData.id && baseData.schema_version === targetData.schema_version;
+          const owned = stable && existing.equals(Buffer.from(current)) &&
+            [baseData, targetData].some((expected) => isDeepStrictEqual(currentData, expected));
+          if (!owned) plan.blockers.push(blocker('configured-resolution-unverified', `${filePath}: current YAML must have the stable source/target id, schema and bindings and exactly verified source or target semantics; novel configured policy requires a separately governed semantic migration.`));
+          const after = reconcile(filePath, base, current, content, owned, true);
+          if (after === current) plan.noop.push(filePath);
+          else if (after !== null) addMerge(filePath, current, after);
+        }
+      }
     }
     try {
       for (const name of await readdir(path.join(root, '.dev-foundry/profiles/capability-profiles'))) {
         if (!name.endsWith('.yaml')) continue;
         const filePath = `.dev-foundry/profiles/capability-profiles/${name}`;
-        const data = parseYamlStrict((await readContained(root, filePath)) ?? Buffer.alloc(0));
+        const bytes = await readContained(root, filePath);
+        if (baseConfigured || evidence) pre[filePath] = shaOrAbsent(bytes);
+        const data = parseYamlStrict(bytes ?? Buffer.alloc(0));
         if (data && newIds.includes(data.id) && !newPaths.has(filePath)) plan.blockers.push(blocker('id-collision', 'A proposed artifact id collides with an existing different artifact.'));
       }
     } catch { /* no capability profile directory */ }
@@ -337,6 +500,28 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
     }
     for (const item of [...(facts.index.routes ?? []), ...(Array.isArray(facts.index.bindings) ? facts.index.bindings : [])]) {
       if (isObject(item) && Object.values(indexBindingIds).includes(item.id) && !newPaths.has(item.path)) plan.blockers.push(blocker('id-collision', 'A proposed Authority Index id collides with an existing entry.'));
+    }
+    if (baseConfigured) {
+      const routes = [...(facts.index.routes ?? []), ...(facts.index.bindings ?? [])];
+      for (const filePath of newPaths) {
+        const expectedId = filePath === BOOTSTRAP_PATH ? indexBindingIds.bootstrap : filePath === PROFILE_PATHS.executor ? indexBindingIds.executor : indexBindingIds.auditor;
+        const atPath = routes.filter((item) => item?.path === filePath);
+        if (atPath.length > 1 || atPath.some((item) => item.id !== expectedId || item.authority_class !== 'configured' ||
+            (item.kind !== undefined && item.kind !== (filePath === BOOTSTRAP_PATH ? 'platform-bootstrap' : 'capability-profile')))) {
+          plan.blockers.push(blocker('configured-authority-collision', `${filePath}: configured authority routing is ambiguous or unexpected.`));
+        }
+        for (const item of routes) {
+          if (typeof item?.path === 'string' && item.path !== filePath &&
+              await realpath(path.resolve(root, item.path)).catch(() => null) === path.resolve(root, filePath)) {
+            plan.blockers.push(blocker('configured-authority-collision', `${filePath}: another authority route aliases this configured artifact.`));
+          }
+        }
+      }
+      // Keep preservation claims exact when an explicit decision writes YAML.
+      if (ops.writes.some((item) => newPaths.has(item.path))) {
+        plan.guaranteed_untouched = plan.guaranteed_untouched.filter((item) =>
+          !newPaths.has(item) && item !== 'existing capability profiles and runner files' && item !== 'every existing platform bootstrap file and entry');
+      }
     }
     if (plan.blockers.length === 0 && activation.overall === 'prepared') {
       plan.cutover_proposal = buildCutoverProposal(facts, adds, indexBindingIds);
@@ -351,9 +536,17 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
   for (const filePath of new Set([...Object.keys(agents), CLAUDE_MD, MCP_FILE, IGNORE_FILE, ...(remove ? [] : [...Object.keys(profiles), BOOTSTRAP_PATH])])) {
     if (await pathHasSymlink(root, filePath)) plan.blockers.push(blocker('symlink-path', 'A generated path or parent is a symlink.'));
   }
-  if (touched.length) {
-    const status = git(root, ['status', '--porcelain', '--untracked-files=all', '--', ...touched]);
-    if (status.status !== 0 || status.stdout.trim() !== '') plan.blockers.push(blocker('dirty-working-tree', 'A touched path has uncommitted changes.'));
+  const checkedPaths = [...touched, ...(plan.reconciliation ?? []).filter((item) => item.classification === 'operator-resolved' && Object.values(AGENT_PATHS).includes(item.path)).map((item) => item.path)];
+  if (await hasUnresolvedDirtyPaths(root, checkedPaths, plan.reconciliation)) plan.blockers.push(blocker('dirty-working-tree', 'A touched path has uncommitted changes without an exact tracked managed-agent resolution.'));
+
+  if (evidence) {
+    try {
+      if (!isDeepStrictEqual(evidence.receipt.state, await reconciliationSurface(root, pre))) throw new Error();
+      plan.reconciliationEvidence = { path: RECONCILIATION_FILE, sha256: evidence.sha256, previousPlanSha256: evidence.receipt.previousPlanSha256 };
+      pre[RECONCILIATION_FILE] = evidence.sha256;
+    } catch {
+      plan.blockers.push(blocker('upgrade-reconciliation-stale', 'The managed surface, configured authority, bindings or cutover state changed after the selected upgrade.'));
+    }
   }
 
   const order = (a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
