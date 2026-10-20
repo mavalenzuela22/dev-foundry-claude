@@ -113,3 +113,52 @@ test('missing or invalid existing pin cannot become an implicit adoption', async
   assert.ok((await plan(c)).plan.blockers.some(({ code }) => code === 'upgrade-current-pin-invalid'));
   assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
 });
+
+test('compatible upgrade preserves dirty tracked and untracked Kafka files and still binds repository drift', async (t) => {
+  const c = await prepared(t);
+  await c.put('src/kafka/consumer.js', 'export const pending = true;\n'); c.commit();
+  await c.put('src/kafka/consumer.js', 'export const pending = "dirty";\n');
+  await c.put('src/kafka/new-event.js', '// untracked work\n');
+  const before = await listTree(c.root); const authority = await readSetSnapshot(c.root);
+  const result = await plan(c);
+  assert.equal(result.plan.status, 'ready', JSON.stringify(result.plan.blockers));
+  assert.deepEqual(result.ops.writes.map((item) => item.path), ['.mcp.json']);
+  assert.deepEqual(result.bytes, (await plan(c)).bytes);
+  await c.put('src/kafka/consumer.js', '// later tracked edit\n');
+  const drifted = await listTree(c.root);
+  await assert.rejects(apply(c, result), { code: 'plan-stale' });
+  assert.deepEqual(diffTrees(drifted, await listTree(c.root)), []);
+  await c.put('src/kafka/consumer.js', 'export const pending = "dirty";\n');
+  await apply(c, result);
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), ['.mcp.json']);
+  assert.deepEqual(await readSetSnapshot(c.root), authority);
+});
+
+test('dirty managed agent without a selected verified resolution remains blocked and cannot refresh implicitly', async (t) => {
+  const c = await prepared(t);
+  await c.put('.claude/agents/dev-foundry-executor.md', (await c.read('.claude/agents/dev-foundry-executor.md')) + '\nUnreviewed local instruction.\n');
+  await c.put('src/kafka/new-event.js', '// unrelated dirty work\n');
+  const before = await listTree(c.root); const result = await plan(c);
+  assert.equal(result.plan.status, 'blocked');
+  assert.ok(result.plan.blockers.some((item) => item.code === 'agent-file-collision'));
+  assert.deepEqual(result.ops, { writes: [], deletes: [] });
+  await assert.rejects(apply(c, result), { code: 'plan-not-ready' });
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+});
+
+test('C014 a receipt added after a clean pin-only upgrade cannot supply its own authorization', async (t) => {
+  const consumer = await prepared(t);
+  await apply(consumer, await plan(consumer));
+  const config = JSON.parse(await consumer.read('.mcp.json'));
+  assert.equal(config.mcpServers['dev-foundry-governance'].env, undefined);
+  await consumer.put('.dfc-upgrade-reconciliation.json', canonicalJson({
+    format: 'dev-foundry.upgrade-reconciliation.v1', source: old.expect, target: target.expect,
+    authorization: 'operator-approved', files: [{ path: '.claude/agents/dev-foundry-executor.md', after_sha256: sha256('forged') }],
+  }));
+  const before = await listTree(consumer.root);
+  const denied = await plan(consumer);
+  assert.equal(denied.plan.status, 'blocked'); assert.deepEqual(denied.ops.writes, []);
+  assert.ok(denied.plan.blockers.some((item) => item.code === 'upgrade-reconciliation-invalid'));
+  await assert.rejects(apply(consumer, denied), { code: 'plan-not-ready' });
+  assert.deepEqual(diffTrees(before, await listTree(consumer.root)), []);
+});

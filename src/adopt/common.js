@@ -5,6 +5,9 @@ import { canonicalJson, sha256 } from './pin.js';
 
 // Runtime transaction data is deliberately outside .dev-foundry authority routing.
 export const CUTOVER_DIR = '.dfc-cutover';
+// Observational upgrade evidence, outside configured methodology authority.
+export const RECONCILIATION_FILE = '.dfc-upgrade-reconciliation.json';
+export const RECONCILIATION_KEY = 'DEV_FOUNDRY_UPGRADE_RECONCILIATION_SHA256';
 
 export function safeRelativePath(value) {
   return typeof value === 'string' && value.length > 0 && !/[\\:\x00-\x1f]/.test(value) &&

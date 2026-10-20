@@ -10,6 +10,8 @@ import { syncBuiltinESMExports } from 'node:module';
 import test from 'node:test';
 import { createPlan } from '../../src/adopt/plan.js';
 import { createUpgradePlan } from '../../src/adopt/upgrade.js';
+import { BOOTSTRAP_PATH, PROFILE_PATHS, RECONCILIATION_FILE, RECONCILIATION_KEY, parseYamlStrict } from '../../src/adopt/common.js';
+import { renderBootstrap, templateParams } from '../../src/adopt/render.js';
 import { applyPlan } from '../../src/adopt/apply.js';
 import { buildManifestBytes, canonicalJson, selfPin, sha256 } from '../../src/adopt/pin.js';
 import { consumerCommand } from '../../src/consumer/command.js';
@@ -50,7 +52,7 @@ const plan = ({ c, source, adapter = target, resolutionFile }) => createUpgradeP
 const apply = ({ c, adapter = target, resolutionFile }, result) => applyPlan({ root: c.root, adapter, upgrade: true, planBytes: result.bytes, planSha256: result.hash, resolutionFile });
 
 // A verified 1.4.2 payload, with managed text that differs from this target.
-async function previous142(t) {
+async function previous142(t, active = false) {
   const source = await mkdtemp(path.join(os.tmpdir(), 'tsk032-142-'));
   t.after(() => rm(source, { recursive: true, force: true }));
   await cp(path.join(repoRoot, 'templates'), path.join(source, 'templates'), { recursive: true });
@@ -61,6 +63,8 @@ async function previous142(t) {
     await writeFile(absolute, text.replace(file.startsWith('agents/') ? 'description: ' : '## DEV FOUNDRY Claude adapter',
       file.startsWith('agents/') ? 'description: Previous release - ' : '## DEV FOUNDRY Claude adapter (previous release)'));
   }
+  if (active) await writeFile(path.join(source, 'templates/platform-bootstrap-claude-code.yaml.tmpl'),
+    execFileSync('git', ['show', 'v1.4.2:templates/platform-bootstrap-claude-code.yaml.tmpl'], { cwd: repoRoot }));
   const entries = [];
   for (const [file, hash] of await listTree(source)) entries.push({ path: file, sha256: hash, size: (await readFile(path.join(source, file))).length });
   await writeFile(path.join(source, 'payload-manifest.json'), buildManifestBytes({ version: '1.4.2', entries }));
@@ -70,6 +74,7 @@ async function previous142(t) {
   const initial = await createPlan({ root: c.root, adapter: old, templatesRoot: path.join(source, 'templates') });
   assert.equal(initial.plan.status, 'ready');
   for (const op of initial.ops.writes) await c.put(op.path, op.content);
+  if (active) await applyProposal(c.root, initial.plan.cutover_proposal);
   c.commit();
   return { c, source, old, adapter: { version: '1.5.0', payloadRoot: 'f'.repeat(64), expect: `1.5.0:sha256:${'f'.repeat(64)}` } };
 }
@@ -106,6 +111,190 @@ async function conflicting142(t) {
   const input = await selectResolution(t, fixture, { [file]: resolved });
   return { ...fixture, file, resolved, input };
 }
+
+// Active authority is fixture data; the upgrader must never write its POP/index.
+async function configured142(t, preserveAgent = false) {
+  const fixture = await previous142(t, true);
+  const { c } = fixture;
+  const contents = {};
+  for (const file of [...Object.values(PROFILE_PATHS), BOOTSTRAP_PATH]) {
+    contents[file] = (await c.read(file)) + '# Consumer formatting and comments stay local.\n';
+    await c.put(file, contents[file]);
+  }
+  await c.put('src/kafka/consumer.js', 'export const pending = true;\n');
+  c.commit();
+  const file = '.claude/agents/dev-foundry-executor.md';
+  const local = (await c.read(file)).replace('Previous release - ', 'Consumer policy - ');
+  await c.put(file, local); // Deliberately tracked and dirty, never committed.
+  contents[file] = preserveAgent ? local : local.replace('Consumer policy - ', 'Reviewed consumer policy - ');
+  await c.put('src/kafka/consumer.js', 'export const pending = "work in progress";\n');
+  await c.put('src/kafka/new-event.js', '// Untracked Kafka work.\n');
+  const input = await selectResolution(t, fixture, contents);
+  return { ...fixture, contents, input, file };
+}
+
+test('1.4.2 configured resolutions and exact tracked dirty agent preserve Kafka work and bound authority', async (t) => {
+  for (const preserveAgent of [false, true]) await t.test(preserveAgent ? 'agent no-write' : 'agent write', async (t) => {
+    const fixture = await configured142(t, preserveAgent); const { c, contents, file } = fixture;
+    // Verified current target fixture. This is API proof, not distributable CLI acceptance.
+    const staged = await makePresentationPackage(); t.after(staged.cleanup);
+    for (const entry of ['src', 'templates', 'migrations', 'package.json']) await cp(path.join(repoRoot, entry), path.join(staged.root, entry), { recursive: true });
+    const version = JSON.parse(await readFile(path.join(staged.root, 'package.json'), 'utf8')).version;
+    const entries = [];
+    for (const [entry, hash] of await listTree(staged.root)) entries.push({ path: entry, sha256: hash, size: (await readFile(path.join(staged.root, entry))).length });
+    await writeFile(path.join(staged.root, 'payload-manifest.json'), buildManifestBytes({ version, entries }));
+    const pin = selfPin(staged.root);
+    fixture.adapter = { version: pin.version, payloadRoot: pin.root, expect: pin.expect };
+    await selectResolution(t, fixture, contents);
+    const before = await listTree(c.root); const authority = await readSetSnapshot(c.root);
+    const result = await plan(fixture);
+    assert.equal(result.plan.status, 'ready', JSON.stringify(result.plan.blockers));
+    assert.deepEqual(result.bytes, (await plan(fixture)).bytes);
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+    assert.equal(result.plan.reconciliation.filter((item) => item.classification === 'operator-resolved').length, 4);
+    for (const configured of [...Object.values(PROFILE_PATHS), BOOTSTRAP_PATH]) {
+      const record = result.plan.reconciliation.find((item) => item.path === configured);
+      assert.equal(record.scope, 'configured-file'); assert.equal(record.current_semantics_preserved, true);
+      assert.equal(record.before_sha256, before.get(configured)); assert.equal(record.current_sha256, before.get(configured));
+      assert.equal(record.after_sha256, sha256(contents[configured]));
+      assert.ok(result.plan.noop.includes(configured));
+    }
+    const writes = [RECONCILIATION_FILE, '.mcp.json', 'CLAUDE.md', ...(preserveAgent ? [] : [file])].sort();
+    assert.deepEqual(result.ops.writes.map((item) => item.path).sort(), writes);
+    assert.deepEqual(result.plan.create.map((item) => item.path), [RECONCILIATION_FILE]); assert.deepEqual(result.plan.delete, []);
+    if (preserveAgent) assert.ok(result.plan.noop.includes(file));
+    assert.deepEqual(await apply(fixture, result), { written: writes.length, deleted: 0 });
+    assert.equal(await c.read(file), contents[file]);
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), writes);
+    assert.deepEqual(await readSetSnapshot(c.root), authority);
+    assert.match(execFileSync('git', ['status', '--porcelain'], { cwd: c.root, encoding: 'utf8' }), /src\/kafka/);
+    assert.equal(JSON.parse(await c.read('.mcp.json')).mcpServers['dev-foundry-governance'].args[2], pin.expect);
+  });
+});
+
+test('configured resolution can select verified target YAML with exact bounded writes and rollback', async (t) => {
+  for (const failure of [false, true]) await t.test(failure ? 'rollback' : 'apply', async (t) => {
+    const fixture = await configured142(t); const { c, input } = fixture;
+    // Both profiles have identical verified source/target semantics; selecting
+    // target bytes removes comments explicitly, rather than overwriting by default.
+    for (const item of input.files.filter((item) => Object.values(PROFILE_PATHS).includes(item.path))) {
+      item.resolved_content = item.resolved_content.replace('# Consumer formatting and comments stay local.\n', '');
+      item.resolved_sha256 = sha256(item.resolved_content);
+    }
+    const pop = parseYamlStrict(Buffer.from(await c.read('.dev-foundry/profiles/project-operating-profile.yaml')));
+    const targetBootstrap = renderBootstrap(templateParams({ project: pop.repository.name, prefix: 'ACME',
+      authorProfile: pop.actor_bindings['governance-author'].profile, custodianProfile: pop.actor_bindings['evidence-custodian'].profile }),
+    undefined, { legacyV2: true })[BOOTSTRAP_PATH];
+    const bootstrapDecision = input.files.find((item) => item.path === BOOTSTRAP_PATH);
+    bootstrapDecision.resolved_content = targetBootstrap; bootstrapDecision.resolved_sha256 = sha256(targetBootstrap);
+    await writeFile(fixture.resolutionFile, canonicalJson(input));
+    const result = await plan(fixture); assert.equal(result.plan.status, 'ready', JSON.stringify(result.plan.blockers));
+    assert.ok(Object.values(PROFILE_PATHS).every((file) => result.ops.writes.some((item) => item.path === file)));
+    assert.equal(result.plan.reconciliation.find((item) => item.path === BOOTSTRAP_PATH).current_semantics_preserved, false);
+    assert.ok(result.ops.writes.some((item) => item.path === BOOTSTRAP_PATH));
+    assert.ok(!result.plan.guaranteed_untouched.includes('existing capability profiles and runner files'));
+    const before = await listTree(c.root);
+    if (failure) {
+      const rename = fsPromises.rename; let count = 0;
+      t.mock.method(fsPromises, 'rename', async (...args) => {
+        if (++count === 4) throw new Error('injected configured rename failure');
+        return rename(...args);
+      });
+      syncBuiltinESMExports(); t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
+      await assert.rejects(apply(fixture, result), { code: 'apply-failed' });
+      assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+    } else {
+      await apply(fixture, result);
+      assert.deepEqual(diffTrees(before, await listTree(c.root)), result.ops.writes.map((item) => item.path).sort());
+      for (const item of input.files) assert.equal(await c.read(item.path), item.resolved_content);
+    }
+  });
+});
+
+test('configured and dirty-agent decisions cannot waive hashes, semantics, identity, routing or dirty non-agent paths', async (t) => {
+  const cases = ['absent', 'missing configured decision', 'bad base hash', 'current semantics', 'resolved semantics', 'changed ID', 'schema',
+    'duplicate ID', 'route collision', 'route alias', 'untracked agent', 'ignored untracked agent', 'staged new agent', 'dirty pin', 'dirty configured write', 'dirty unresolved agent', 'symlink configured'];
+  for (const kind of cases) await t.test(kind, async (t) => {
+    const fixture = await configured142(t); const { c, input, file } = fixture;
+    const profile = PROFILE_PATHS.auditor;
+    const decision = input.files.find((item) => item.path === profile);
+    if (kind === 'absent') fixture.resolutionFile = undefined;
+    if (kind === 'missing configured decision') input.files = input.files.filter((item) => item !== decision);
+    if (kind === 'bad base hash') decision.base_sha256 = '0'.repeat(64);
+    if (kind === 'resolved semantics') {
+      decision.resolved_content = decision.resolved_content.replace('shell_execution: forbidden', 'shell_execution: allowed');
+      decision.resolved_sha256 = sha256(decision.resolved_content);
+    }
+    if (['current semantics', 'changed ID', 'schema'].includes(kind)) {
+      const current = (await c.read(profile)).replace(...(kind === 'current semantics' ? ['shell_execution: forbidden', 'shell_execution: allowed'] :
+        kind === 'schema' ? ['dev-foundry.capability-profile.v1', 'dev-foundry.capability-profile.v999'] : ['ACME-GOVERNANCE-AUDITOR', 'FOREIGN-GOVERNANCE-AUDITOR']));
+      await c.put(profile, current);
+      decision.before_sha256 = decision.current_sha256 = decision.resolved_sha256 = sha256(current); decision.resolved_content = current;
+    }
+    if (kind === 'duplicate ID') await c.put('.dev-foundry/profiles/capability-profiles/duplicate.yaml', await c.read(profile));
+    if (kind === 'route collision') await c.put('.dev-foundry/authority-index.yaml', (await c.read('.dev-foundry/authority-index.yaml')).replace('id: governance-auditor-capability-claude-code-v1', 'id: foreign-configured-authority'));
+    if (kind === 'route alias') {
+      await symlink(path.join(c.root, profile), path.join(c.root, '.dev-foundry/profile-alias.yaml'));
+      await c.put('.dev-foundry/authority-index.yaml', (await c.read('.dev-foundry/authority-index.yaml')).replace('bindings:\n', 'bindings:\n  - id: profile-alias\n    path: .dev-foundry/profile-alias.yaml\n    authority_class: configured\n'));
+    }
+    if (['untracked agent', 'ignored untracked agent', 'staged new agent'].includes(kind)) {
+      execFileSync('git', ['rm', '--cached', file], { cwd: c.root });
+      execFileSync('git', ['commit', '-qm', 'fixture removes tracked agent'], { cwd: c.root });
+      input.repository.head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: c.root, encoding: 'utf8' }).trim();
+      if (kind === 'staged new agent') execFileSync('git', ['add', file], { cwd: c.root });
+      if (kind === 'ignored untracked agent') await c.put('.gitignore', file + '\n');
+    }
+    if (kind === 'dirty pin') await c.put('.mcp.json', (await c.read('.mcp.json')) + ' ');
+    if (kind === 'dirty configured write') {
+      await c.put(profile, (await c.read(profile)) + '# Dirty configured policy.\n');
+      decision.before_sha256 = decision.current_sha256 = sha256(await c.read(profile));
+    }
+    if (kind === 'dirty unresolved agent') await c.put('.claude/agents/dev-foundry-auditor.md', (await c.read('.claude/agents/dev-foundry-auditor.md')).replaceAll('\n', '\r\n'));
+    if (kind === 'symlink configured') {
+      const content = await c.read(profile); await rm(path.join(c.root, profile));
+      await c.put('.dev-foundry/other-profile.yaml', content); await symlink(path.join(c.root, '.dev-foundry/other-profile.yaml'), path.join(c.root, profile));
+    }
+    if (fixture.resolutionFile) await writeFile(fixture.resolutionFile, canonicalJson(input));
+    const before = await listTree(c.root); const result = await plan(fixture);
+    assert.equal(result.plan.status, 'blocked', kind); assert.deepEqual(result.ops.writes, []);
+    await assert.rejects(apply(fixture, result), { code: 'plan-not-ready' });
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  });
+});
+
+test('configured dirty-agent plan rechecks exact decision, package, repository and configured bytes through staging', async (t) => {
+  for (const kind of ['decision bytes', 'configured bytes', 'source bytes', 'Kafka after plan', 'forged plan', 'configured during staging', 'agent during staging', 'identity scan during staging']) await t.test(kind, async (t) => {
+    const fixture = await configured142(t); const { c } = fixture;
+    const scanned = '.dev-foundry/profiles/capability-profiles/other.yaml';
+    if (kind === 'identity scan during staging') await c.put(scanned, 'id: harmless-unrelated-profile\n');
+    const result = await plan(fixture); assert.equal(result.plan.status, 'ready', JSON.stringify(result.plan.blockers));
+    let supplied = result;
+    if (kind === 'decision bytes') await writeFile(fixture.resolutionFile, (await readFile(fixture.resolutionFile)) + ' ');
+    if (kind === 'configured bytes') await c.put(BOOTSTRAP_PATH, (await c.read(BOOTSTRAP_PATH)) + '# post-plan edit\n');
+    if (kind === 'source bytes') await writeFile(path.join(fixture.source, 'package.json'), '{}');
+    if (kind === 'Kafka after plan') await c.put('src/kafka/consumer.js', '// later edit\n');
+    if (kind === 'forged plan') {
+      const forged = structuredClone(result.plan); forged.merge.push({ path: 'src/kafka/consumer.js', after_sha256: sha256('forged') });
+      const bytes = Buffer.from(canonicalJson(forged)); supplied = { bytes, hash: sha256(bytes) };
+    }
+    const before = await listTree(c.root);
+    let driftPath; let drift;
+    if (kind.endsWith('during staging')) {
+      const write = fsPromises.writeFile; let changed = false;
+      driftPath = kind.startsWith('identity scan') ? scanned : kind.startsWith('configured') ? BOOTSTRAP_PATH : fixture.file;
+      drift = kind.startsWith('identity scan') ? await c.read(PROFILE_PATHS.auditor) : (await c.read(driftPath)) + '\n# concurrent external edit\n';
+      t.mock.method(fsPromises, 'writeFile', async (file, ...args) => {
+        const written = await write(file, ...args);
+        if (!changed && String(file).includes('.dfc-stage-')) { changed = true; await write(path.join(c.root, driftPath), drift); }
+        return written;
+      });
+      syncBuiltinESMExports(); t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
+    }
+    await assert.rejects(apply(fixture, supplied), { code: 'plan-stale' });
+    const expected = new Map(before); if (driftPath) expected.set(driftPath, sha256(drift));
+    assert.deepEqual(diffTrees(expected, await listTree(c.root)), []);
+  });
+});
 
 test('tagged v1.4.2 managed agents and span with legitimate conflicting local policies can be explicitly resolved together', async (t) => {
   const source = await mkdtemp(path.join(os.tmpdir(), 'tsk032-tagged-142-'));
@@ -796,4 +985,55 @@ test('public 1.3.0 source fixture matches the exact git tag payload and declares
   const recipe = material.legacy.find((recipe) => recipe.source === old.expect);
   assert.equal(recipe.proof.gitTag, 'v1.3.0');
   assert.equal(recipe.proof.gitCommit, execFileSync('git', ['rev-parse', 'v1.3.0'], { cwd: repoRoot, encoding: 'utf8' }).trim());
+});
+
+test('C014 reconciliation evidence is a planned write and rolls back with every managed file and pin', async (t) => {
+  const fixture = await configured142(t); const { c } = fixture;
+  const result = await plan(fixture);
+  assert.equal(result.plan.status, 'ready', JSON.stringify(result.plan.blockers));
+  const receiptWrite = result.plan.create.find((item) => item.path === RECONCILIATION_FILE);
+  assert.ok(receiptWrite);
+  const receipt = JSON.parse(receiptWrite.content);
+  assert.equal(receiptWrite.sha256, sha256(canonicalJson(receipt)));
+  assert.equal(receipt.source, fixture.old.expect); assert.equal(receipt.target, fixture.adapter.expect);
+  assert.equal(receipt.resolutionSha256, result.plan.resolutionInput.sha256);
+  const mcp = JSON.parse(result.ops.writes.find((item) => item.path === '.mcp.json').content);
+  assert.equal(mcp.mcpServers['dev-foundry-governance'].env[RECONCILIATION_KEY], receiptWrite.sha256);
+  const before = await listTree(c.root);
+  const rename = fsPromises.rename; let installed = 0;
+  t.mock.method(fsPromises, 'rename', async (...args) => {
+    if (args[1] === path.join(await realpath(c.root), RECONCILIATION_FILE)) throw new Error('fail receipt installation');
+    await rename(...args); installed++;
+  });
+  syncBuiltinESMExports();
+  try {
+    await assert.rejects(apply(fixture, result), { code: 'apply-failed' });
+    assert.equal(installed, result.ops.writes.length - 1);
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  } finally { t.mock.restoreAll(); syncBuiltinESMExports(); }
+  await apply(fixture, result);
+  assert.equal((await createPlan({ root: c.root, adapter: fixture.adapter })).plan.status, 'noop');
+  assert.equal((await createUpgradePlan({ root: c.root, adapter: fixture.adapter })).plan.status, 'noop');
+  await rm(fixture.resolutionFile);
+  const presentation = await makePresentationPackage(); t.after(presentation.cleanup);
+  let launched = 0;
+  assert.equal(await consumerCommand({ command: 'start', argv: ['--root', c.root], packageRoot: presentation.root,
+    getAdapter: () => fixture.adapter, executableAvailable: () => true, launcher: async () => { launched++; return 0; }, output: () => {} }), 0);
+  assert.equal(launched, 1);
+});
+
+test('C014 staged receipt replacement cannot install bytes outside the reviewed plan', async (t) => {
+  const fixture = await configured142(t); const { c } = fixture;
+  const result = await plan(fixture); const before = await listTree(c.root);
+  const write = fsPromises.writeFile;
+  t.mock.method(fsPromises, 'writeFile', async (file, ...args) => {
+    const value = await write(file, ...args);
+    if (String(file).includes(`${RECONCILIATION_FILE}.dfc-stage-`)) await write(file, '{"forged":"after staging"}\n');
+    return value;
+  });
+  syncBuiltinESMExports();
+  try {
+    await assert.rejects(apply(fixture, result), { code: 'plan-stale' });
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  } finally { t.mock.restoreAll(); syncBuiltinESMExports(); }
 });

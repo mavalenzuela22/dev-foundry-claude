@@ -1,14 +1,15 @@
 import path from 'node:path';
 import { currentMigrationMaterial, legacyVersion, migrationRequiresGovernedSession } from './migration.js';
 import { lstat, readFile, realpath } from 'node:fs/promises';
-import { AGENT_PATHS, CLAUDE_MD, MCP_FILE, MCP_SERVER_NAME, POP_PATH, isObject, parseYamlStrict, pathHasSymlink, readContained, readYamlContained } from './common.js';
+import { AGENT_PATHS, BOOTSTRAP_PATH, CLAUDE_MD, MCP_FILE, MCP_SERVER_NAME, POP_PATH, PROFILE_PATHS, RECONCILIATION_FILE, RECONCILIATION_KEY, isObject, parseYamlStrict, pathHasSymlink, readContained, readYamlContained } from './common.js';
 import { makeUnifiedDiff } from './diff.js';
 import { git } from './ignore.js';
-import { createPlan } from './plan.js';
+import { createPlan, hasUnresolvedDirtyPaths, reconciliationSurface } from './plan.js';
 import { canonicalJson, parseExpect, selfPin, sha256 } from './pin.js';
 
 const exactKeys = (value, keys) => isObject(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const hash = (value) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+const resolutionPaths = new Set([...Object.values(AGENT_PATHS), CLAUDE_MD, ...Object.values(PROFILE_PATHS), BOOTSTRAP_PATH]);
 
 // This is Operator-selected candidate data, not a self-attesting authorization.
 // Explicit application of the reviewed exact plan is the authorization boundary.
@@ -27,11 +28,10 @@ async function readResolution(file, root, source, target) {
       !exactKeys(input.repository, ['root', 'head']) || input.repository.root !== root ||
       input.repository.head !== git(root, ['rev-parse', 'HEAD']).stdout.trim() ||
       input.source !== source || input.target !== target || !Array.isArray(input.files) || !input.files.length) throw new Error();
-  const allowed = new Set([...Object.values(AGENT_PATHS), CLAUDE_MD]);
   const seen = new Set();
   for (const item of input.files) {
     if (!exactKeys(item, ['path', 'before_sha256', 'base_sha256', 'current_sha256', 'target_sha256', 'resolved_sha256', 'resolved_content']) ||
-        !allowed.has(item.path) || seen.has(item.path) ||
+        !resolutionPaths.has(item.path) || seen.has(item.path) ||
         !['before_sha256', 'base_sha256', 'current_sha256', 'target_sha256', 'resolved_sha256'].every((key) => hash(item[key])) ||
         typeof item.resolved_content !== 'string' || !item.resolved_content || /[\u0000\ufffd]/.test(item.resolved_content) ||
         Buffer.from(item.resolved_content).toString('utf8') !== item.resolved_content || sha256(item.resolved_content) !== item.resolved_sha256) throw new Error();
@@ -122,12 +122,13 @@ export async function createUpgradePlan({ root: rootArgument, adapter, currentPa
       if (resolution?.files.some((item) => !plan.reconciliation?.some((record) => record.path === item.path && record.classification === 'operator-resolved'))) {
         block('upgrade-resolution-unused', 'Every selected resolution must match an existing verified managed conflict and its exact fingerprints.');
       }
-      const allowed = new Set([...Object.values(AGENT_PATHS), CLAUDE_MD]);
       if (!['noop', 'ready'].includes(compatible.plan.status) || compatible.plan.create.length || compatible.plan.delete.length ||
-          compatible.ops.writes.some((item) => !allowed.has(item.path))) throw new Error();
+          compatible.ops.writes.some((item) => !resolutionPaths.has(item.path) ||
+            (![...Object.values(AGENT_PATHS), CLAUDE_MD].includes(item.path) &&
+              !plan.reconciliation?.some((record) => record.path === item.path && record.classification === 'operator-resolved')))) throw new Error();
       plan.upgradeKind = legacy ? 'legacy-bridge' : 'managed-refresh';
     } catch {
-      block('upgrade-ownership-unverified', 'The previous package must match the project pin. Only verified managed agents and the CLAUDE.md span may be reconciled; resolve ownership, content or authority collisions before replanning.');
+      block('upgrade-ownership-unverified', 'The previous package must match the project pin. Reconciliation requires verified managed content or an explicit resolution of the three known configured artifacts; resolve ownership, content or authority collisions before replanning.');
     }
   }
   plan.activation = compatible.plan.activation;
@@ -151,18 +152,62 @@ export async function createUpgradePlan({ root: rootArgument, adapter, currentPa
     plan.noop = [MCP_FILE];
     return finish();
   }
-  const touched = git(root, ['status', '--porcelain', '--untracked-files=all', '--', MCP_FILE, ...compatible.ops.writes.map((item) => item.path)]);
-  if (touched.status !== 0 || touched.stdout.trim() !== '') {
-    block('dirty-working-tree', 'The runtime pin path has uncommitted changes.');
+  if (await hasUnresolvedDirtyPaths(root, [MCP_FILE, ...compatible.ops.writes.map((item) => item.path),
+    ...(plan.reconciliation ?? []).filter((item) => item.classification === 'operator-resolved' && Object.values(AGENT_PATHS).includes(item.path)).map((item) => item.path)], plan.reconciliation)) {
+    block('dirty-working-tree', 'A touched path has uncommitted changes without an exact tracked managed-agent resolution.');
     return finish();
   }
   entry.args[2] = adapter.expect;
-  const after = `${JSON.stringify(config, null, 2)}\n`;
+  let after = `${JSON.stringify(config, null, 2)}\n`;
   plan.noop = plan.noop.filter((file) => file !== MCP_FILE);
   plan.merge = [...compatible.plan.merge, { path: MCP_FILE, before_sha256: sha256(before), after_sha256: sha256(after), diff: makeUnifiedDiff(MCP_FILE, before.toString('utf8'), after) }].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
   ops.writes.push(...compatible.ops.writes);
   ops.writes.push({ path: MCP_FILE, content: after });
   plan.status = 'ready';
+  const inherited = compatible.plan.reconciliationEvidence
+    ? JSON.parse((await readContained(root, RECONCILIATION_FILE)).toString('utf8')) : null;
+  const differing = plan.reconciliation?.filter((record) => record.after_sha256 !== record.target_sha256) ?? inherited?.files ?? [];
+  if (differing.length) {
+    // No circular hashes: commit the complete deterministic migration candidate
+    // before adding its receipt and the runtime commitment. The final reviewed
+    // plan includes both writes, and apply regenerates that exact final plan.
+    const previousPlanSha256 = sha256(canonicalJson(plan));
+    plan.preconditions[RECONCILIATION_FILE] = sha256(await readContained(root, RECONCILIATION_FILE) ?? Buffer.alloc(0));
+    if (!inherited) plan.preconditions[RECONCILIATION_FILE] = 'absent';
+    try {
+      if (await pathHasSymlink(root, RECONCILIATION_FILE) ||
+          (!inherited && await readContained(root, RECONCILIATION_FILE) !== null) ||
+          await hasUnresolvedDirtyPaths(root, [RECONCILIATION_FILE])) throw new Error();
+      const receipt = {
+        format: 'dev-foundry.upgrade-reconciliation.v1', repository: root,
+        project: { name: compatible.plan.target.project, idPrefix: compatible.plan.target.idPrefix },
+        source: plan.current.expect, target: adapter.expect, previousPlanSha256,
+        resolutionSha256: plan.resolutionInput?.sha256 ?? inherited?.resolutionSha256 ?? null,
+        files: differing.map((record) => Object.fromEntries(['path', 'scope', 'classification', 'before_sha256', 'base_sha256',
+          'current_sha256', 'target_sha256', 'after_sha256'].map((key) => [key, record[key]]))),
+        state: await reconciliationSurface(root, plan.preconditions, ops.writes),
+      };
+      const content = canonicalJson(receipt);
+      entry.env = { ...entry.env, [RECONCILIATION_KEY]: sha256(content) };
+      after = `${JSON.stringify(config, null, 2)}\n`;
+      ops.writes.find((item) => item.path === MCP_FILE).content = after;
+      const pinWrite = plan.merge.find((item) => item.path === MCP_FILE);
+      pinWrite.after_sha256 = sha256(after);
+      pinWrite.diff = makeUnifiedDiff(MCP_FILE, before.toString('utf8'), after);
+      if (inherited) {
+        const old = await readContained(root, RECONCILIATION_FILE);
+        plan.merge.push({ path: RECONCILIATION_FILE, before_sha256: sha256(old), after_sha256: sha256(content), diff: makeUnifiedDiff(RECONCILIATION_FILE, old.toString('utf8'), content) });
+      } else plan.create.push({ path: RECONCILIATION_FILE, sha256: sha256(content), content });
+      ops.writes.push({ path: RECONCILIATION_FILE, content });
+      plan.reconciliationEvidence = { path: RECONCILIATION_FILE, sha256: sha256(content), previousPlanSha256 };
+      plan.merge.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+    } catch {
+      block('upgrade-reconciliation-unsafe', 'Upgrade evidence requires an unchanged safe local path and a complete contained authority surface.');
+      plan.status = 'blocked';
+      plan.create = []; plan.merge = [];
+      ops.writes.length = 0;
+    }
+  }
   return finish();
 }
 

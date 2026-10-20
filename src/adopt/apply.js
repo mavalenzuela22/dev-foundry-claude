@@ -1,6 +1,7 @@
 import { mkdir, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { createPlan } from './plan.js';
+import { createPlan, reconciliationSurface } from './plan.js';
+import { isDeepStrictEqual } from 'node:util';
 import { selfPin, sha256 } from './pin.js';
 import { createUpgradePlan } from './upgrade.js';
 import { pathHasSymlink, readContained } from './common.js';
@@ -37,8 +38,11 @@ export async function applyPlan({ planBytes, planSha256, adapter, root: rootArgu
   const journal = [];
   const createdDirs = [];
   const staged = [];
+  const boundSurface = upgrading && current.plan.reconciliationEvidence
+    ? await reconciliationSurface(root, current.plan.preconditions) : null;
   try {
     for (const write of current.ops.writes) {
+      if (await pathHasSymlink(root, write.path)) throw new ApplyError('plan-stale', 'A planned path changed during staging.');
       const target = absolute(write.path);
       const missing = [];
       for (let probe = path.dirname(target); probe !== root && !(await isDirectory(probe)); probe = path.dirname(probe)) missing.push(probe);
@@ -47,32 +51,41 @@ export async function applyPlan({ planBytes, planSha256, adapter, root: rootArgu
       const stage = `${target}.dfc-stage-${process.pid}`;
       await writeFile(stage, write.content, { encoding: 'utf8', flag: 'wx' });
       staged.push(stage);
-      journal.push({ target, stage, prior: await readOrNull(target) });
+      journal.push({ target, stage, stagedSha256: sha256(Buffer.from(write.content)), prior: await readOrNull(target) });
     }
     // Staging must not hide a changed decision or precondition. Re-read exact
     // inputs immediately before installing any staged byte; discard on drift.
-    if (upgrading && current.plan.resolutionInput) {
+    if (upgrading && current.ops.writes.length) {
       const decision = current.plan.resolutionInput;
-      if (await pathHasSymlink(path.parse(decision.path).root, decision.path.slice(path.parse(decision.path).root.length).split(path.sep).join('/')) ||
-          sha256(await readOrNull(decision.path) ?? Buffer.alloc(0)) !== decision.sha256) throw new ApplyError('plan-stale', 'Resolution input changed during staging.');
+      if (decision && (await pathHasSymlink(path.parse(decision.path).root, decision.path.slice(path.parse(decision.path).root.length).split(path.sep).join('/')) ||
+          sha256(await readOrNull(decision.path) ?? Buffer.alloc(0)) !== decision.sha256)) throw new ApplyError('plan-stale', 'Resolution input changed during staging.');
       for (const [file, expected] of Object.entries(current.plan.preconditions)) {
         const bytes = await readContained(root, file);
         if (await pathHasSymlink(root, file) || (bytes === null ? 'absent' : sha256(bytes)) !== expected) throw new ApplyError('plan-stale', 'Plan inputs changed during staging.');
       }
       try {
-        if (selfPin(current.plan.currentPackageRoot).expect !== current.plan.current.expect) throw new Error();
+        if (current.plan.currentPackageRoot && selfPin(current.plan.currentPackageRoot).expect !== current.plan.current.expect) throw new Error();
       } catch { throw new ApplyError('plan-stale', 'Previous package changed during staging.'); }
       const head = git(root, ['rev-parse', 'HEAD']);
       const diff = git(root, ['diff', 'HEAD', '--binary']);
       const status = git(root, ['status', '--porcelain', '--untracked-files=all']);
       const stagePaths = new Set(staged.map((file) => path.relative(root, file).split(path.sep).join('/')));
+      if (boundSurface && !isDeepStrictEqual(boundSurface, await reconciliationSurface(root, current.plan.preconditions, [], stagePaths))) {
+        throw new ApplyError('plan-stale', 'The reconciliation surface changed during staging.');
+      }
       const unstagedStatus = status.stdout.split('\n').filter((line) => !stagePaths.has(line.slice(3))).join('\n');
       if (head.status !== 0 || diff.status !== 0 || status.status !== 0 || head.stdout.trim() !== current.plan.repository.head ||
           sha256(diff.stdout) !== current.plan.repository.diffSha256 || sha256(unstagedStatus) !== current.plan.repository.statusSha256) {
         throw new ApplyError('plan-stale', 'Repository changed during staging.');
       }
     }
-    for (const entry of journal) { await rename(entry.stage, entry.target); entry.installed = true; }
+    for (const entry of journal) {
+      if (await pathHasSymlink(root, path.relative(root, entry.stage).split(path.sep).join('/')) ||
+          sha256(await readOrNull(entry.stage) ?? Buffer.alloc(0)) !== entry.stagedSha256) {
+        throw new ApplyError('plan-stale', 'Staged content changed before installation.');
+      }
+      await rename(entry.stage, entry.target); entry.installed = true;
+    }
     staged.length = 0;
     for (const relative of current.ops.deletes) {
       const target = absolute(relative);
