@@ -5,7 +5,7 @@ request into unrelated changes, or call work finished before it has been checked
 DEV FOUNDRY keeps project decisions, work limits and required checks in the
 repository so each session can pick up from the same agreed starting point.
 
-The **Claude Code adapter 1.5.1**, `dev-foundry-claude`, connects those project
+The **Claude Code adapter 1.5.2**, `dev-foundry-claude`, connects those project
 rules to Claude and provides guided setup, launch, diagnostics and upgrades.
 
 ## 60-second Quick Start

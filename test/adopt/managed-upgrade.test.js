@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { legacyPackage } from './legacy-fixture.js';
 import { cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -141,12 +141,34 @@ test('tagged v1.4.2 managed agents and span with legitimate conflicting local po
   assert.deepEqual(diffTrees(before, await listTree(c.root)), result.ops.writes.map((item) => item.path).sort());
 });
 
-test('explicit Operator selection resolves a real 1.4.2 consumer conflict with deterministic provenance and CRLF bytes', async (t) => {
+test('advanced CLI explicit Operator selection resolves a real 1.4.2 conflict with deterministic provenance and CRLF bytes', async (t) => {
   const fixture = await conflicting142(t); const { c, file, resolved } = fixture;
+  // Exercise the real advanced bin with a verified, isolated package snapshot.
+  const packaged = await makePresentationPackage(); t.after(packaged.cleanup);
+  for (const entry of ['bin', 'src', 'templates', 'migrations', 'package.json', 'node_modules/yaml']) {
+    await cp(path.join(repoRoot, entry), path.join(packaged.root, entry), { recursive: true });
+  }
+  const version = JSON.parse(await readFile(path.join(packaged.root, 'package.json'), 'utf8')).version;
+  const entries = [];
+  for (const [entry, hash] of await listTree(packaged.root)) entries.push({ path: entry, sha256: hash, size: (await readFile(path.join(packaged.root, entry))).length });
+  await writeFile(path.join(packaged.root, 'payload-manifest.json'), buildManifestBytes({ version, entries }));
+  const pin = selfPin(packaged.root);
+  fixture.adapter = { version: pin.version, payloadRoot: pin.root, expect: pin.expect };
+  await selectResolution(t, fixture, { [file]: resolved });
+  const invoke = (action, args = [], root = c.root) => spawnSync(process.execPath, [path.join(packaged.root, 'bin/dev-foundry-claude.js'),
+    'upgrade', action, '--root', root, ...args], { cwd: path.dirname(fixture.resolutionFile), encoding: 'utf8' });
+  // Relative selection must resolve against the invocation directory in both commands.
+  const selected = ['--resolution-file', path.basename(fixture.resolutionFile)];
+  const from = ['--from-package', fixture.source];
   const before = await listTree(c.root); const authority = await readSetSnapshot(c.root);
   const result = await plan(fixture);
   assert.equal(result.plan.status, 'ready', JSON.stringify(result.plan.blockers));
   assert.deepEqual(result.bytes, (await plan(fixture)).bytes);
+  const planFile = path.join(path.dirname(fixture.resolutionFile), 'plan.json');
+  const planned = invoke('plan', [...from, ...selected, '--out', planFile]);
+  assert.equal(planned.status, 0, planned.stderr);
+  assert.equal(JSON.parse(planned.stdout).planSha256, result.hash);
+  assert.deepEqual(await readFile(planFile), result.bytes);
   assert.equal(result.plan.resolutionInput.path, fixture.resolutionFile);
   assert.equal(result.plan.resolutionInput.sha256, sha256(await readFile(fixture.resolutionFile)));
   const actorProfile = '.dev-foundry/releases/2.1.0/actor-profiles/governance-author-v3.yaml';
@@ -155,10 +177,76 @@ test('explicit Operator selection resolves a real 1.4.2 consumer conflict with d
   assert.equal(record.classification, 'operator-resolved'); assert.equal(record.after_sha256, sha256(resolved));
   assert.match(record.current_after_diff, /Reviewed consumer policy/); assert.match(record.target_after_diff, /Reviewed consumer policy/);
   assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
-  await apply(fixture, result);
+  const decision = await readFile(fixture.resolutionFile);
+  const localBytes = await c.read(file);
+  const applyArgs = ['--plan', planFile, '--plan-sha256', result.hash];
+  for (const kind of ['omitted', 'missing', 'changed', 'invalid', 'symlink', 'different path', 'inside project', 'stale repository', 'missing hash', 'wrong hash']) await t.test(kind, async () => {
+    let selection = selected;
+    let args = applyArgs;
+    if (kind === 'omitted') selection = [];
+    if (kind === 'missing') selection = ['--resolution-file', 'missing.json'];
+    if (kind === 'changed') await writeFile(fixture.resolutionFile, Buffer.concat([decision, Buffer.from(' ')]));
+    if (kind === 'invalid') await writeFile(fixture.resolutionFile, '{"authorizedBy":"Operator"}');
+    if (kind === 'symlink' || kind === 'different path') {
+      const other = fixture.resolutionFile + (kind === 'symlink' ? '.link' : '.copy');
+      if (kind === 'symlink') await symlink(fixture.resolutionFile, other); else await cp(fixture.resolutionFile, other);
+      selection = ['--resolution-file', other];
+    }
+    if (kind === 'inside project') { await c.put('decision.json', decision); selection = ['--resolution-file', path.join(c.root, 'decision.json')]; }
+    if (kind === 'stale repository') await c.put(file, resolved + '\r\nLater local policy.\r\n');
+    if (kind === 'missing hash') args = ['--plan', planFile];
+    if (kind === 'wrong hash') args = ['--plan', planFile, '--plan-sha256', '0'.repeat(64)];
+    const unchanged = await listTree(c.root);
+    try {
+      if (!['missing hash', 'wrong hash', 'different path', 'stale repository'].includes(kind)) {
+        const refused = invoke('plan', [...from, ...selection]);
+        if (kind === 'changed') {
+          assert.equal(refused.status, 0, refused.stderr);
+          const changed = JSON.parse(refused.stdout);
+          assert.equal(changed.resolutionInput.sha256, sha256(await readFile(fixture.resolutionFile)));
+          assert.notEqual(sha256(refused.stdout), result.hash);
+        } else {
+          assert.equal(refused.status, 2, refused.stderr);
+          const blocked = JSON.parse(refused.stdout);
+          assert.equal(blocked.status, 'blocked'); assert.deepEqual(blocked.merge, []);
+          if (kind !== 'omitted') assert.ok(blocked.blockers.some((item) => item.code === 'upgrade-resolution-invalid'));
+        }
+      }
+      const refused = invoke('apply', [...args, ...selection]);
+      assert.equal(refused.status, kind === 'missing hash' ? 2 : 1, refused.stderr);
+      assert.match(refused.stderr, kind === 'missing hash' ? /apply requires/ : kind === 'wrong hash' ? /plan-hash-mismatch/ : /plan-stale/);
+      assert.deepEqual(diffTrees(unchanged, await listTree(c.root)), []);
+      assert.deepEqual(await readSetSnapshot(c.root), authority);
+    } finally {
+      await writeFile(fixture.resolutionFile, decision);
+      if (kind === 'inside project') await rm(path.join(c.root, 'decision.json'));
+      if (kind === 'stale repository') await c.put(file, localBytes);
+    }
+  });
+  const applied = invoke('apply', [...applyArgs, ...selected]);
+  assert.equal(applied.status, 0, applied.stderr);
+  assert.deepEqual(JSON.parse(applied.stdout), { written: result.ops.writes.length, deleted: 0 });
   assert.equal(await c.read(file), resolved);
   assert.deepEqual(diffTrees(before, await listTree(c.root)), result.ops.writes.map((item) => item.path).sort());
   assert.deepEqual(await readSetSnapshot(c.root), authority);
+  const unchanged = await previous142(t);
+  const compatible = invoke('plan', ['--from-package', unchanged.source], unchanged.c.root);
+  assert.equal(compatible.status, 0, compatible.stderr);
+  assert.equal(JSON.parse(compatible.stdout).status, 'ready');
+  assert.equal(JSON.parse(compatible.stdout).resolutionInput, undefined);
+  const noDecision = path.join(path.dirname(planFile), 'compatible.json');
+  await writeFile(noDecision, compatible.stdout);
+  const compatibleApply = invoke('apply', ['--plan', noDecision, '--plan-sha256', sha256(compatible.stdout)], unchanged.c.root);
+  assert.equal(compatibleApply.status, 0, compatibleApply.stderr);
+  unchanged.c.commit();
+  const healthy = await listTree(unchanged.c.root);
+  const noopPlan = invoke('plan', [], unchanged.c.root);
+  assert.equal(noopPlan.status, 0, noopPlan.stderr); assert.equal(JSON.parse(noopPlan.stdout).status, 'noop');
+  await writeFile(noDecision, noopPlan.stdout);
+  const noop = invoke('apply', ['--plan', noDecision, '--plan-sha256', sha256(noopPlan.stdout)], unchanged.c.root);
+  assert.equal(noop.status, 0, noop.stderr); assert.deepEqual(JSON.parse(noop.stdout), { written: 0, deleted: 0 });
+  assert.deepEqual(diffTrees(healthy, await listTree(unchanged.c.root)), []);
+  assert.equal(invoke('status', selected).status, 2);
 });
 
 test('resolved CLAUDE span preserves arbitrary outside bytes and binds full-file and span hashes separately', async (t) => {

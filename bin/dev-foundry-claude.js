@@ -159,7 +159,7 @@ if (command === 'readiness') {
 } else if (command === 'upgrade') {
   const [action, ...args] = rest;
   if (!['status', 'plan', 'apply'].includes(action)) fail('Usage: dev-foundry-claude upgrade <status|plan|apply> --root <repo>', 2);
-  const allowed = { '--root': 'value', ...(action === 'plan' ? { '--out': 'value', '--from-package': 'value' } : action === 'apply' ? { '--plan': 'value', '--plan-sha256': 'value' } : { '--from-package': 'value' }) };
+  const allowed = { '--root': 'value', ...(action === 'plan' ? { '--out': 'value', '--from-package': 'value', '--resolution-file': 'value' } : action === 'apply' ? { '--plan': 'value', '--plan-sha256': 'value', '--resolution-file': 'value' } : { '--from-package': 'value' }) };
   const options = flags(args, allowed);
   if (!options['--root']) fail('upgrade requires --root.', 2);
   let adapter;
@@ -168,12 +168,13 @@ if (command === 'readiness') {
     adapter = { version: pin.version, payloadRoot: pin.root, expect: pin.expect };
   } catch { verificationFailure(); }
   const root = path.resolve(options['--root']);
+  const resolutionFile = options['--resolution-file'] === undefined ? undefined : path.resolve(options['--resolution-file']);
   const { createUpgradePlan, upgradeStatus } = await import('../src/adopt/upgrade.js');
   if (action === 'apply') {
     if (!options['--plan'] || !options['--plan-sha256']) fail('apply requires --plan and --plan-sha256.', 2);
     const { applyPlan } = await import('../src/adopt/apply.js');
     try {
-      console.log(JSON.stringify(await applyPlan({ root, adapter, upgrade: true,
+      console.log(JSON.stringify(await applyPlan({ root, adapter, upgrade: true, resolutionFile,
         planBytes: readFileSync(path.resolve(options['--plan'])), planSha256: options['--plan-sha256'] })));
     } catch (error) { fail(`upgrade apply refused: ${error.code ?? 'error'}`); }
   } else if (action === 'status') {
@@ -181,7 +182,7 @@ if (command === 'readiness') {
     console.log(JSON.stringify(result, null, 2));
     process.exitCode = result.status === 'blocked' ? 2 : 0;
   } else {
-    const result = await createUpgradePlan({ root, adapter, currentPackageRoot: options['--from-package'] });
+    const result = await createUpgradePlan({ root, adapter, currentPackageRoot: options['--from-package'], resolutionFile });
     if (options['--out']) {
       // Plan artifacts must stay outside the consumer, and never overwrite files.
       const out = path.resolve(options['--out']);
