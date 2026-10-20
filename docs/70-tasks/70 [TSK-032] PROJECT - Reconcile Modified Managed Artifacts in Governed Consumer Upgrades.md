@@ -4,7 +4,7 @@ artifact:
   id: TSK-032
   type: TSK
   title: Reconcile Modified Managed Artifacts in Governed Consumer Upgrades
-  status: IN_PROGRESS
+  status: CLOSED
 artifactVersion: "1"
 authorityScope: tsk-032-managed-artifact-upgrade-reconciliation
 ownerRole: governance-author
@@ -49,9 +49,11 @@ traceability:
     - TSK-020
     - TSK-021
     - TSK-031
+  closureArtifact: TSK-032-CLOSURE
 lifecycle:
-  phase: in-progress
+  phase: closed
   blockedBy: []
+  closureArtifact: TSK-032-CLOSURE
   promotionRequired: true
 portability: project-specific
 ---
@@ -135,3 +137,7 @@ Reuse existing verified plan data, `createPlan`/readiness logic, `applyPlan` sta
 The Mechanical Validator `TSK032-RELEASE-153-FINAL` produced complete FAIL evidence: `npm test` had exactly 488 PASS / 7 FAIL across 495 tests, while dashboard typecheck, 75 dashboard tests, and `npm pack --dry-run --json` passed. The only failing package fixture still matched printed CLI help against literal `1.5.2`, after C016/C017 had correctly established 1.5.3. Six other tests in `test/bootstrap/claude-cutover-readiness.test.js` and `test/bootstrap/claude-subagents.test.js` asserted the historical POP v2/DEV FOUNDRY 2.1.0 producer role-binding contract despite the current authoritative POP v3/DEV FOUNDRY 2.3.0 and platform bootstrap v3. Specific obsolete requirements include actor profiles at releases/2.1.0, an embedded POP `implementation` mapping and `capability_profiles` array, deriving every required capability from those obsolete fields, and an obsolete runner-v3 pre-cutover environment constraint. These are causally identified *test-harness* divergences, not authorization to change product behavior or authority.
 
 Under OPS-007 and the already authorized patch publication acceptance, adjust only these three test files to assert actual v3 operation-scoped role selection, explicit active configured required capability routes, producer/consumer capability isolation and existing historical safeguards. Keep the integrity/negative tests substantively meaningful, rejecting unsafe or conflicting capability routing. Change the residual printed-help version assertion to 1.5.3. Do not alter actual POP, bootstrap, Authority Index, capability profiles, framework releases, runtime code, templates, historical data or consumer. This is a strictly necessary test-contract projection variance in the same TSK, not a new task or audit trigger. The distinct Mechanical Validator must re-evaluate release readiness after these corrections; no release until PASS.
+
+## 11. Terminal disposition — verified adapter v1.5.3 (2026-10-20)
+
+The approved producer corrective is complete. Governed Mechanical Validation `TSK032-153-RECHECK` passed 496/496 tests; [PR #58](https://github.com/mavalenzuela22/dev-foundry-claude/pull/58) merged to `main` at `6ed110a5fa7ff367e0f86e726690d34404606b0c`. The Operator dispatched the official release; [run 39465155836](https://github.com/mavalenzuela22/dev-foundry-claude/actions/runs/39465155836) succeeded from the same commit. Authentic downloaded [v1.5.3](https://github.com/mavalenzuela22/dev-foundry-claude/releases/tag/v1.5.3) assets, alias identity, published SHA256SUMS, SHA-256 `472218d41c904e8e32cbb985f810178ff2c886ae916e53a6dba609bdc812b81d`, and manifest version 1.5.3 were all verified in `execution_18e634e4921d4a10f47f43d71a14545d90bc7a58980f6cd428f980b39388ade0`. Refer to TSK-032-CLOSURE for this task's terminal producer disposition. PagoElectronico TSK-044 live consumer cutover remains separate and unclaimed.

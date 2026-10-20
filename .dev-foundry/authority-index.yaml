@@ -550,6 +550,12 @@ routes:
       - verified-managed-artifact-reconciliation-on-upgrade
       - minimal-corrective-release-after-adapter-150
     section_id: null
+  - id: TSK-032-CLOSURE
+    path: docs/70-tasks/70 [TSK-032-CLOSURE] PROJECT - Reconcile Modified Managed Artifacts in Governed Consumer Upgrades Closure.md
+    authority_class: configured
+    governs:
+      - tsk-032-release-153-terminal-disposition
+    section_id: null
 
 bindings:
   - id: governance-author-capability-producer-maintenance-v1
