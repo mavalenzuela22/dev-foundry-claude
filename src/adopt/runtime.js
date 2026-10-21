@@ -127,6 +127,9 @@ async function writeDurable(file, bytes) {
   const handle = await open(temporary, 'wx', 0o600);
   try { await handle.writeFile(bytes); await handle.sync(); } finally { await handle.close(); }
   await rename(temporary, file);
+  // Windows does not provide a portable fsync for directory handles. File
+  // bytes are still synced above; directory-entry durability is unavailable.
+  if (process.platform === 'win32') return;
   const directory = await open(path.dirname(file), 'r');
   try { await directory.sync(); } finally { await directory.close(); }
 }
@@ -243,6 +246,7 @@ export async function runtimeUpgradeState(rootArgument) {
     try {
       const journal = parseJournal(await readFile(path.join(root, journalDir, name)), name.slice(0, -5));
       if (journal.phase === 'IN_PROGRESS') return { blocked: true, status: 'in-progress', planSha256: journal.planSha256 };
+      if (journal.phase === 'PREPARED') return { blocked: true, status: 'prepared-recovery-required', planSha256: journal.planSha256 };
     } catch { return { blocked: true, status: 'unknown' }; }
   }
   return { blocked: false, status: 'complete' };
@@ -277,6 +281,19 @@ export async function recoverRuntimeUpgrade({ root: rootArgument, planSha256, ou
   try {
     let journal = parseJournal(await readFile(file), planSha256);
     if (journal.repository !== root) fail('runtime-recovery-not-required');
+    if (journal.phase === 'PREPARED') {
+      if (outcome !== 'source') fail('runtime-recovery-not-required');
+      if (sourcePackageRoot) {
+        if ((await verifyAdapterPackage(await realpath(sourcePackageRoot), journal.source))?.version !== parseExpect(journal.source).version) fail('runtime-recovery-package-mismatch');
+      } else await resolveRuntime({ expect: journal.source, packageRoot, env });
+      for (const item of journal.files) {
+        if (await pathHasSymlink(root, item.path)) fail('runtime-recovery-unsafe-path');
+        if (fileHash(await readContained(root, item.path)) !== item.beforeSha256) fail('runtime-recovery-ambiguous-bytes');
+      }
+      const { journalSha256: _discard, ...body } = journal;
+      await writeDurable(file, Buffer.from(sealJournal({ ...body, phase: 'ROLLED_BACK', outcome: 'source', lockOwner: null })));
+      return { status: 'ROLLED_BACK', planSha256 };
+    }
     if (journal.phase !== 'IN_PROGRESS') {
       if (outcome === 'source' && journal.phase === 'TARGET_VERIFIED' && journal.targetSessionStarted === true) fail('runtime-source-rollback-unsafe');
       fail('runtime-recovery-not-required');
