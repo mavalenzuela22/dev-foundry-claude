@@ -71,9 +71,93 @@ function flags(argv, allowed) {
 const [command, ...rest] = process.argv.slice(2);
 const packageVersion = () => JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8')).version;
 
+// The package's entrypoint is also the bootstrap selector: governed project
+// commands are dispatched only to the exact immutable package selected in the
+// consumer's MCP pin. A target-first global install therefore cannot silently
+// make an older consumer execute the new package.
+if (command === 'mcp' && rest.length === 2 && rest[0] === '--expect') {
+  try {
+    const { resolveRuntime } = await import('../src/adopt/runtime.js');
+    const selected = await resolveRuntime({ expect: rest[1], packageRoot });
+    if (selected !== realpathSync(packageRoot)) {
+      const child = spawnSync(process.execPath, [path.join(selected, 'bin/dev-foundry-claude.js'), ...process.argv.slice(2)], { stdio: 'inherit', env: process.env });
+      process.exit(child.status ?? 1);
+    }
+  } catch { verificationFailure(); }
+}
+
+const dashboardArgsValid = (() => {
+  if (command !== 'dashboard') return true;
+  const options = {};
+  for (let index = 0; index < rest.length; index += 2) {
+    const key = rest[index]; const value = rest[index + 1];
+    if (!['--port', '--root'].includes(key) || Object.hasOwn(options, key) || !value || value.startsWith('--')) return false;
+    options[key] = value;
+  }
+  const port = Number(options['--port']);
+  return /^\d+$/.test(options['--port'] ?? '') && Number.isInteger(port) && port >= 1024 && port <= 65535;
+})();
+
+if (command && ['setup', 'start', 'status', 'doctor', 'dashboard', 'run'].includes(command) && dashboardArgsValid) {
+  try {
+    let selectedRoot = process.cwd();
+    const rootIndex = rest.indexOf('--root');
+    if (rootIndex >= 0 && rest[rootIndex + 1]) selectedRoot = path.resolve(rest[rootIndex + 1]);
+    else {
+      const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !['GIT_DIR', 'GIT_WORK_TREE', 'GIT_COMMON_DIR', 'GIT_INDEX_FILE'].includes(key)));
+      const top = spawnSync('git', ['rev-parse', '--show-toplevel'], { cwd: selectedRoot, encoding: 'utf8', env: gitEnv });
+      if (top.status === 0) selectedRoot = top.stdout.trim();
+    }
+    const { readConsumerPin, resolveRuntime } = await import('../src/adopt/runtime.js');
+    let expect;
+    try { expect = await readConsumerPin(selectedRoot); }
+    catch (error) {
+      const diagnostic = ['status', 'doctor'].includes(command) || (command === 'dashboard' && error.code === 'consumer-pin-missing');
+      const firstSetup = command === 'setup' && error.code === 'consumer-pin-missing';
+      if (!diagnostic && !firstSetup) throw error;
+    }
+    if (expect) {
+      // Let each command retain its established verification diagnostic when
+      // this entrypoint package itself is corrupt. A valid newer global
+      // launcher may still dispatch to an older selected runtime.
+      let entrypointVerified = true;
+      try { selfPin(packageRoot); } catch { entrypointVerified = false; }
+      if (!entrypointVerified) expect = null;
+    }
+    if (expect) {
+      let selected;
+      try { selected = await resolveRuntime({ expect, packageRoot }); }
+      catch {
+        if (['status', 'doctor'].includes(command)) {
+          try { selfPin(packageRoot); selected = realpathSync(packageRoot); }
+          catch { /* report the closed failure below */ }
+        }
+        if (selected) {
+          // Read-only diagnostics may explain a same-version pin mismatch using
+          // this verified package; work commands still require an exact match.
+        } else {
+          if (command === 'dashboard') {
+            try { verifyPayload(packageRoot, expect); } catch { verificationFailure(); }
+            fail('The selected consumer runtime is unavailable or unverified.', 1);
+          }
+          try { selfPin(packageRoot); }
+          catch { try { verifyPayload(packageRoot, expect); } catch { verificationFailure(); } }
+          fail('The selected consumer runtime is unavailable or unverified. No application files were changed.', 2);
+        }
+      }
+      if (selected !== realpathSync(packageRoot)) {
+        const child = spawnSync(process.execPath, [path.join(selected, 'bin/dev-foundry-claude.js'), ...process.argv.slice(2)], { stdio: 'inherit', cwd: process.cwd(), env: process.env });
+        process.exit(child.status ?? 1);
+      }
+    }
+  } catch (error) {
+    verificationFailure();
+  }
+}
+
 if (command === 'readiness') {
   await readinessCommand(rest);
-} else if (!command || ['setup', 'start', 'status', 'doctor', 'help', '--help'].includes(command) || (command === 'upgrade' && !['status', 'plan', 'apply'].includes(rest[0]))) {
+} else if (!command || ['setup', 'start', 'status', 'doctor', 'help', '--help'].includes(command) || (command === 'upgrade' && !['status', 'plan', 'apply', 'recover'].includes(rest[0]))) {
   const { consumerCommand } = await import('../src/consumer/command.js');
   try { process.exitCode = await consumerCommand({ command: !command || command === '--help' ? 'help' : command, argv: rest, packageRoot }); }
   catch (error) { fail(`The operation could not complete safely. No application files were changed. ${error.exitCode === 2 ? error.message : `Next: dev-foundry-claude doctor. Use --verbose for technical diagnostics.${rest.includes('--verbose') ? ` Detail: ${error.code ?? error.message}` : ''}`}`, error.exitCode ?? 1); }
@@ -158,10 +242,16 @@ if (command === 'readiness') {
   process.exitCode = await runLauncher({ argv: ['--runtime', runtime, '--', ...claudeArgs], projectRoot: root });
 } else if (command === 'upgrade') {
   const [action, ...args] = rest;
-  if (!['status', 'plan', 'apply'].includes(action)) fail('Usage: dev-foundry-claude upgrade <status|plan|apply> --root <repo>', 2);
-  const allowed = { '--root': 'value', ...(action === 'plan' ? { '--out': 'value', '--from-package': 'value', '--resolution-file': 'value' } : action === 'apply' ? { '--plan': 'value', '--plan-sha256': 'value', '--resolution-file': 'value' } : { '--from-package': 'value' }) };
+  if (!['status', 'plan', 'apply', 'recover'].includes(action)) fail('Usage: dev-foundry-claude upgrade <status|plan|apply|recover> --root <repo>', 2);
+  const allowed = { '--root': 'value', ...(action === 'plan' ? { '--out': 'value', '--from-package': 'value', '--resolution-file': 'value' } : action === 'apply' ? { '--plan': 'value', '--plan-sha256': 'value', '--resolution-file': 'value' } : action === 'recover' ? { '--plan-sha256': 'value', '--outcome': 'value', '--from-package': 'value' } : { '--from-package': 'value' }) };
   const options = flags(args, allowed);
   if (!options['--root']) fail('upgrade requires --root.', 2);
+  if (action === 'recover') {
+    if (!options['--plan-sha256'] || !['source', 'target'].includes(options['--outcome'])) fail('upgrade recover requires the exact --plan-sha256 and --outcome source|target.', 2);
+    const { recoverRuntimeUpgrade } = await import('../src/adopt/runtime.js');
+    try { console.log(JSON.stringify(await recoverRuntimeUpgrade({ root: path.resolve(options['--root']), planSha256: options['--plan-sha256'], outcome: options['--outcome'], packageRoot, sourcePackageRoot: options['--from-package'] ? path.resolve(options['--from-package']) : undefined }))); }
+    catch (error) { fail(`upgrade recovery refused: ${error.code ?? 'error'}`); }
+  } else {
   let adapter;
   try {
     const pin = selfPin(packageRoot);
@@ -174,7 +264,7 @@ if (command === 'readiness') {
     if (!options['--plan'] || !options['--plan-sha256']) fail('apply requires --plan and --plan-sha256.', 2);
     const { applyPlan } = await import('../src/adopt/apply.js');
     try {
-      console.log(JSON.stringify(await applyPlan({ root, adapter, upgrade: true, resolutionFile,
+      console.log(JSON.stringify(await applyPlan({ root, adapter, targetPackageRoot: packageRoot, env: process.env, upgrade: true, resolutionFile,
         planBytes: readFileSync(path.resolve(options['--plan'])), planSha256: options['--plan-sha256'] })));
     } catch (error) { fail(`upgrade apply refused: ${error.code ?? 'error'}`); }
   } else if (action === 'status') {
@@ -196,6 +286,7 @@ if (command === 'readiness') {
       console.error(`plan-sha256: ${result.hash}`);
     }
     process.exitCode = ['ready', 'noop'].includes(result.plan.status) ? 0 : 2;
+  }
   }
 } else if (command === 'adopt') {
   const [action, ...args] = rest;

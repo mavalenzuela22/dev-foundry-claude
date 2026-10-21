@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { INDEX_PATH, MCP_FILE, MCP_SERVER_NAME, POP_PATH, cutoverState, pathHasSymlink, readContained, readYamlContained } from '../adopt/common.js';
 import { canonicalJson, parseExpect, sha256 } from '../adopt/pin.js';
+import { markTargetSessionStarted, runtimeUpgradeState } from '../adopt/runtime.js';
 
 // Only runtime bindings enter this projection. Task content/routes, policies and
 // Authority Index authoring are deliberately resolved afresh by the resolver.
@@ -8,6 +9,7 @@ export async function sessionProjection(root) {
   if (typeof root !== 'string' || !path.isAbsolute(root)) throw new Error('Project root unavailable');
   const cutover = await cutoverState(root);
   if (cutover.blocked) throw new Error('Authority cutover requires recovery');
+  if ((await runtimeUpgradeState(root)).blocked) throw new Error('Runtime upgrade requires recovery');
   if (await pathHasSymlink(root, POP_PATH) || await pathHasSymlink(root, MCP_FILE)) throw new Error('Unsafe runtime authority path');
   const pop = await readYamlContained(root, POP_PATH);
   const config = JSON.parse((await readContained(root, MCP_FILE)).toString('utf8'));
@@ -44,7 +46,12 @@ export async function sessionProjection(root) {
 
 export async function createSessionGuard(root, expectedRuntimePin) {
   let startup = null;
-  try { const projection = await sessionProjection(root); if (expectedRuntimePin && projection.adapterPin !== expectedRuntimePin) throw new Error('Runtime pin mismatch'); startup = sha256(canonicalJson(projection)); } catch { /* unavailable runtime fails closed */ }
+  try {
+    const projection = await sessionProjection(root);
+    if (expectedRuntimePin && projection.adapterPin !== expectedRuntimePin) throw new Error('Runtime pin mismatch');
+    startup = sha256(canonicalJson(projection));
+    await markTargetSessionStarted(root, projection.adapterPin);
+  } catch { /* unavailable runtime fails closed */ }
   let stale = false;
   return async () => {
     try { if (!startup || sha256(canonicalJson(await sessionProjection(root))) !== startup) stale = true; } catch { stale = true; }

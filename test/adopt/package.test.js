@@ -344,7 +344,7 @@ test('14 every tamper, a mismatched version, and a bad --expect exit non-zero be
   exitsEarly(clean, ['mcp', '--expect', base.pin, 'extra']);
 });
 
-const cliEnv = (extra = {}) => ({ ...cleanEnv(), GIT_CONFIG_GLOBAL: '/dev/null', ...extra });
+const cliEnv = (extra = {}) => ({ ...cleanEnv(), DEV_FOUNDRY_RUNTIME_STORE: path.join(os.tmpdir(), `dev-foundry-package-runtime-${process.pid}`), GIT_CONFIG_GLOBAL: '/dev/null', ...extra });
 const cli = (dir, args, options = {}) => spawnSync(process.execPath, [path.join(dir, 'bin/dev-foundry-claude.js'), ...args], { encoding: 'utf8', timeout: 60000, env: cliEnv(options.env), cwd: options.cwd ?? os.tmpdir() });
 async function adoptThroughInstalledCli(base, consumer) {
   const planFile = path.join(await scratch('plan'), 'plan.json');
@@ -479,7 +479,7 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
   assert.equal(lock.name, pkg.name);
   assert.equal(lock.version, pkg.version);
   assert.equal(lock.packages[''].version, pkg.version);
-  assert.equal(pkg.version, '1.5.3');
+  assert.equal(pkg.version, '1.5.4');
   const readme = await readFile(path.join(repoRoot, 'README.md'), 'utf8');
   assert.match(readme, /\*\*Claude Code adapter 1\.5\.3\*\*/);
   assert.match(readme.split('## 1. What is DEV FOUNDRY?')[0], /npm install -g[\s\S]*cd <project>[\s\S]*dev-foundry-claude setup[\s\S]*dev-foundry-claude start/);
@@ -492,7 +492,7 @@ test('22 package metadata: private, scoped name, bundled deps, lock stays a buil
 // adoption/MCP/run regression tests. Its temporary producer tree is deleted.
 test('TSK-016 package ships only dashboard runtime/assets and pins every dashboard byte', async () => {
   const base = await baseline();
-  assert.equal(base.manifest.version, '1.5.3', 'TSK-021 preserves the TSK-016 dashboard payload contract');
+  assert.equal(base.manifest.version, '1.5.4', 'candidate keeps the dashboard payload on the package identity');
   await assert.rejects(lstat(base.tree), /ENOENT/);
   const files = base.info.files.map((file) => file.path);
   for (const name of ['http', 'evidence', 'claude-otel', 'launch']) assert.ok(files.includes(`tools/dashboard/server/${name}.mjs`));
@@ -685,7 +685,7 @@ test('TSK-016 dashboard rejects invalid args, roots, unsafe structure, stale pin
   }
 });
 
-test('TSK-020 installed CLI explicitly plans/applies compatible upgrade with exact verified target identity', async (t) => {
+test('TSK-020 installed CLI refuses a compatible pin upgrade when its exact source runtime is unavailable', async (t) => {
   const base = await baseline();
   const consumer = await makeConsumer(); t.after(consumer.cleanup);
   const { createPlan } = await import('../../src/adopt/plan.js');
@@ -725,21 +725,16 @@ test('TSK-020 installed CLI explicitly plans/applies compatible upgrade with exa
   assert.match(differentBuild.stderr, /plan-stale/);
   assert.deepEqual(diffTrees(before, await listTree(consumer.root)), []);
   const applied = invoke(['apply', '--plan', out, '--plan-sha256', summary.planSha256]);
-  assert.equal(applied.status, 0, applied.stderr);
-  assert.deepEqual(JSON.parse(applied.stdout), { written: 1, deleted: 0 });
-  assert.deepEqual(diffTrees(before, await listTree(consumer.root)), ['.mcp.json']);
+  assert.equal(applied.status, 1, applied.stderr);
+  assert.match(applied.stderr, /source-selected-runtime-unavailable/);
+  assert.deepEqual(diffTrees(before, await listTree(consumer.root)), []);
   assert.deepEqual(await readSetSnapshot(consumer.root), authority);
-  consumer.commit();
-  assert.equal(JSON.parse(invoke(['status']).stdout).status, 'current');
-  const replan = cli(base.installed, ['adopt', 'plan', '--root', consumer.root]);
-  assert.equal(replan.status, 0, replan.stderr);
-  assert.equal(JSON.parse(replan.stdout).status, 'noop');
-  assert.equal(JSON.parse(replan.stdout).activation.overall, 'prepared');
+  assert.equal(JSON.parse(invoke(['status']).stdout).status, 'upgrade-needed');
 });
 
 test('TSK-021 isolated installed package guides fresh and brownfield setup, status, doctor, help and start recovery', async (t) => {
   const base = await baseline();
-  assert.equal(base.manifest.version, '1.5.3');
+  assert.equal(base.manifest.version, '1.5.4');
   for (const file of ['src/consumer/help.js', 'src/consumer/command.js', 'src/telemetry/launch.js']) assert.ok(base.manifest.files.some((entry) => entry.path === file));
   const fresh = await makeConsumer({ governed: false }); t.after(fresh.cleanup);
   const freshBefore = await listTree(fresh.root);
@@ -800,11 +795,11 @@ test('TSK-021 isolated installed package guides fresh and brownfield setup, stat
 
 test('TSK-025 installed 1.4.2 proves compatible pin upgrades and managed refresh from exact historical 1.2.2 packages', async (t) => {
   const base = await baseline();
-  assert.equal(base.manifest.version, '1.5.3');
+  assert.equal(base.manifest.version, '1.5.4');
   assert.equal(selfPin(base.installed).expect, base.pin);
   const material = JSON.parse(await readFile(path.join(base.installed, 'migrations/release.json'), 'utf8'));
   assert.equal(material.selfUpdateBaseline, '1.4.0');
-  assert.equal(material.targetVersion, '1.5.3');
+  assert.equal(material.targetVersion, '1.5.4');
   for (const version of ['1.2.2', '1.2.2-windows']) await t.test(version, async (t) => {
     const { source: oldPackage } = await legacyPackage(t, version);
     const oldPin = selfPin(oldPackage).expect;
@@ -875,7 +870,7 @@ test('TSK-025 installed 1.4.2 proves compatible pin upgrades and managed refresh
     assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
     const applied = cli(base.installed, ['upgrade', 'apply', '--root', c.root, '--plan', planFile, '--plan-sha256', hash]);
     assert.equal(applied.status, 0, applied.stderr); assert.deepEqual(JSON.parse(applied.stdout), { written: changed.length, deleted: 0 });
-    assert.deepEqual(diffTrees(before, await listTree(c.root)), changed);
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), [`.dfc-runtime-upgrade/${hash}.json`, ...changed].sort());
     assert.deepEqual(await readSetSnapshot(c.root), authority);
     assert.equal(JSON.parse(await c.read('.mcp.json')).mcpServers['dev-foundry-governance'].args[2], base.pin);
     assert.deepEqual(diffTrees(sourceBefore, await listTree(oldPackage)), []);

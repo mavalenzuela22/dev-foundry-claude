@@ -4,8 +4,8 @@ artifact:
   id: TSK-026
   type: TSK
   title: Establish Governed Model-Assisted Adapter Runtime Lifecycle
-  status: PLANNED
-artifactVersion: "1"
+  status: IN_PROGRESS
+artifactVersion: "2"
 authorityScope: tsk-026-governed-model-assisted-adapter-runtime-lifecycle
 ownerRole: governance-author
 canonical: true
@@ -58,7 +58,7 @@ traceability:
     - TSK-021
     - TSK-025
 lifecycle:
-  phase: planned
+  phase: in-progress
   blockedBy: []
   promotionRequired: true
 portability: project-specific
@@ -68,7 +68,7 @@ portability: project-specific
 
 ## 1. Operator intent and authority boundary
 
-The Operator explicitly authorized a complete governed design and preparation of a model-assisted adapter self-update capability, **up to but excluding product implementation**. This task is PLANNED; no Implementation Executor for TSK-026 is currently bound or authorized. This document, ADR-008, ARC-001 and SPC-008 define the candidate architecture and executable acceptance contract. They do not claim working updater software or release availability.
+Originally the Operator authorized design and preparation only. On 2026-10-20 the Operator explicitly authorized producer implementation of TSK-026, selecting a bounded **replacement of defective upgrade/recovery orchestration with reuse of verified integrity, reconciliation and durable-journal primitives**. This task is now IN_PROGRESS for governed execution preparation. Authorization alone does not prove Implementation Executor fit, execution package eligibility, validation, publication or consumer adoption. ADR-008, ARC-001 and SPC-008 retain product authority. No consumer repository may be mutated.
 
 Baseline observed on 2026-10-09: producer `dev-foundry-claude` at clean main `588fd87fc0eb7ec1bfa0b512b929e17dbf02d391`; adopted immutable DEV FOUNDRY 2.1.0; shipped adapter 1.4.2. Prior TSK-025 and its implementation bindings are history and grant no new implementation authority. This task does not authorize any consumer operation.
 
@@ -125,7 +125,7 @@ The implementation SHALL satisfy SPC-008 sections 4–10 and 11 onward, ADR-008 
 
 1. Governance Author completes ADR-008 selection, ARC-001 and SPC-008 reconciliations, this TSK and binding; records exact changed-path list, self-assessment and audit-trigger disposition.
 2. Resolve TSK-026 against the resulting indexed authority; validate the documentation candidate and promote documentation only through independently verified gates when authorized.
-3. **Stop before product implementation.** A later separate bounded operation SHALL explicitly authorize an eligible TSK-026 Implementation Executor and Capability Profile, implementation scope and evidence contract. Authoring approval alone does not activate that binding.
+3. **Implementation authorized by Operator on 2026-10-20, subject to eligibility.** Governance Author SHALL prepare one bounded prompt/execution contract on the producer task branch, prove operation-scoped Implementation Executor v2/runner-v3 fit, and obtain an eligible Runner resolution before starting code execution. The executor may modify only task-authorized product/test/package surfaces and may not author governance.
 4. Once authorized, implementation may be divided only along materially independent launcher/runtime, migration/recovery, model integration and packaged E2E gates; do not manufacture additional TSKs or audits for routine failed local tests.
 5. Producer release publication and consumer adoption remain separately authorized post-validation actions.
 
@@ -148,15 +148,12 @@ Documentation has complete architecture decision, migration/launcher contract, r
   integrity engine is introduced.
 - **State truth:** current 1.4.2 implements a partial migration substrate, not
   the stable version-resolved launcher nor a proven end-to-end model-assisted
-  runtime lifecycle. This document claims only a governed PLANNED capability.
+  runtime lifecycle. This section describes historical design state; current implementation work remains unverified.
 - **Security:** a payload hash is byte integrity, not publisher authenticity;
   trusted GitHub Release provenance/transport and target execution policy must
   be implemented and shown in the release trust model. No silent upgrade,
   global overwrite, or unverified package execution is allowed.
-- **Actor fit:** one currently eligible Governance Author and its TSK-026
-  documentary Capability Profile are active; the prior TSK-025 executor remains
-  task-bound and cannot implement TSK-026. No Implementation Executor binding
-  for TSK-026 exists; stop before code execution.
+- **Actor fit:** Governance Author authoring was resolved by the process-bound producer Runner. Operator implementation approval now exists, but executor identity/profile and a current execution package still require separate proof. Earlier TSK-025 bindings do not authorize TSK-026.
 - **Audit disposition:** adopted OPS-004 defines triggered independent audit.
   POP audit_triggers are empty; neither this task nor ADR-008 requires an
   independent audit for this document-only preparation, and the Operator did
@@ -174,3 +171,41 @@ Documentation has complete architecture decision, migration/launcher contract, r
   require validated concrete implementation choices **before** their relevant
   execution boundary. An unsupported assumption is a stop, not permission
   to broaden the task.
+
+## 10. Authorized implementation disposition (2026-10-20)
+
+**OPS-007 necessity:** 1.5.3 global CLI/MCP execution is coupled to installed package identity while consumer `--expect` can still select source 1.4.2. Source-governed migration then depends on a runtime that cannot start; modified agents and partially prepared target bootstrap can independently cause collisions. Existing staged apply rollback is not a durable process-crash recovery guarantee. No-change, pin-only refresh or another isolated bypass cannot satisfy the full observed recovery/cutover acceptance.
+
+**Selected material boundary:** Replace failing upgrade/maintenance orchestration with one source/target lifecycle per ADR-008. First reuse `pin.js` integrity, existing managed-file reconciliation and `cutover.js` durable journal/lock behavior wherever valid. Retire redundant prior paths only after packaged acceptance; do not introduce a second authority/resolver engine, speculative dependencies or new network services. A stable launcher selects exact immutable per-consumer runtime; an official bounded maintenance path independently plans, authorizes, applies and recovers without requiring the ordinary source MCP to be READY. Global installation/staging must never mutate consumer pin, active bootstrap or source authority prematurely. Model interpretation handles semantic configuration differences; exact Operator-approved candidate data becomes a verifiable plan, and only deterministic tools execute mutations.
+
+**Hard exclusions:** no PagoElectronico or other consumer repository mutation, no Foundry Runner or immutable framework methodology changes, no silent framework adoption/background upgrade, no guard bypass, no arbitrary maintenance shell execution, no historical evidence deletion, no new general governance system and no release before full acceptance. Preserve source 1.4.2 from verified official package bytes and source pin until approved cutover.
+
+**Expected mutation projection:** `bin/dev-foundry-claude.js`, `src/adopt/{pin,migration,upgrade,plan,apply,cutover,common,activation,inspect,render}.js`, `src/consumer/{command,help}.js`, `src/governance-mcp/session.js`, runtime dashboard/telemetry dispatch, directly affected package metadata/build scripts/migration material/templates, existing upgrade/cutover/package tests and necessary focused launcher/manager/test files. The executor must report any causally necessary projection variance under OPS-007/OPS-008; the projection cannot expand material authority. No `docs/`, `.dev-foundry/`, canonical framework release or consumer mutation by the Implementation Executor.
+
+**Required acceptance:** Installed packed CLI case A (genuinely customized 1.4.2 -> target), case B (1.4.2 pin with partially target-prepared bootstrap, modified executor/Capability Profiles, source `readyToWork=false`, MCP `STALE_SESSION` -> official recovery -> complete cutover), and global-target-first installation, without manual pin/bootstrap resets. Both require a READY authorized plan, exact bound decisions/hashes, preservation of all unrelated dirty worktree bytes, source runtime protection until cutover, integrity/stale/invalid-resolution/concurrent-writer rejection, interruption recovery, correct independent pinned runtimes and fresh CLI/MCP/dashboard/telemetry parity. Retain all additional TSK-026/SPC-008 macOS/Windows installed-host proof, not solely import-level fixture tests. No terminal PASS/publication on command discovery or partial unblocking.
+
+**Role and gates:** Implementation Executor v2 must be bound to a valid Runner execution contract and compatible runner-v3 Capability Profile. Executor completes focused self-verification; mechanical validation must establish state-bound packaged E2E; Governance Author reconciles actual change and semantic sufficiency. Independent audit occurs only on a demonstrated applicable trigger. Publication is separately gated and cannot be assumed now. One TSK, no default MTP or corrective release per discovered test failure.
+
+## 11. 1.5.4 release-candidate evidence and remaining gates (2026-10-21)
+
+The Operator requested rapid publication and recovery of PagoElectronico without a time-consuming Windows test cycle. This confirms urgency and publication intent, **not** that missing mandatory acceptance evidence has been obtained or that the source/consumer contract may be silently bypassed.
+
+The completed producer release-candidate preparation is Runner execution `execution_3e2bbe185bdf7259c91617d7654bba57f9264312d4da4a86aa9d00d113f94e3b`, request `req_77b4341674dbfdb1d3310423369a7288`: execution PASS, path policy PASS, post-execution Mechanical Validation PASS and complete evidence. The version-sensitive serial package/release-assets/packaged-upgrade command reported 43 PASS / 0 FAIL / 0 SKIP; `npm pack --dry-run --json` and `git diff --check` passed. The candidate identifies itself as 1.5.4, with payload root `1786a3ef92684df8187d849d56360fdca9aecf0fefcca34a6e31a246083f5eb6`. The installed 1.4.2 source fixture was downloaded from the published GitHub asset and its verified transport SHA-256 matched `3aa7542c41ce613c9c152e21c8e2d95d835dc00be1cb8f2e46302daa54cadaf3`; the 1.5.4 target remains **local, not published**. The earlier independent focused validation `tsk026-managed-runtime-focused-20261020-v001` returned PASS, evidenceComplete true, without invoking Codex.
+
+Current review conclusion: the implementation and package candidate are materially real, not merely planned, and existing focused proof is reused per OPS-007. The 1.5.4 candidate is not yet a release or approved consumer cutover. Still unproven under the active SPC-008/TSK-026 full acceptance contract: real Windows installed-host behavior, exhaustive journal-phase interruption coverage, live model/Operator semantic migration, full current-payload provenance/release trust and the remaining runtime component parity where host-limited. These are recorded as **not verified**, not product FAIL or fabricated PASS. No repeat of the full 503-case suite is justified solely by this candidate's version change.
+
+Disposition (superseded in part by the explicit exception below): retain the exact candidate changes and evidence, protect all consumer worktrees, and do not publish a GitHub release, repin PagoElectronico or claim terminal task acceptance until the remaining applicable publication conditions are genuinely resolved. Publication and consumer adoption are separate side effects under OPS-008.
+
+## 12. Authorized release-scoped exception — Windows proof for 1.5.4 (2026-10-21)
+
+The Operator explicitly authorized proceeding with the established release procedure for the existing 1.5.4 managed-runtime candidate **without Windows tests**. Consistent with OPS-007/OPS-008, the smallest authorized change is a **release-bound Windows evidence exception** recorded in SPC-008 §18.1 and here. The missing Windows installed-host bootstrap, recovery and file-lock proofs are classified **not verified / risk accepted for this delivery**, not PASS and not a general waiver for subsequent releases.
+
+The Operator did **not** waive package provenance, tamper checks, correct source/target identity, explicit resolution of governed configured-authority changes, READY exact plan, preservation of dirty consumer files and audit/validation when genuinely required. The remaining non-Windows material acceptance gaps recorded in §11 must be resolved or an explicit separately bounded Operator decision obtained before any GitHub release. No new Windows testing cycle and no repeat full suite solely for version metadata. Producer release publication and PagoElectronico consumer upgrade remain distinct boundaries; do not modify the consumer from the producer task.
+
+## 13. Bounded 1.5.4 recovery pilot — Operator release direction (2026-10-21)
+
+After the Windows-only exception, the Operator urgently requested that the team **do whatever is necessary to restore PagoElectronico**, responding to the explicit proposal of a limited 1.5.4 recovery pilot. Accept this as authorization to **prepare and attempt** the established controlled promotion/publication path for that **limited pilot**, with the exception scope and unverified risks defined in SPC-008 §18.2. Do not reinterpret this direction as a claim of completed validation, permission to force an unsafe consumer migration, or authority to modify PagoElectronico from the producer.
+
+Producer candidate commit `3243fba8acf80a7b1695f0cd4e18463dd22f3beb` on PR #60 has independent focus validation and verified packaged upgrade-case evidence. The remaining known gaps from §11 are disclosed as not verified for the pilot only: live natural-language model/Operator orchestration, every new runtime-journal interruption point, and comprehensive live-host component parity; Windows-host tests remain omitted under §12. This narrowly replaces the §10 pre-release full-acceptance prohibition **for one explicitly limited 1.5.4 recovery pilot**, but does **not** close TSK-026 or assert its full acceptance. Security, release provenance/integrity, real READY plan plus explicit Operator choices, source-package preservation, independent validation and authenticated publication from exact committed main remain required.
+
+Promotion and release remain separate state-bound operations; the approved test evidence must be reusable for the exact commit. No broader upgrade rollout, auto-update or consumer write is approved. A later consumer operation must re-read its own 1.4.2 pin/worktree, stage the verifiable released target and prove its own preflight before considering apply.

@@ -138,7 +138,7 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
     return { file, hash: returned.planSha256, data, bytes };
   };
   const apply = (c, p, resolutionFile, env) => cli(target.pkg, ['upgrade', 'apply', '--root', c.root, '--plan', p.file, '--plan-sha256', p.hash,
-    ...(resolutionFile ? ['--resolution-file', resolutionFile] : [])], env);
+    ...(resolutionFile ? ['--resolution-file', resolutionFile] : [])], { DEV_FOUNDRY_RUNTIME_STORE: path.join(scratch, 'runtime-store'), ...env });
   async function fixture(local = true) {
     const c = await makeConsumer(); t.after(c.cleanup); c.root = await realpath(c.root); outside(c.root);
     const file = artifact('source-adopt');
@@ -170,6 +170,122 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
     const resolutionFile = artifact('resolution'); await writeFile(resolutionFile, JSON.stringify(input));
     return { c, contents, input, resolutionFile };
   }
+  let pinnedSourceConsumer;
+
+  await scenario('packed global target dispatches to the exact 1.4.2 package before consumer selection changes', async () => {
+    const { c } = await fixture(false);
+    pinnedSourceConsumer = c.root;
+    const runtimeStore = path.join(scratch, 'runtime-store');
+    const sourceSlot = path.join(runtimeStore, `1.4.2--${source.pin.root}`);
+    await mkdir(sourceSlot, { recursive: true });
+    await cp(source.pkg, sourceSlot, { recursive: true });
+    const before = await listTree(c.root);
+    const result = success(cli(target.pkg, ['status', '--root', c.root, '--json'], {
+      DEV_FOUNDRY_RUNTIME_STORE: runtimeStore,
+    }));
+    const status = JSON.parse(result.stdout);
+    assert.equal(status.adapterVersion, '1.4.2');
+    assert.equal(status.selectedAdapterVersion, '1.4.2');
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+    evidence.outcomes.push({ case: 'global-target-first-source-runtime-dispatch', source: status.adapterVersion,
+      targetGlobal: target.pin.version, consumerPin: status.selectedAdapterVersion, consumerWrites: 0 });
+  });
+
+  await scenario('independent maintenance upgrades a stale, not-ready source with a target-prepared bootstrap and modified profiles', async () => {
+    const { c, contents, resolutionFile } = await fixture();
+    const sessionModule = await import(pathToFileURL(path.join(source.pkg, 'src/governance-mcp/session.js')).href);
+    const guard = await sessionModule.createSessionGuard(c.root, SOURCE_PIN);
+    const profile = CONFIGURED[0];
+    contents[profile] += '# B-case retained source executor decision.\n';
+    await c.put(profile, contents[profile]);
+
+    const pop = parse(await c.read('.dev-foundry/profiles/project-operating-profile.yaml'));
+    const executor = parse(await c.read(pop.actor_bindings['implementation-executor'].profile));
+    const auditor = parse(await c.read(pop.actor_bindings['governance-auditor'].profile));
+    const renderer = await import(pathToFileURL(path.join(target.pkg, 'src/adopt/render.js')).href);
+    const preparedBootstrap = renderer.renderBootstrap(renderer.templateParams({ project: pop.repository.name, prefix: 'ACME',
+      executorProfileId: executor.id, auditorProfileId: auditor.id,
+      authorProfile: pop.actor_bindings['governance-author'].profile,
+      custodianProfile: pop.actor_bindings['evidence-custodian'].profile,
+    }), path.join(target.pkg, 'templates'), { legacyV2: true })['.dev-foundry/platform-bootstrap-claude-code.yaml'] +
+      '# B-case retained source bootstrap decision.\n';
+    contents[CONFIGURED[2]] = preparedBootstrap;
+    await c.put(CONFIGURED[2], preparedBootstrap);
+    assert.equal((await guard())?.errorCode, 'STALE_SESSION');
+
+    const runtimeStore = path.join(scratch, 'runtime-store');
+    const runtime = await import(pathToFileURL(path.join(target.pkg, 'src/adopt/runtime.js')).href);
+    await runtime.installRuntime({ packageRoot: source.pkg, expect: SOURCE_PIN, env: { DEV_FOUNDRY_RUNTIME_STORE: runtimeStore } });
+    const sourceStatusResult = cli(target.pkg, ['status', '--root', c.root, '--json'], {
+      DEV_FOUNDRY_RUNTIME_STORE: runtimeStore,
+    });
+    assert.equal(sourceStatusResult.status, 2, sourceStatusResult.stderr || sourceStatusResult.stdout);
+    const sourceStatus = JSON.parse(sourceStatusResult.stdout);
+    assert.equal(sourceStatus.adapterVersion, '1.4.2');
+    assert.equal(sourceStatus.readyToWork, false);
+    const blocked = await plan(c, undefined, 'blocked');
+    const input = { format: 'dev-foundry.managed-resolution.v1',
+      repository: { root: blocked.data.repository.root, head: blocked.data.repository.head },
+      source: SOURCE_PIN, target: target.pin.expect,
+      files: Object.entries(contents).map(([file, content]) => {
+        const record = blocked.data.reconciliation.find((item) => item.path === file);
+        assert.equal(record?.classification, 'conflict', file);
+        return { path: file, before_sha256: record.before_sha256, base_sha256: record.base_sha256,
+          current_sha256: record.current_sha256, target_sha256: record.target_sha256,
+          resolved_sha256: sha256(content), resolved_content: content };
+      }) };
+    await writeFile(resolutionFile, JSON.stringify(input));
+    const before = await listTree(c.root);
+    const ready = await plan(c, resolutionFile);
+    assert.equal(ready.data.status, 'ready');
+    success(apply(c, ready, resolutionFile, { DEV_FOUNDRY_RUNTIME_STORE: runtimeStore }));
+    assert.equal(JSON.parse(await c.read('.mcp.json')).mcpServers['dev-foundry-governance'].args[2], target.pin.expect);
+    assert.equal(await c.read(CONFIGURED[2]), preparedBootstrap);
+    const after = await listTree(c.root);
+    for (const file of ['src/billing.js', 'src/kafka/consumer.js']) assert.equal(after.get(file), before.get(file));
+    evidence.outcomes.push({ case: 'stale-not-ready-target-prepared-recovery', sourceReadyToWork: false,
+      sourceSession: 'STALE_SESSION', targetPin: target.pin.expect, runtime: 'independent target maintenance CLI', noSourceRestore: true });
+  });
+
+  await scenario('independent packaged recovery restores source after a process dies mid-upgrade', async () => {
+    const { c, resolutionFile } = await fixture();
+    const ready = await plan(c, resolutionFile);
+    const sessionModule = await import(pathToFileURL(path.join(target.pkg, 'src/governance-mcp/session.js')).href);
+    const guard = await sessionModule.createSessionGuard(c.root, SOURCE_PIN);
+    const upgradeUrl = pathToFileURL(path.join(target.pkg, 'src/adopt/upgrade.js')).href;
+    const runtimeUrl = pathToFileURL(path.join(target.pkg, 'src/adopt/runtime.js')).href;
+    const rootLiteral = JSON.stringify(c.root);
+    const sourceLiteral = JSON.stringify(source.pkg);
+    const targetLiteral = JSON.stringify({ version: target.pin.version, payloadRoot: target.pin.root, expect: target.pin.expect });
+    const resolutionLiteral = JSON.stringify(resolutionFile);
+    const driver = `
+      import { writeFile } from 'node:fs/promises';
+      import path from 'node:path';
+      const { createUpgradePlan } = await import(${JSON.stringify(upgradeUrl)});
+      const { beginRuntimeUpgrade } = await import(${JSON.stringify(runtimeUrl)});
+      const root = ${rootLiteral};
+      const sourcePackageRoot = ${sourceLiteral};
+      const adapter = ${targetLiteral};
+      const resolutionFile = ${resolutionLiteral};
+      const result = await createUpgradePlan({ root, adapter, currentPackageRoot: sourcePackageRoot, resolutionFile });
+      await beginRuntimeUpgrade({ root, planBytes: result.bytes, planSha256: result.hash, writes: result.ops.writes });
+      const first = result.ops.writes.find((item) => item.path !== '.mcp.json');
+      await writeFile(path.join(root, ...first.path.split('/')), first.content);
+      process.stdout.write(result.hash);
+      process.exit(0);
+    `;
+    const crashed = success(run(process.execPath, ['--input-type=module', '-e', driver], scratch,
+      { DEV_FOUNDRY_RUNTIME_STORE: path.join(scratch, 'runtime-store') }));
+    assert.equal(crashed.stdout.trim(), ready.hash);
+    assert.equal((await guard())?.errorCode, 'STALE_SESSION');
+    const recovered = success(cli(target.pkg, ['upgrade', 'recover', '--root', c.root, '--plan-sha256', ready.hash,
+      '--outcome', 'source', '--from-package', source.pkg], { DEV_FOUNDRY_RUNTIME_STORE: path.join(scratch, 'runtime-store') }));
+    assert.equal(JSON.parse(recovered.stdout).status, 'ROLLED_BACK');
+    assert.equal(await c.read('.mcp.json').then((bytes) => JSON.parse(bytes).mcpServers['dev-foundry-governance'].args[2]), SOURCE_PIN);
+    assert.equal((await guard())?.errorCode, 'STALE_SESSION');
+    evidence.outcomes.push({ case: 'process-loss-mid-upgrade', planSha256: ready.hash, recovered: 'source', sourcePinPreserved: true,
+      interruptedSessionRemainsStale: true, nextAction: 'start a fresh source session' });
+  });
 
   await scenario('READY exact-plan apply preserves configured semantics and all unrelated bytes', async () => {
     const { c, contents, resolutionFile } = await fixture();
@@ -187,7 +303,8 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
     const applied = JSON.parse(success(apply(c, ready, resolutionFile)).stdout);
     const changed = [RECONCILIATION_FILE, '.mcp.json', 'CLAUDE.md', AGENT, '.claude/agents/dev-foundry-auditor.md'].sort();
     assert.deepEqual(applied, { written: changed.length, deleted: 0 });
-    assert.deepEqual(diffTrees(before, await listTree(c.root)), changed);
+    const transactionJournal = `.dfc-runtime-upgrade/${ready.hash}.json`;
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), [...changed, transactionJournal].sort());
     assert.deepEqual(await readSetSnapshot(c.root), authority);
     for (const [file, content] of Object.entries(contents)) {
       const after = await c.read(file); assert.equal(sha256(after), sha256(content));
@@ -203,6 +320,17 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
     assert.equal(status.target.expect, target.pin.expect);
     assert.equal(observed.status, 0); assert.equal(status.status, 'current');
     assert.deepEqual(status.blockers, []);
+    const runtimeStore = path.join(scratch, 'runtime-store');
+    const sourceConsumerStatus = JSON.parse(success(cli(target.pkg, ['status', '--root', pinnedSourceConsumer, '--json'], {
+      DEV_FOUNDRY_RUNTIME_STORE: runtimeStore,
+    })).stdout);
+    assert.equal(sourceConsumerStatus.adapterVersion, '1.4.2');
+    assert.equal(sourceConsumerStatus.selectedAdapterVersion, '1.4.2');
+    const targetConsumerStatus = JSON.parse(success(cli(target.pkg, ['status', '--root', c.root, '--json'], {
+      DEV_FOUNDRY_RUNTIME_STORE: runtimeStore,
+    })).stdout);
+    assert.equal(targetConsumerStatus.adapterVersion, '1.5.4');
+    assert.equal(targetConsumerStatus.selectedAdapterVersion, '1.5.4');
     // Remove the transient decision. Every following observation starts a new
     // shipped process; neither the source package nor the decision is supplied.
     await rm(resolutionFile);
@@ -349,15 +477,17 @@ process.exitCode = await consumerCommand({ command: 'start',
 const promises = require('node:fs/promises');
 const original = promises.rename; let count = 0;
 promises.rename = async (...args) => {
-  if (++count === 2) { fs.writeFileSync(${JSON.stringify(marker)}, JSON.stringify({ installed: count - 1, failed: args })); throw new Error('C013 injected rename failure'); }
+  if (++count === 4) { fs.writeFileSync(${JSON.stringify(marker)}, JSON.stringify({ installed: count - 3, failed: args })); throw new Error('C013 injected rename failure'); }
   return original(...args);
 };
 require('node:module').syncBuiltinESMExports();\n`);
     const failed = apply(c, p, resolutionFile, { NODE_OPTIONS: `--require=${preload}` });
     assert.equal(failed.status, 1); assert.match(failed.stderr, /apply-failed/);
     assert.equal(JSON.parse(await readFile(marker)).installed, 1);
-    assert.deepEqual(diffTrees(before, await listTree(c.root)), [], 'rollback restores all bytes and removes every stage');
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), [`.dfc-runtime-upgrade/${p.hash}.json`],
+      'rollback restores consumer bytes and retains only its durable recovery record');
     assert.deepEqual(JSON.parse(success(apply(c, p, resolutionFile)).stdout), { written: 5, deleted: 0 });
+    assert.equal(JSON.parse(await c.read(`.dfc-runtime-upgrade/${p.hash}.json`)).phase, 'TARGET_VERIFIED');
     evidence.outcomes.push({ case: 'rollback/retry', failedStatus: failed.status, installedBeforeFailure: 1, restoredAllBytes: true, exactRetryStatus: 0 });
   });
   await scenario('clean exact legacy source still requires an explicit configured bootstrap decision', async () => {
