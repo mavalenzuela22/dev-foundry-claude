@@ -85,6 +85,54 @@ test('verified source packages are installed side by side without replacing thei
   assert.equal(await resolveRuntime({ expect: source.expect, packageRoot: target.root, env: { DEV_FOUNDRY_RUNTIME_STORE: store } }), installed);
 });
 
+test('PREPARED upgrade journals require explicit source recovery with every before-state intact', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'dfc-runtime-prepared-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const source = await packageFixture(temp, '1.4.2', 'source');
+  const target = await packageFixture(temp, '1.5.3', 'target');
+  const consumer = path.join(temp, 'consumer');
+  await mkdir(consumer);
+  const sourcePin = JSON.stringify({ mcpServers: { 'dev-foundry-governance': { command: 'dev-foundry-claude', args: ['mcp', '--expect', source.expect] } } });
+  const targetPin = JSON.stringify({ mcpServers: { 'dev-foundry-governance': { command: 'dev-foundry-claude', args: ['mcp', '--expect', target.expect] } } });
+  await writeFile(path.join(consumer, '.mcp.json'), sourcePin);
+  await writeFile(path.join(consumer, 'managed.txt'), 'source-bytes');
+  const planBytes = Buffer.from(canonicalJson({ mode: 'upgrade', status: 'ready', current: { expect: source.expect }, target: { expect: target.expect },
+    create: [{ path: 'new-managed.txt', sha256: sha256('new-target-bytes') }], merge: [
+      { path: 'managed.txt', before_sha256: sha256('source-bytes'), after_sha256: sha256('target-bytes') },
+      { path: '.mcp.json', before_sha256: sha256(sourcePin), after_sha256: sha256(targetPin) },
+    ] }));
+  const planSha256 = sha256(planBytes);
+  await beginRuntimeUpgrade({ root: consumer, planBytes, planSha256, writes: [
+    { path: 'new-managed.txt', content: 'new-target-bytes' }, { path: 'managed.txt', content: 'target-bytes' }, { path: '.mcp.json', content: targetPin },
+  ] });
+  const journalFile = path.join(consumer, '.dfc-runtime-upgrade', `${planSha256}.json`);
+  const journal = JSON.parse(await readFile(journalFile, 'utf8'));
+  delete journal.journalSha256;
+  journal.phase = 'PREPARED';
+  journal.journalSha256 = sha256(canonicalJson(journal));
+  await writeFile(journalFile, canonicalJson(journal));
+  await writeFile(path.join(consumer, '.dfc-runtime-upgrade', `${planSha256}.lock`), JSON.stringify({ pid: 99999999 }));
+
+  assert.deepEqual(await runtimeUpgradeState(consumer), { blocked: true, status: 'prepared-recovery-required', planSha256 });
+  await assert.rejects(recoverRuntimeUpgrade({ root: consumer, planSha256, outcome: 'target', packageRoot: target.root }), { code: 'runtime-recovery-not-required' });
+  await writeFile(path.join(consumer, 'managed.txt'), 'unexpected-bytes');
+  await assert.rejects(recoverRuntimeUpgrade({ root: consumer, planSha256, outcome: 'source', packageRoot: target.root,
+    sourcePackageRoot: source.root }), { code: 'runtime-recovery-ambiguous-bytes' });
+  await writeFile(path.join(consumer, 'managed.txt'), 'source-bytes');
+  await writeFile(path.join(consumer, 'new-managed.txt'), 'unexpected-created-file');
+  await assert.rejects(recoverRuntimeUpgrade({ root: consumer, planSha256, outcome: 'source', packageRoot: target.root,
+    sourcePackageRoot: source.root }), { code: 'runtime-recovery-ambiguous-bytes' });
+  await rm(path.join(consumer, 'new-managed.txt'));
+
+  assert.deepEqual(await recoverRuntimeUpgrade({ root: consumer, planSha256, outcome: 'source', packageRoot: target.root,
+    sourcePackageRoot: source.root }), { status: 'ROLLED_BACK', planSha256 });
+  assert.equal(await readFile(path.join(consumer, 'managed.txt'), 'utf8'), 'source-bytes');
+  assert.equal(await readFile(path.join(consumer, '.mcp.json'), 'utf8'), sourcePin);
+  await assert.rejects(readFile(path.join(consumer, 'new-managed.txt')), { code: 'ENOENT' });
+  assert.equal(JSON.parse(await readFile(journalFile, 'utf8')).phase, 'ROLLED_BACK');
+  assert.equal((await runtimeUpgradeState(consumer)).blocked, false);
+});
+
 test('durable upgrade intent blocks sessions and recovers source or verified target after process loss', async (t) => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'dfc-runtime-recovery-'));
   t.after(() => rm(temp, { recursive: true, force: true }));
