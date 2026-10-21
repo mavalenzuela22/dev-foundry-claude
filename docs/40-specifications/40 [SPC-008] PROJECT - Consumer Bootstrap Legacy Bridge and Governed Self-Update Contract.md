@@ -454,3 +454,9 @@ Test reports SHALL distinguish deterministic tests, model semantic evidence,
 host-limited assumptions and independent audit verdict where triggered.
 A user-facing “upgrade complete” requires independently verified fresh target
 session and component identity; merely applying the pin is not completion.
+
+### 18.1. Operator-authorized Windows evidence exception — adapter 1.5.4 only (2026-10-21)
+
+For the first managed-runtime recovery release **1.5.4** only, the Operator explicitly authorizes deferring **Windows installed-host execution and Windows file-lock tests** from the pre-publication acceptance evidence because the prolonged release delay is materially preventing PagoElectronico development. This is a release-scoped exception to the Windows-specific portions of §18 and TSK-026 §5(I), not a claim that Windows behavior passed. The product remains intended for Windows consumers, but **Windows compatibility is unverified for this release** until exercised on the real consumer or other representative installed host; report this residual risk in release and adoption records.
+
+The exception does not waive archive/payload integrity, authorized plan and decisions, preservation of consumer modifications and source runtime, recovery safety, actual macOS installed-package acceptance, or other applicable product and publication gates. Existing valid evidence may be reused under OPS-007. No invented PASS, unrelated test expansion, extra process or general relaxation for later releases. A Windows production consumer MUST still verify its actual source/target plan, package identity and observed readiness before applying the upgrade; a failed or unavailable recovery remains blocked, never force-applied.
