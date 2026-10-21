@@ -58,6 +58,16 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
   // producer too, so even transient config/build artifacts stay in scratch.
   const dashboardDependencies = path.join(scratch, 'dashboard-build/node_modules');
   await cp(path.join(repoRoot, 'tools/dashboard/node_modules'), dashboardDependencies, { recursive: true, verbatimSymlinks: true });
+  const runtimeAvailabilityDir = path.join(scratch, 'runtime-availability');
+  await mkdir(runtimeAvailabilityDir);
+  if (process.platform === 'win32') {
+    await writeFile(path.join(runtimeAvailabilityDir, 'claude.cmd'), '@echo off\r\nexit /b 0\r\n');
+  } else {
+    const executable = path.join(runtimeAvailabilityDir, 'claude');
+    await writeFile(executable, `#!${process.execPath}\nprocess.exit(0);\n`);
+    await chmod(executable, 0o755);
+  }
+  const runtimeAvailabilityEnv = { PATH: `${runtimeAvailabilityDir}${path.delimiter}${process.env.PATH ?? ''}` };
 
   // Same disposable build pattern as package.test.js. No generated manifest or
   // dashboard output is written in the producer, and no test payload is invented.
@@ -182,6 +192,7 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
     const before = await listTree(c.root);
     const result = success(cli(target.pkg, ['status', '--root', c.root, '--json'], {
       DEV_FOUNDRY_RUNTIME_STORE: runtimeStore,
+      ...runtimeAvailabilityEnv,
     }));
     const status = JSON.parse(result.stdout);
     assert.equal(status.adapterVersion, '1.4.2');
@@ -323,11 +334,13 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
     const runtimeStore = path.join(scratch, 'runtime-store');
     const sourceConsumerStatus = JSON.parse(success(cli(target.pkg, ['status', '--root', pinnedSourceConsumer, '--json'], {
       DEV_FOUNDRY_RUNTIME_STORE: runtimeStore,
+      ...runtimeAvailabilityEnv,
     })).stdout);
     assert.equal(sourceConsumerStatus.adapterVersion, '1.4.2');
     assert.equal(sourceConsumerStatus.selectedAdapterVersion, '1.4.2');
     const targetConsumerStatus = JSON.parse(success(cli(target.pkg, ['status', '--root', c.root, '--json'], {
       DEV_FOUNDRY_RUNTIME_STORE: runtimeStore,
+      ...runtimeAvailabilityEnv,
     })).stdout);
     assert.equal(targetConsumerStatus.adapterVersion, target.pin.version);
     assert.equal(targetConsumerStatus.selectedAdapterVersion, target.pin.version);
@@ -341,7 +354,7 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
 require('node:fs').writeFileSync(process.env.DFC_C014_RUNTIME_MARKER, JSON.stringify({ cwd: process.cwd(), args: process.argv.slice(2) }));
 `);
     await chmod(stub, 0o755);
-    const runtimeEnv = { PATH: `${stubDir}${path.delimiter}${process.env.PATH}`, DFC_C014_RUNTIME_MARKER: marker };
+    const runtimeEnv = { ...runtimeAvailabilityEnv, PATH: `${stubDir}${path.delimiter}${runtimeAvailabilityEnv.PATH}`, DFC_C014_RUNTIME_MARKER: marker };
     const readOnlyBefore = await listTree(c.root);
     const readiness = JSON.parse(success(cli(target.pkg, ['status', '--root', c.root, '--json'], runtimeEnv)).stdout);
     assert.equal(readiness.readyToWork, true); assert.equal(readiness.integration, 'ready');

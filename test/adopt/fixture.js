@@ -13,6 +13,30 @@ export const adapterIdentity = { version: '9.9.9', payloadRoot: 'f'.repeat(64), 
 export const PROJECT = 'acme-billing';
 
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
+async function materializeFrameworkRelease(version, root) {
+  const bundlePath = path.join(repoRoot, 'framework', `dev-foundry-${version}.bundle.json`);
+  const bundle = JSON.parse(await readFile(bundlePath, 'utf8'));
+  if (bundle.format !== 'dev-foundry.framework-bundle.v1' || bundle.version !== version || !Array.isArray(bundle.files)) {
+    throw new Error(`Invalid canonical framework bundle for ${version}`);
+  }
+  const paths = new Set();
+  for (const file of bundle.files) {
+    const relative = file.path;
+    if (typeof relative !== 'string' || !relative || relative.includes('\\') || path.posix.isAbsolute(relative) ||
+        path.posix.normalize(relative) !== relative || relative.split('/').some((part) => !part || part === '.' || part === '..') ||
+        paths.has(relative)) {
+      throw new Error(`Unsafe or duplicate framework bundle path: ${relative}`);
+    }
+    paths.add(relative);
+    const bytes = Buffer.from(file.base64, 'base64');
+    if (bytes.toString('base64') !== file.base64 || bytes.length !== file.size || sha(bytes) !== file.sha256) {
+      throw new Error(`Framework bundle integrity mismatch for ${version}/${relative}`);
+    }
+    const target = path.join(root, ...relative.split('/'));
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, bytes);
+  }
+}
 const actorFiles = {
   'governance-author': 'governance-author-v3', 'governance-auditor': 'governance-auditor-v2', 'implementation-executor': 'implementation-executor-v2',
   'mechanical-validator': 'mechanical-validator-v2', 'evidence-custodian': 'evidence-custodian-v1',
@@ -43,7 +67,9 @@ export async function makeConsumer(options = {}) {
   await put('.claude/settings.local.json', `${JSON.stringify({ permissions: { allow: ['Bash(ls)'] } }, null, 2)}\n`);
   await put('.dev-foundry/.gitignore', options.ignore ?? 'execution-requests/\nprompts/\n');
   if (options.governed !== false) {
-    await cp(path.join(repoRoot, '.dev-foundry/releases'), path.join(root, '.dev-foundry/releases'), { recursive: true });
+    for (const version of ['2.1.0', '2.3.0']) {
+      await materializeFrameworkRelease(version, path.join(root, '.dev-foundry/releases', version));
+    }
     const runnerProfile = '.dev-foundry/profiles/capability-profiles/implementation-executor-runner-v2.yaml';
     await put(runnerProfile, stringify({
       schema_version: 'dev-foundry.capability-profile.v1', id: 'ACME-IMPLEMENTATION-EXECUTOR-RUNNER-V2', status: 'active',
