@@ -200,7 +200,8 @@ export async function consumerCommand({ command, argv = [], packageRoot, cwd = p
       // Human output precedes any write so explicit application includes the
       // same reviewable preflight. JSON returns the full plan in one response.
       if (!json && review) output(review.trimStart());
-      applied = await applyPlan({ root: view.repository, adapter, upgrade: true, planBytes: result.bytes, planSha256: result.hash, resolutionFile });
+      const targetPackageRoot = (() => { try { return selfPin(packageRoot).expect === adapter.expect ? packageRoot : undefined; } catch { return undefined; } })();
+      applied = await applyPlan({ root: view.repository, adapter, targetPackageRoot, env, upgrade: true, planBytes: result.bytes, planSha256: result.hash, resolutionFile });
     }
     const governed = plan.blockers.some((item) => item.code === 'governed-migration-required');
     const unsupported = plan.blockers.some((item) => item.code === 'legacy-source-unsupported');

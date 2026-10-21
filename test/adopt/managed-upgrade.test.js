@@ -345,7 +345,8 @@ test('advanced CLI explicit Operator selection resolves a real 1.4.2 conflict wi
   fixture.adapter = { version: pin.version, payloadRoot: pin.root, expect: pin.expect };
   await selectResolution(t, fixture, { [file]: resolved });
   const invoke = (action, args = [], root = c.root) => spawnSync(process.execPath, [path.join(packaged.root, 'bin/dev-foundry-claude.js'),
-    'upgrade', action, '--root', root, ...args], { cwd: path.dirname(fixture.resolutionFile), encoding: 'utf8' });
+    'upgrade', action, '--root', root, ...args], { cwd: path.dirname(fixture.resolutionFile), encoding: 'utf8',
+    env: { ...process.env, DEV_FOUNDRY_RUNTIME_STORE: path.join(path.dirname(fixture.resolutionFile), 'runtime-store') } });
   // Relative selection must resolve against the invocation directory in both commands.
   const selected = ['--resolution-file', path.basename(fixture.resolutionFile)];
   const from = ['--from-package', fixture.source];
@@ -416,7 +417,7 @@ test('advanced CLI explicit Operator selection resolves a real 1.4.2 conflict wi
   assert.equal(applied.status, 0, applied.stderr);
   assert.deepEqual(JSON.parse(applied.stdout), { written: result.ops.writes.length, deleted: 0 });
   assert.equal(await c.read(file), resolved);
-  assert.deepEqual(diffTrees(before, await listTree(c.root)), result.ops.writes.map((item) => item.path).sort());
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), [`.dfc-runtime-upgrade/${result.hash}.json`, ...result.ops.writes.map((item) => item.path)].sort());
   assert.deepEqual(await readSetSnapshot(c.root), authority);
   const unchanged = await previous142(t);
   const compatible = invoke('plan', ['--from-package', unchanged.source], unchanged.c.root);
@@ -1008,7 +1009,9 @@ test('C014 reconciliation evidence is a planned write and rolls back with every 
   syncBuiltinESMExports();
   try {
     await assert.rejects(apply(fixture, result), { code: 'apply-failed' });
-    assert.equal(installed, result.ops.writes.length - 1);
+    const installOrder = [...result.ops.writes].sort((a, b) => a.path === '.mcp.json' ? 1 : b.path === '.mcp.json' ? -1 :
+      a.path === RECONCILIATION_FILE ? 1 : b.path === RECONCILIATION_FILE ? -1 : a.path.localeCompare(b.path));
+    assert.equal(installed, installOrder.findIndex((item) => item.path === RECONCILIATION_FILE));
     assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
   } finally { t.mock.restoreAll(); syncBuiltinESMExports(); }
   await apply(fixture, result);

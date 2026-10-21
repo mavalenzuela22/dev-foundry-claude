@@ -6,6 +6,7 @@ import { makeUnifiedDiff } from './diff.js';
 import { git } from './ignore.js';
 import { createPlan, hasUnresolvedDirtyPaths, reconciliationSurface } from './plan.js';
 import { canonicalJson, parseExpect, selfPin, sha256 } from './pin.js';
+import { runtimeUpgradeState } from './runtime.js';
 
 const exactKeys = (value, keys) => isObject(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const hash = (value) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
@@ -57,6 +58,11 @@ export async function createUpgradePlan({ root: rootArgument, adapter, currentPa
   let root, before, config, entry;
   try {
     root = await realpath(path.resolve(rootArgument ?? process.cwd()));
+    const transaction = await runtimeUpgradeState(root);
+    if (transaction.blocked) {
+      block('upgrade-recovery-required', 'A prior runtime cutover needs explicit recovery before another plan can be made.');
+      return finish();
+    }
     before = await readContained(root, MCP_FILE);
     config = JSON.parse(before.toString('utf8'));
     entry = config.mcpServers[MCP_SERVER_NAME];
@@ -142,7 +148,8 @@ export async function createUpgradePlan({ root: rootArgument, adapter, currentPa
   if (head.status !== 0 || drift.status !== 0 || status.status !== 0) {
     block('upgrade-repository-invalid', 'Repository state cannot be established.');
   }
-  plan.repository = { root, head: head.stdout.trim(), diffSha256: sha256(drift.stdout), statusSha256: sha256(status.stdout) };
+  const observableStatus = status.stdout.split('\n').filter((line) => line && !/^\?\? \.dfc-runtime-upgrade\//.test(line)).join('\n');
+  plan.repository = { root, head: head.stdout.trim(), diffSha256: sha256(drift.stdout), statusSha256: sha256(observableStatus) };
   if (compatible.plan.status !== 'noop' && !['managed-refresh', 'legacy-bridge'].includes(plan.upgradeKind)) {
     block('upgrade-migration-required', 'Some DEV FOUNDRY-managed files need to be refreshed. Supply the exact previous installed package with --from-package to verify ownership. Your application code will not be changed.');
   }
