@@ -329,8 +329,8 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
     const targetConsumerStatus = JSON.parse(success(cli(target.pkg, ['status', '--root', c.root, '--json'], {
       DEV_FOUNDRY_RUNTIME_STORE: runtimeStore,
     })).stdout);
-    assert.equal(targetConsumerStatus.adapterVersion, '1.5.4');
-    assert.equal(targetConsumerStatus.selectedAdapterVersion, '1.5.4');
+    assert.equal(targetConsumerStatus.adapterVersion, target.pin.version);
+    assert.equal(targetConsumerStatus.selectedAdapterVersion, target.pin.version);
     // Remove the transient decision. Every following observation starts a new
     // shipped process; neither the source package nor the decision is supplied.
     await rm(resolutionFile);
