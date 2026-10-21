@@ -1,0 +1,39 @@
+name: TSK-026 native adapter 1.5.5 acceptance
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-acceptance:
+    name: Native ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Probe published adapter archives
+        shell: bash
+        env:
+          TSK026_REPORT_ROOT: ${{ runner.temp }}
+        run: node scripts/acceptance/tsk026-native-155.mjs
+      - name: Upload native acceptance report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tsk026-native-155-${{ matrix.os }}
+          path: ${{ runner.temp }}/tsk026-native-155-*/report.json
+          if-no-files-found: warn
+          retention-days: 14
