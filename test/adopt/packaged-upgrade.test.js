@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmod, cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { access, chmod, cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -51,6 +51,17 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
     assert.ifError(result.error);
     return result;
   };
+  const npmPack = async (tree) => {
+    const args = ['pack', '--pack-destination', scratch, '--json'];
+    if (process.platform !== 'win32') return run('npm', args, tree);
+    const npmCli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+    try {
+      await access(npmCli);
+    } catch (error) {
+      throw new Error(`Windows npm CLI not found at the expected Node installation path: ${npmCli}`, { cause: error });
+    }
+    return run(process.execPath, [npmCli, ...args], tree);
+  };
   const success = (result) => { assert.equal(result.status, 0, result.stderr || result.stdout); return result; };
   const cli = (pkg, args, env) => run(process.execPath, [path.join(pkg, 'bin/dev-foundry-claude.js'), ...args], scratch, env);
   const git = (...args) => execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' }).trim();
@@ -58,6 +69,16 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
   // producer too, so even transient config/build artifacts stay in scratch.
   const dashboardDependencies = path.join(scratch, 'dashboard-build/node_modules');
   await cp(path.join(repoRoot, 'tools/dashboard/node_modules'), dashboardDependencies, { recursive: true, verbatimSymlinks: true });
+  const runtimeAvailabilityDir = path.join(scratch, 'runtime-availability');
+  await mkdir(runtimeAvailabilityDir);
+  if (process.platform === 'win32') {
+    await writeFile(path.join(runtimeAvailabilityDir, 'claude.cmd'), '@echo off\r\nexit /b 0\r\n');
+  } else {
+    const executable = path.join(runtimeAvailabilityDir, 'claude');
+    await writeFile(executable, `#!${process.execPath}\nprocess.exit(0);\n`);
+    await chmod(executable, 0o755);
+  }
+  const runtimeAvailabilityEnv = { PATH: `${runtimeAvailabilityDir}${path.delimiter}${process.env.PATH ?? ''}` };
 
   // Same disposable build pattern as package.test.js. No generated manifest or
   // dashboard output is written in the producer, and no test payload is invented.
@@ -77,14 +98,16 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
     await symlink(dashboardDependencies, path.join(tree, 'tools/dashboard/node_modules'), 'dir');
     await cp(path.join(repoRoot, 'node_modules'), path.join(tree, 'node_modules'), { recursive: true, verbatimSymlinks: true,
       filter: (source) => !source.includes(`${path.sep}node_modules${path.sep}@modelcontextprotocol${path.sep}client`) });
-    const info = JSON.parse(success(run('npm', ['pack', '--pack-destination', scratch, '--json'], tree)).stdout)[0];
+    const info = JSON.parse(success(await npmPack(tree)).stdout)[0];
     return { tarball: path.join(scratch, info.filename), info };
   }
   async function unpack(tarball, name) {
     const root = path.join(scratch, name); await mkdir(root);
-    const listing = success(run('tar', ['-tzf', tarball])).stdout.split(/\r?\n/).filter((entry) => entry && !entry.endsWith('/'));
+    const archiveName = path.basename(tarball);
+    const archiveDirectory = path.dirname(tarball);
+    const listing = success(run('tar', ['-tzf', archiveName], archiveDirectory)).stdout.split(/\r?\n/).filter((entry) => entry && !entry.endsWith('/'));
     assert.ok(listing.every((entry) => entry.startsWith('package/') && !entry.split('/').includes('..')));
-    success(run('tar', ['-xzf', tarball, '-C', root]));
+    success(run('tar', ['-xzf', archiveName, '-C', name], archiveDirectory));
     const pkg = path.join(root, 'package');
     const bytes = await readFile(path.join(pkg, 'payload-manifest.json'));
     const manifest = JSON.parse(bytes);
@@ -182,6 +205,7 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
     const before = await listTree(c.root);
     const result = success(cli(target.pkg, ['status', '--root', c.root, '--json'], {
       DEV_FOUNDRY_RUNTIME_STORE: runtimeStore,
+      ...runtimeAvailabilityEnv,
     }));
     const status = JSON.parse(result.stdout);
     assert.equal(status.adapterVersion, '1.4.2');
@@ -323,11 +347,13 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
     const runtimeStore = path.join(scratch, 'runtime-store');
     const sourceConsumerStatus = JSON.parse(success(cli(target.pkg, ['status', '--root', pinnedSourceConsumer, '--json'], {
       DEV_FOUNDRY_RUNTIME_STORE: runtimeStore,
+      ...runtimeAvailabilityEnv,
     })).stdout);
     assert.equal(sourceConsumerStatus.adapterVersion, '1.4.2');
     assert.equal(sourceConsumerStatus.selectedAdapterVersion, '1.4.2');
     const targetConsumerStatus = JSON.parse(success(cli(target.pkg, ['status', '--root', c.root, '--json'], {
       DEV_FOUNDRY_RUNTIME_STORE: runtimeStore,
+      ...runtimeAvailabilityEnv,
     })).stdout);
     assert.equal(targetConsumerStatus.adapterVersion, target.pin.version);
     assert.equal(targetConsumerStatus.selectedAdapterVersion, target.pin.version);
@@ -341,7 +367,7 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
 require('node:fs').writeFileSync(process.env.DFC_C014_RUNTIME_MARKER, JSON.stringify({ cwd: process.cwd(), args: process.argv.slice(2) }));
 `);
     await chmod(stub, 0o755);
-    const runtimeEnv = { PATH: `${stubDir}${path.delimiter}${process.env.PATH}`, DFC_C014_RUNTIME_MARKER: marker };
+    const runtimeEnv = { ...runtimeAvailabilityEnv, PATH: `${stubDir}${path.delimiter}${runtimeAvailabilityEnv.PATH}`, DFC_C014_RUNTIME_MARKER: marker };
     const readOnlyBefore = await listTree(c.root);
     const readiness = JSON.parse(success(cli(target.pkg, ['status', '--root', c.root, '--json'], runtimeEnv)).stdout);
     assert.equal(readiness.readyToWork, true); assert.equal(readiness.integration, 'ready');

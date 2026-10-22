@@ -439,21 +439,58 @@ consumer merely because its runtime store is shared.
 
 ## 18. Minimum independent acceptance
 
-Producer tests SHALL include (1) real packed installed bootstrap on macOS and
-Windows; (2) exact installed 1.4.2 initial transition; (3) two consumers with
-different simultaneous package pins; (4) CLI/MCP/dashboard/telemetry true
-runtime-package consistency; (5) actual configured-authority semantic migration
-requiring a real model/Operator disposition; (6) injected interruption at every
-durable phase and target CLI/MCP failure without corrupting source; (7) negative
-security/provenance/path/concurrency tests; (8) historical evidence/dashboard
-compatibility or truthful degradation; and (9) natural-language governed UX
-with no routine manual npm or pin edits.
+Acceptance SHALL be proportional to the actual release or task boundary,
+supported hosts, material failure modes and observable product risk. There is
+no prescribed count of tests, exhaustive host-by-host matrix, mandatory
+GitHub Actions job, or obligation to inject every internal write/checkpoint
+failure. Valid state-bound evidence SHALL be reused under OPS-007.
 
-Fixtures alone are insufficient for the installed-package and host tests.
-Test reports SHALL distinguish deterministic tests, model semantic evidence,
-host-limited assumptions and independent audit verdict where triggered.
-A user-facing “upgrade complete” requires independently verified fresh target
-session and component identity; merely applying the pin is not completion.
+**Non-waivable safety proof:** The applicable packaged/source or installed
+consumer evidence MUST establish trusted exact source/target package identity
+and payload integrity; fail-closed tamper, authorization, stale-plan,
+unresolved-choice and path/concurrency rejection; preservation of unrelated
+consumer changes and the source runtime; and recoverability without silent
+mixed authority. An observed defect in these controls blocks the affected
+operation, regardless of a pilot risk acceptance.
+
+**Representative functional proof:** Use the smallest complete combination
+of focused deterministic tests, verified packaged binaries, actual installed
+consumer observations and targeted negative/failure cases needed to establish
+the approved capability. For a first 1.4.2 handover, prove the real source and
+target package identities and the actual transition, rather than substituting
+only source imports or synthetic pins. Verify relevant runtime component
+identity, version isolation, persistence and restart/recovery at materially
+distinct state boundaries. Exhaustive interruption at every implementation
+subphase or every supported host is not an independent acceptance gate unless
+a concrete risk, defect or external obligation requires it.
+
+**Host evidence and verdicts:** Windows and macOS compatibility remain
+product goals, but proof can come from trustworthy native automation OR from
+a representative installed consumer and recorded operation on that host.
+A failing test harness, unavailable executable, broken fixture or CI
+environment is classified separately under OPS-004 as VALIDATION ERROR,
+BLOCKED or INCOMPLETE; it is not a product FAIL without evidence of product
+nonconformance. Nor does it count as a test PASS. Unverified platform behavior
+must be recorded as NOT VERIFIED with the affected capability, risk,
+operator disposition and condition for further verification; do not claim
+general host compatibility on that basis. A bounded Operator-accepted pilot
+may proceed with that declared risk if all non-waivable controls above hold.
+Evidence of an actual unsafe host failure cannot be waived as a harness issue.
+
+**Model-assisted workflow:** Full TSK-026 capability acceptance still needs
+representative real source-governed model/Operator semantic migration when
+configured authority changes, and an in-session natural-language update
+demonstration with an independently verified fresh target session. These
+may be proved once for the applicable behavior and reused while relevant.
+An exceptional first-bridge recovery or a successful advanced CLI alone does
+not establish the normal conversational workflow; classify its unproven
+behavior as NOT VERIFIED rather than claiming terminal capability PASS.
+
+Mechanical validation, Governance Author semantic assessment, any genuinely
+triggered independent audit, bounded Operator risk acceptance, publication,
+consumer adoption and terminal task closure remain distinct facts. Record
+actual verified scope and limitations; never convert partial evidence or a
+successful limited pilot into an unconditional conformance or closure claim.
 
 ### 18.2. Limited recovery pilot disposition — 1.5.4 (2026-10-21)
 
