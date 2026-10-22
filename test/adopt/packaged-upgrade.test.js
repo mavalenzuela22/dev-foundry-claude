@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmod, cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { access, chmod, cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -51,6 +51,17 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
     assert.ifError(result.error);
     return result;
   };
+  const npmPack = async (tree) => {
+    const args = ['pack', '--pack-destination', scratch, '--json'];
+    if (process.platform !== 'win32') return run('npm', args, tree);
+    const npmCli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+    try {
+      await access(npmCli);
+    } catch (error) {
+      throw new Error(`Windows npm CLI not found at the expected Node installation path: ${npmCli}`, { cause: error });
+    }
+    return run(process.execPath, [npmCli, ...args], tree);
+  };
   const success = (result) => { assert.equal(result.status, 0, result.stderr || result.stdout); return result; };
   const cli = (pkg, args, env) => run(process.execPath, [path.join(pkg, 'bin/dev-foundry-claude.js'), ...args], scratch, env);
   const git = (...args) => execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' }).trim();
@@ -87,7 +98,7 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
     await symlink(dashboardDependencies, path.join(tree, 'tools/dashboard/node_modules'), 'dir');
     await cp(path.join(repoRoot, 'node_modules'), path.join(tree, 'node_modules'), { recursive: true, verbatimSymlinks: true,
       filter: (source) => !source.includes(`${path.sep}node_modules${path.sep}@modelcontextprotocol${path.sep}client`) });
-    const info = JSON.parse(success(run('npm', ['pack', '--pack-destination', scratch, '--json'], tree)).stdout)[0];
+    const info = JSON.parse(success(await npmPack(tree)).stdout)[0];
     return { tarball: path.join(scratch, info.filename), info };
   }
   async function unpack(tarball, name) {
