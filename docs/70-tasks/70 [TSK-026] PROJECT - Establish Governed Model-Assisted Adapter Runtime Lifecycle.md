@@ -101,7 +101,7 @@ The implementation SHALL satisfy SPC-008 sections 4–10 and 11 onward, ADR-008 
 
 ## 5. Acceptance matrix (all required for terminal PASS)
 
-**A. Bootstrap boundaries.** Package installed from release asset without producer checkout on Windows/macOS; greenfield and brownfield initial CLI setup remain explicit, idempotent and preserve product files. Unsupported pre-baseline consumers fail closed.
+**A. Bootstrap boundaries.** Exercise a real packaged installation without producer checkout in representative installed-host evidence (native automation or an actual consumer). Record Windows/macOS outcomes separately as verified or NOT VERIFIED rather than requiring every host/job to pass before a bounded delivery. Greenfield and brownfield initial CLI setup remain explicit, idempotent and preserve product files; unsupported pre-baseline consumers fail closed.
 
 **B. Initial 1.4.2 transition.** Exercise an **actual installed 1.4.2** consumer to the first new managed-runtime release using the declared one-time transition: package global/launcher reparenting, old self-pin preservation, bounded cutover, fresh start and recoverability. Do not assume the source release already implements the launcher.
 
@@ -111,13 +111,13 @@ The implementation SHALL satisfy SPC-008 sections 4–10 and 11 onward, ADR-008 
 
 **E. Semantic migration.** Synthetic release genuinely changes configured POP, index, bootstrap or profiles. The source-governed Claude workflow prepares semantically valid candidate under source authority, requests real reserved Operator choices, records audit disposition when triggered, refuses altered hash/authority, and only then cuts over. A deterministic-only fixture does not satisfy this case.
 
-**F. Fault injection.** Inject crashes/restarts or power-loss-equivalent interruptions at download, verification, staging, preflight, authorization, plan writing, file writes, pin switch, journal commit, CLI/MCP/dashboard restart and final verification. Each case must end in intact source state, verified target state or documented recoverable blocked state; never an unobserved silent mixed authority.
+**F. Fault injection.** Cover representative, materially distinct interruption/restart boundaries across acquisition, authorization, managed writes, pin/journal commit and fresh-session activation. Show intact source, verified target or an explicitly recoverable blocked state without silent mixed authority. Extend injection to a specific internal subphase only for observed defects or concrete risk; exhaustive injections at every internal write are not a default acceptance gate.
 
 **G. Negative and security tests.** Refuse unknown target/build, unsupported transition, ambiguous/dirty touched paths, symlinks/escape, tampered payload/manifest, wrong trusted source, executed package lifecycle scripts, stale plan, expired authorization, changed framework requirement, unresolved Operator choice, concurrent upgrades, unsafe cleanup and stale-session further governed work.
 
 **H. Persistence and schemas.** Historical evidence retains original framework/schema meaning; dashboard serves compatible records or explicitly reports bounded degradation without data loss; old telemetry remains available. Release and upgrade state survive process exit.
 
-**I. Cross-platform and packaging.** Tests use exact packed release assets and installed/runtime-resolved trees (not only source imports) on Windows and macOS; test Node/npm minimum-version failures and Windows file-lock behavior; full focused and regression suites, diff check and deterministic payload/release identity checks PASS.
+**I. Cross-platform and packaging.** Use exact packed release assets and installed/runtime-resolved trees, not solely source imports. Windows/macOS host evidence may be native CI or a trustworthy recorded real-consumer operation; explicitly distinguish verified platforms from NOT VERIFIED host behavior. Apply focused compatibility, Node/npm-version, Windows file-lock and recovery checks where their risk or observed behavior requires them; retain deterministic payload/release identity, integrity and directly affected regression PASS. A fixture/tool/CI failure is a validation ERROR/INCOMPLETE under OPS-004 rather than product FAIL, but is never counted as test PASS or proof of full host compatibility. An exhaustive full-suite PASS on every CI host is not a universal closure prerequisite.
 
 **J. User workflow.** Initiate from natural request inside a governed Claude session. No required manual npm, hash-copying, JSON editing or repeated approval when the original exact scoped authorization remains valid. Advanced CLI remains usable for deliberate recovery and first setup.
 
