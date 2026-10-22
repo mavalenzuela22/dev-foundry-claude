@@ -92,9 +92,11 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
   }
   async function unpack(tarball, name) {
     const root = path.join(scratch, name); await mkdir(root);
-    const listing = success(run('tar', ['-tzf', tarball])).stdout.split(/\r?\n/).filter((entry) => entry && !entry.endsWith('/'));
+    const archiveName = path.basename(tarball);
+    const archiveDirectory = path.dirname(tarball);
+    const listing = success(run('tar', ['-tzf', archiveName], archiveDirectory)).stdout.split(/\r?\n/).filter((entry) => entry && !entry.endsWith('/'));
     assert.ok(listing.every((entry) => entry.startsWith('package/') && !entry.split('/').includes('..')));
-    success(run('tar', ['-xzf', tarball, '-C', root]));
+    success(run('tar', ['-xzf', archiveName, '-C', root], archiveDirectory));
     const pkg = path.join(root, 'package');
     const bytes = await readFile(path.join(pkg, 'payload-manifest.json'));
     const manifest = JSON.parse(bytes);

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { cp, link, mkdir, mkdtemp, readFile, readdir, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test, { after } from 'node:test';
@@ -579,5 +579,24 @@ test('portable Windows case aliases in configured authority are rejected before 
   const result = await createCutoverPlan({ root: c.root, packageRoot });
   assert.equal(result.plan.status, 'blocked');
   assert.equal(result.plan.blockers[0].code, 'ambiguous-configured-routing');
+  assert.equal(await treeHash(c.root), before);
+});
+
+test('distinct configured paths that are hardlinks fail closed before staging', async (t) => {
+  const { c } = await fixture(t);
+  const source = '.dev-foundry/profiles/capability-profiles/implementation-executor-runner-v2.yaml';
+  const alias = '.dev-foundry/profiles/capability-profiles/implementation-executor-runner-hardlink.yaml';
+  const index = parseDocument(await c.read(INDEX_PATH));
+  index.addIn(['bindings'], index.createNode({ id: 'implementation-executor-hardlink', path: alias,
+    kind: 'capability-profile', authority_class: 'configured', required: false }));
+  await c.put(INDEX_PATH, index.toString());
+  await c.put(alias, await c.read(source));
+  await unlink(path.join(c.root, alias));
+  await link(path.join(c.root, source), path.join(c.root, alias));
+  c.commit();
+  const before = await treeHash(c.root);
+  const result = await createCutoverPlan({ root: c.root, packageRoot });
+  assert.equal(result.plan.status, 'blocked');
+  assert.equal(result.plan.blockers[0].code, 'authority-path-alias');
   assert.equal(await treeHash(c.root), before);
 });

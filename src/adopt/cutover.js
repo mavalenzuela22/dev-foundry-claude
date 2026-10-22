@@ -259,7 +259,22 @@ export async function createCutoverPlan({ root: argument, packageRoot }) {
       plan.preconditions[file] = shaOrAbsent(bytes);
       if (bytes) {
         const info = await lstat(absolute(root, file));
-        const identity = info.ino ? String(info.dev) + ':' + String(info.ino) : portable(await realpath(absolute(root, file)));
+        let identity;
+        if (process.platform === 'win32') {
+          // Windows hosted filesystems may report the same dev:ino for distinct
+          // files. Canonical paths distinguish those files; nlink catches true
+          // hardlinks, which must fail closed even when inode metadata is opaque.
+          if (!Number.isSafeInteger(info.nlink) || info.nlink < 1) fail('authority-identity-unavailable', file);
+          if (info.nlink > 1) fail('authority-path-alias');
+          identity = portable(await realpath(absolute(root, file)));
+        } else if (info.ino) {
+          identity = String(info.dev) + ':' + String(info.ino);
+        } else {
+          // Preserve hardlink rejection if inode identifiers are unavailable.
+          if (!Number.isSafeInteger(info.nlink) || info.nlink < 1) fail('authority-identity-unavailable', file);
+          if (info.nlink > 1) fail('authority-path-alias');
+          identity = portable(await realpath(absolute(root, file)));
+        }
         if (physicalFiles.has(identity)) fail('authority-path-alias');
         physicalFiles.add(identity);
       }
