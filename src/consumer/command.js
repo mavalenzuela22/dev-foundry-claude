@@ -58,7 +58,7 @@ export async function inspectConsumer({ root: selected, packageRoot, adapter, ru
   try { if (top.status === 0 && top.stdout.trim()) root = realpathSync(top.stdout.trim()); } catch { /* diagnostics below */ }
   const result = { repository: root, project: null, framework: null, adoption: 'unconfigured', integration: 'unconfigured',
     adapterVersion: adapter.version, selectedAdapterVersion: null, payloadVerified: true, runtime, runtimeAvailable: executableAvailable(runtime, env),
-    telemetry: 'not-ready', dashboardAvailable: existsSync(path.join(packageRoot, 'tools/dashboard/dist/index.html')),
+    telemetry: 'not-ready', dashboardAvailable: existsSync(path.join(packageRoot, 'tools/dashboard/dist/index.html')), observability: 'not-ready',
     readyToWork: false, nextAction: `${cli} help getting-started`, diagnostics: [], plan: null };
   if (!root) { result.summary = 'Open a Git project before setting up Claude.'; result.diagnostics.push('repository-unavailable'); return result; }
   const cutover = await cutoverState(root);
@@ -96,9 +96,10 @@ export async function inspectConsumer({ root: selected, packageRoot, adapter, ru
   if (!telemetryOk) result.diagnostics.push('telemetry-not-ready');
   if (!result.runtimeAvailable) result.diagnostics.push('runtime-executable-unavailable');
   if (!result.dashboardAvailable) result.diagnostics.push('dashboard-unavailable');
-  result.readyToWork = active && plan.status === 'noop' && telemetryOk && result.runtimeAvailable && result.dashboardAvailable;
+  result.observability = telemetryOk && result.dashboardAvailable ? 'ready-on-start' : 'degraded';
+  result.readyToWork = active && plan.status === 'noop' && result.runtimeAvailable;
   if (result.readyToWork) {
-    result.integration = 'ready'; result.summary = 'This project is ready to work with Claude.'; result.nextAction = `${cli} start`;
+    result.integration = 'ready'; result.summary = `This project is ready to work with Claude.${result.observability === 'degraded' ? ' Optional observability is degraded.' : ''}`; result.nextAction = `${cli} start`;
   } else if (result.diagnostics.includes('adapter-runtime-mismatch') || result.diagnostics.includes('agent-file-collision') || result.diagnostics.includes('managed-block-modified')) {
     result.summary = 'The installed adapter and this project need to be brought into sync.'; result.nextAction = `${cli} upgrade`;
   } else if (plan.status === 'blocked') {
@@ -110,7 +111,7 @@ export async function inspectConsumer({ root: selected, packageRoot, adapter, ru
   } else if (!result.runtimeAvailable) {
     result.summary = `The ${runtime} launch executable is unavailable. Install the selected runtime and complete its sign-in separately.`; result.nextAction = `${cli} help start`;
   } else {
-    result.summary = 'Local telemetry or the packaged dashboard needs attention.'; result.nextAction = `${cli} help doctor`;
+    result.summary = 'Claude integration needs attention.'; result.nextAction = `${cli} help doctor`;
   }
   if (legacyVersion(result.selectedAdapterVersion ?? '')) {
     result.integration = active ? 'legacy-active' : 'legacy-prepared';
@@ -123,7 +124,7 @@ export async function inspectConsumer({ root: selected, packageRoot, adapter, ru
 const publicView = ({ plan, ...view }) => view;
 const changes = (plan) => [...plan.create, ...plan.merge, ...plan.delete].map((item) => item.path);
 function humanView(view) {
-  return `${view.summary}\nProject: ${view.project ?? 'not configured'}\nRepository: ${view.repository ?? 'not detected'}\nDEV FOUNDRY: ${view.adoption}${view.framework ? ` (${view.framework})` : ''}\nClaude integration: ${view.integration}\nAdapter: ${view.adapterVersion}; project selection: ${view.selectedAdapterVersion ?? 'none'}\nTelemetry: ${view.telemetry} (preflight; collector starts with Claude)\nRuntime (${view.runtime}): ${view.runtimeAvailable ? 'available' : 'unavailable'}\nDashboard: ${view.dashboardAvailable ? 'packaged; run dev-foundry-claude dashboard --port 4319' : 'unavailable'}\nReady to work: ${view.readyToWork ? 'yes' : 'no'}\nNext: ${view.nextAction}`;
+  return `${view.summary}\nProject: ${view.project ?? 'not configured'}\nRepository: ${view.repository ?? 'not detected'}\nDEV FOUNDRY: ${view.adoption}${view.framework ? ` (${view.framework})` : ''}\nClaude integration: ${view.integration}\nAdapter: ${view.adapterVersion}; project selection: ${view.selectedAdapterVersion ?? 'none'}\nTelemetry (optional auxiliary): ${view.telemetry} (preflight; collector starts with Claude)\nRuntime (${view.runtime}): ${view.runtimeAvailable ? 'available' : 'unavailable'}\nObservability (optional auxiliary): ${view.observability}\nDashboard: ${view.dashboardAvailable ? 'packaged; run dev-foundry-claude dashboard --port 4319' : 'unavailable'}\nReady to work: ${view.readyToWork ? 'yes' : 'no'}\nNext: ${view.nextAction}`;
 }
 
 // Presentation/orchestration only: all writes go through canonical plan/apply.
@@ -156,14 +157,15 @@ export async function consumerCommand({ command, argv = [], packageRoot, cwd = p
       managedSurface: view.plan?.status === 'noop', activation: view.plan?.activation?.overall === 'active',
       runtime: view.runtimeAvailable, telemetry: view.telemetry === 'ready-on-start', dashboard: view.dashboardAvailable,
     };
-    emit(data, `${command === 'doctor' ? `Read-only diagnosis: ${view.readyToWork ? 'healthy' : 'attention needed'}\n` : ''}${humanView(view)}`);
+    emit(data, `${command === 'doctor' ? `Read-only diagnosis: ${view.readyToWork ? view.observability === 'degraded' ? 'operation-ready; observability degraded' : 'healthy' : 'attention needed'}\n` : ''}${humanView(view)}`);
     return view.readyToWork ? 0 : 2;
   }
   if (command === 'start') {
     if (!view.readyToWork) { emit(publicView(view), humanView(view)); return 2; }
-    output(`Starting Claude (${runtime}) in ${view.project}. Telemetry preflight passed.`);
-    const code = await launcher({ argv: ['--runtime', runtime, '--', ...options.claudeArgs], projectRoot: view.repository, env,
-      onReady: ({ port }) => output(`Local telemetry is ready.${verbose ? ` Collector: http://127.0.0.1:${port}` : ''}\nDashboard: in another terminal run ${cli} dashboard --port 4319, then open its printed URL. If occupied, select another local port.`) });
+    output(`Starting Claude (${runtime}) in ${view.project}.${view.telemetry === 'ready-on-start' ? ' Optional telemetry preflight passed.' : ' Warning: optional telemetry preflight failed.'}`);
+    if (!view.dashboardAvailable) output('Warning: optional packaged dashboard is unavailable.');
+    const code = await launcher({ argv: ['--runtime', runtime, '--', ...options.claudeArgs], projectRoot: view.repository, env, telemetryPreflight: view.telemetry === 'ready-on-start',
+      onReady: ({ port }) => output(`Local telemetry is ready.${verbose ? ` Collector: http://127.0.0.1:${port}` : ''}${view.dashboardAvailable ? `\nDashboard: in another terminal run ${cli} dashboard --port 4319, then open its printed URL. If occupied, select another local port.` : ''}`) });
     output(code === 0 ? `Claude session finished. Next: ${cli} status` : `Claude could not complete the session. Next: ${cli} doctor --runtime ${runtime}`);
     return code;
   }

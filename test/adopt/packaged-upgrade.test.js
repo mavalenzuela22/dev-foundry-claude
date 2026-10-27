@@ -301,14 +301,14 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
     const crashed = success(run(process.execPath, ['--input-type=module', '-e', driver], scratch,
       { DEV_FOUNDRY_RUNTIME_STORE: path.join(scratch, 'runtime-store') }));
     assert.equal(crashed.stdout.trim(), ready.hash);
-    assert.equal((await guard())?.errorCode, 'STALE_SESSION');
+    assert.equal((await guard())?.errorCode, 'RUNTIME_RECOVERY_REQUIRED');
     const recovered = success(cli(target.pkg, ['upgrade', 'recover', '--root', c.root, '--plan-sha256', ready.hash,
       '--outcome', 'source', '--from-package', source.pkg], { DEV_FOUNDRY_RUNTIME_STORE: path.join(scratch, 'runtime-store') }));
     assert.equal(JSON.parse(recovered.stdout).status, 'ROLLED_BACK');
     assert.equal(await c.read('.mcp.json').then((bytes) => JSON.parse(bytes).mcpServers['dev-foundry-governance'].args[2]), SOURCE_PIN);
-    assert.equal((await guard())?.errorCode, 'STALE_SESSION');
+    assert.equal(await guard(), null);
     evidence.outcomes.push({ case: 'process-loss-mid-upgrade', planSha256: ready.hash, recovered: 'source', sourcePinPreserved: true,
-      interruptedSessionRemainsStale: true, nextAction: 'start a fresh source session' });
+      restoredOriginalSourceSessionRetained: true });
   });
 
   await scenario('READY exact-plan apply preserves configured semantics and all unrelated bytes', async () => {
@@ -324,9 +324,16 @@ test('C013 real packaged advanced CLI upgrades exact 1.4.2 with explicit configu
       assert.equal(record.scope, 'configured-file'); assert.equal(record.current_semantics_preserved, true);
       assert.equal(record.after_sha256, sha256(contents[configured])); assert.ok(ready.data.noop.includes(configured));
     }
+    const attributes = `${RECONCILIATION_FILE} text eol=lf\n`;
+    assert.deepEqual(ready.data.create.filter((item) => item.path === '.gitattributes'),
+      [{ path: '.gitattributes', sha256: sha256(attributes), content: attributes }]);
+    assert.equal(ready.data.preconditions['.gitattributes'], 'absent');
+    const reviewedWrites = [...ready.data.create, ...ready.data.merge].map((item) => item.path).sort();
+    const changed = ['.gitattributes', RECONCILIATION_FILE, '.mcp.json', 'CLAUDE.md', AGENT, '.claude/agents/dev-foundry-auditor.md'].sort();
+    assert.deepEqual(reviewedWrites, changed);
     const applied = JSON.parse(success(apply(c, ready, resolutionFile)).stdout);
-    const changed = [RECONCILIATION_FILE, '.mcp.json', 'CLAUDE.md', AGENT, '.claude/agents/dev-foundry-auditor.md'].sort();
-    assert.deepEqual(applied, { written: changed.length, deleted: 0 });
+    assert.deepEqual(applied, { written: reviewedWrites.length, deleted: 0 });
+    assert.equal(await c.read('.gitattributes'), attributes);
     const transactionJournal = `.dfc-runtime-upgrade/${ready.hash}.json`;
     assert.deepEqual(diffTrees(before, await listTree(c.root)), [...changed, transactionJournal].sort());
     assert.deepEqual(await readSetSnapshot(c.root), authority);
@@ -395,7 +402,7 @@ process.exitCode = await consumerCommand({ command: 'start',
     assert.equal(JSON.parse(success(cli(target.pkg, ['status', '--root', c.root, '--json'], runtimeEnv)).stdout).readyToWork, true);
     const originals = new Map();
     for (const file of [RECONCILIATION_FILE, '.mcp.json', AGENT, 'CLAUDE.md', ...CONFIGURED,
-      '.dev-foundry/profiles/project-operating-profile.yaml', '.dev-foundry/authority-index.yaml',
+      '.dev-foundry/profiles/project-operating-profile.yaml',
       '.dev-foundry/releases/2.1.0/actor-profiles/implementation-executor-v2.yaml',
       '.dev-foundry/releases/2.1.0/authority-index.yaml', '.dev-foundry/releases/2.1.0/release-integrity-manifest.yaml']) {
       originals.set(file, await readFile(path.join(c.root, file)));
@@ -406,7 +413,7 @@ process.exitCode = await consumerCommand({ command: 'start',
     assert.equal(JSON.parse(originals.get('.mcp.json')).mcpServers['dev-foundry-governance'].env[RECONCILIATION_KEY], sha256(originals.get(RECONCILIATION_FILE)));
     for (const kind of ['missing receipt', 'edited receipt', 'forged after hash', 'missing commitment', 'stale pin',
       'agent content', 'agent identity', 'managed span', 'profile semantics', 'bootstrap semantics', 'bootstrap identity',
-      'POP binding', 'index binding', 'role profile', 'framework index', 'framework manifest', 'receipt symlink',
+      'POP binding', 'role profile', 'framework index', 'framework manifest', 'receipt symlink',
       'agent symlink', 'configured symlink', 'extra agent', 'extra configured']) {
       let file;
       if (kind.includes('receipt') || kind === 'forged after hash') file = RECONCILIATION_FILE;
@@ -436,7 +443,7 @@ process.exitCode = await consumerCommand({ command: 'start',
       } else {
         file = ({ 'agent content': AGENT, 'agent identity': AGENT, 'managed span': 'CLAUDE.md', 'profile semantics': CONFIGURED[0],
           'bootstrap semantics': CONFIGURED[2], 'bootstrap identity': CONFIGURED[2], 'POP binding': '.dev-foundry/profiles/project-operating-profile.yaml',
-          'index binding': '.dev-foundry/authority-index.yaml', 'role profile': '.dev-foundry/releases/2.1.0/actor-profiles/implementation-executor-v2.yaml',
+          'role profile': '.dev-foundry/releases/2.1.0/actor-profiles/implementation-executor-v2.yaml',
           'framework index': '.dev-foundry/releases/2.1.0/authority-index.yaml', 'framework manifest': '.dev-foundry/releases/2.1.0/release-integrity-manifest.yaml' })[kind];
         const original = originals.get(file).toString();
         const modified = kind === 'agent identity' ? original.replace('name: dev-foundry-executor', 'name: impostor')
@@ -445,7 +452,6 @@ process.exitCode = await consumerCommand({ command: 'start',
           : kind === 'profile semantics' ? original.replace('delegation_depth: 1', 'delegation_depth: 9')
           : kind === 'bootstrap semantics' ? original.replace('mode: governed-project-bindings', 'mode: fixed')
           : kind === 'POP binding' ? original.replace('identity: dev-foundry-executor', 'identity: impostor')
-          : kind === 'index binding' ? original.replace('required: true', 'required: false')
           : original + '\n# Unapproved post-apply change.\n';
         assert.notEqual(modified, original); await c.put(file, modified);
       }
@@ -512,7 +518,8 @@ require('node:module').syncBuiltinESMExports();\n`);
     assert.equal(JSON.parse(await readFile(marker)).installed, 1);
     assert.deepEqual(diffTrees(before, await listTree(c.root)), [`.dfc-runtime-upgrade/${p.hash}.json`],
       'rollback restores consumer bytes and retains only its durable recovery record');
-    assert.deepEqual(JSON.parse(success(apply(c, p, resolutionFile)).stdout), { written: 5, deleted: 0 });
+    assert.deepEqual(JSON.parse(success(apply(c, p, resolutionFile)).stdout),
+      { written: p.data.create.length + p.data.merge.length, deleted: 0 });
     assert.equal(JSON.parse(await c.read(`.dfc-runtime-upgrade/${p.hash}.json`)).phase, 'TARGET_VERIFIED');
     evidence.outcomes.push({ case: 'rollback/retry', failedStatus: failed.status, installedBeforeFailure: 1, restoredAllBytes: true, exactRetryStatus: 0 });
   });

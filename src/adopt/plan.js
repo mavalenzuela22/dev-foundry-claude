@@ -541,7 +541,22 @@ export async function createPlan({ root: rootArgument, project, idPrefix, remove
 
   if (evidence) {
     try {
-      if (!isDeepStrictEqual(evidence.receipt.state, await reconciliationSurface(root, pre))) throw new Error();
+      // The receipt proves the transition, not a freeze of later project work.
+      // Keep runtime/framework bindings protected even when stored under docs/;
+      // inspect and the resolver validate the current project Authority Index.
+      const protectedPaths = new Set([
+        POP_PATH, MCP_FILE, CLAUDE_MD, IGNORE_FILE, BOOTSTRAP_PATH,
+        ...Object.values(AGENT_PATHS), ...Object.values(PROFILE_PATHS),
+        facts.pop.framework.selected_authority_index, facts.pop.framework.selected_manifest,
+        ...Object.values(facts.actorProfiles), ...facts.bootstraps.map((item) => item.path),
+        ...Object.values(facts.pop.actor_bindings).flatMap((item) => [item?.profile, ...(item?.capability_profiles ?? item?.selection?.required_capabilities ?? [])]),
+      ].filter((file) => typeof file === 'string').map((file) => path.relative(root, path.resolve(root, file)).split(path.sep).join('/')));
+      const protectedState = (state) => ({
+        ...state,
+        files: Object.fromEntries(Object.entries(state.files).filter(([file]) =>
+          protectedPaths.has(file) || file.startsWith('.claude/agents/') || file.startsWith('.dev-foundry/profiles/capability-profiles/'))),
+      });
+      if (!isDeepStrictEqual(protectedState(evidence.receipt.state), protectedState(await reconciliationSurface(root, pre)))) throw new Error();
       plan.reconciliationEvidence = { path: RECONCILIATION_FILE, sha256: evidence.sha256, previousPlanSha256: evidence.receipt.previousPlanSha256 };
       pre[RECONCILIATION_FILE] = evidence.sha256;
     } catch {

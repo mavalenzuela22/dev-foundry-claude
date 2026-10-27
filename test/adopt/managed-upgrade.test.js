@@ -10,12 +10,13 @@ import { syncBuiltinESMExports } from 'node:module';
 import test from 'node:test';
 import { createPlan } from '../../src/adopt/plan.js';
 import { createUpgradePlan } from '../../src/adopt/upgrade.js';
+import { makeUnifiedDiff } from '../../src/adopt/diff.js';
 import { BOOTSTRAP_PATH, PROFILE_PATHS, RECONCILIATION_FILE, RECONCILIATION_KEY, parseYamlStrict } from '../../src/adopt/common.js';
 import { renderBootstrap, templateParams } from '../../src/adopt/render.js';
 import { applyPlan } from '../../src/adopt/apply.js';
 import { buildManifestBytes, canonicalJson, selfPin, sha256 } from '../../src/adopt/pin.js';
 import { consumerCommand } from '../../src/consumer/command.js';
-import { diffTrees, listTree, makeConsumer, makePresentationPackage, readSetSnapshot, repoRoot, applyProposal } from './fixture.js';
+import { diffTrees, gitIn, listTree, makeConsumer, makePresentationPackage, readSetSnapshot, repoRoot, applyProposal } from './fixture.js';
 
 const target = { version: '1.4.0', payloadRoot: 'f'.repeat(64), expect: `1.4.0:sha256:${'f'.repeat(64)}` };
 // Real released 1.2.2 templates and exact verified historical payload.
@@ -113,7 +114,7 @@ async function conflicting142(t) {
 }
 
 // Active authority is fixture data; the upgrader must never write its POP/index.
-async function configured142(t, preserveAgent = false) {
+async function configured142(t, preserveAgent = false, attributes) {
   const fixture = await previous142(t, true);
   const { c } = fixture;
   const contents = {};
@@ -122,6 +123,7 @@ async function configured142(t, preserveAgent = false) {
     await c.put(file, contents[file]);
   }
   await c.put('src/kafka/consumer.js', 'export const pending = true;\n');
+  if (attributes !== undefined) await c.put('.gitattributes', attributes);
   c.commit();
   const file = '.claude/agents/dev-foundry-executor.md';
   const local = (await c.read(file)).replace('Previous release - ', 'Consumer policy - ');
@@ -159,9 +161,9 @@ test('1.4.2 configured resolutions and exact tracked dirty agent preserve Kafka 
       assert.equal(record.after_sha256, sha256(contents[configured]));
       assert.ok(result.plan.noop.includes(configured));
     }
-    const writes = [RECONCILIATION_FILE, '.mcp.json', 'CLAUDE.md', ...(preserveAgent ? [] : [file])].sort();
+    const writes = ['.gitattributes', RECONCILIATION_FILE, '.mcp.json', 'CLAUDE.md', ...(preserveAgent ? [] : [file])].sort();
     assert.deepEqual(result.ops.writes.map((item) => item.path).sort(), writes);
-    assert.deepEqual(result.plan.create.map((item) => item.path), [RECONCILIATION_FILE]); assert.deepEqual(result.plan.delete, []);
+    assert.deepEqual(result.plan.create.map((item) => item.path), ['.gitattributes', RECONCILIATION_FILE]); assert.deepEqual(result.plan.delete, []);
     if (preserveAgent) assert.ok(result.plan.noop.includes(file));
     assert.deepEqual(await apply(fixture, result), { written: writes.length, deleted: 0 });
     assert.equal(await c.read(file), contents[file]);
@@ -994,12 +996,32 @@ test('C014 reconciliation evidence is a planned write and rolls back with every 
   assert.equal(result.plan.status, 'ready', JSON.stringify(result.plan.blockers));
   const receiptWrite = result.plan.create.find((item) => item.path === RECONCILIATION_FILE);
   assert.ok(receiptWrite);
+  const attributes = `${RECONCILIATION_FILE} text eol=lf\n`;
+  assert.deepEqual(result.plan.create.find((item) => item.path === '.gitattributes'),
+    { path: '.gitattributes', sha256: sha256(attributes), content: attributes });
+  assert.deepEqual(result.ops.writes.find((item) => item.path === '.gitattributes'), { path: '.gitattributes', content: attributes });
+  assert.equal(result.plan.preconditions['.gitattributes'], 'absent');
+  assert.deepEqual(result.bytes, (await plan(fixture)).bytes);
   const receipt = JSON.parse(receiptWrite.content);
   assert.equal(receiptWrite.sha256, sha256(canonicalJson(receipt)));
   assert.equal(receipt.source, fixture.old.expect); assert.equal(receipt.target, fixture.adapter.expect);
   assert.equal(receipt.resolutionSha256, result.plan.resolutionInput.sha256);
+  assert.equal(receipt.state.files['.gitattributes'], sha256(attributes));
   const mcp = JSON.parse(result.ops.writes.find((item) => item.path === '.mcp.json').content);
   assert.equal(mcp.mcpServers['dev-foundry-governance'].env[RECONCILIATION_KEY], receiptWrite.sha256);
+  // Reconstruct the candidate before its receipt/anchor, proving that the
+  // historical commitment already includes the attributes write and absence.
+  const candidate = structuredClone(result.plan);
+  delete candidate.reconciliationEvidence;
+  delete candidate.preconditions[RECONCILIATION_FILE];
+  candidate.create = candidate.create.filter((item) => item.path !== RECONCILIATION_FILE);
+  delete mcp.mcpServers['dev-foundry-governance'].env[RECONCILIATION_KEY];
+  if (!Object.keys(mcp.mcpServers['dev-foundry-governance'].env).length) delete mcp.mcpServers['dev-foundry-governance'].env;
+  const pinContent = `${JSON.stringify(mcp, null, 2)}\n`;
+  const pinWrite = candidate.merge.find((item) => item.path === '.mcp.json');
+  pinWrite.after_sha256 = sha256(pinContent);
+  pinWrite.diff = makeUnifiedDiff('.mcp.json', await c.read('.mcp.json'), pinContent);
+  assert.equal(receipt.previousPlanSha256, sha256(canonicalJson(candidate)));
   const before = await listTree(c.root);
   const rename = fsPromises.rename; let installed = 0;
   t.mock.method(fsPromises, 'rename', async (...args) => {
@@ -1015,6 +1037,10 @@ test('C014 reconciliation evidence is a planned write and rolls back with every 
     assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
   } finally { t.mock.restoreAll(); syncBuiltinESMExports(); }
   await apply(fixture, result);
+  assert.equal(await c.read('.gitattributes'), attributes);
+  assert.equal(gitIn(c.root, '-c', 'core.autocrlf=true', 'check-attr', 'text', 'eol', '--', RECONCILIATION_FILE),
+    `${RECONCILIATION_FILE}: text: set\n${RECONCILIATION_FILE}: eol: lf\n`);
+  assert.equal(await c.read(RECONCILIATION_FILE), receiptWrite.content);
   assert.equal((await createPlan({ root: c.root, adapter: fixture.adapter })).plan.status, 'noop');
   assert.equal((await createUpgradePlan({ root: c.root, adapter: fixture.adapter })).plan.status, 'noop');
   await rm(fixture.resolutionFile);
@@ -1025,18 +1051,171 @@ test('C014 reconciliation evidence is a planned write and rolls back with every 
   assert.equal(launched, 1);
 });
 
-test('C014 staged receipt replacement cannot install bytes outside the reviewed plan', async (t) => {
-  const fixture = await configured142(t); const { c } = fixture;
-  const result = await plan(fixture); const before = await listTree(c.root);
-  const write = fsPromises.writeFile;
-  t.mock.method(fsPromises, 'writeFile', async (file, ...args) => {
-    const value = await write(file, ...args);
-    if (String(file).includes(`${RECONCILIATION_FILE}.dfc-stage-`)) await write(file, '{"forged":"after staging"}\n');
-    return value;
+test('C014 staged receipt or attributes replacement cannot install bytes outside the reviewed plan', async (t) => {
+  for (const stagedPath of [RECONCILIATION_FILE, '.gitattributes']) await t.test(stagedPath, async (t) => {
+    const fixture = await configured142(t); const { c } = fixture;
+    const result = await plan(fixture); const before = await listTree(c.root);
+    const write = fsPromises.writeFile;
+    t.mock.method(fsPromises, 'writeFile', async (file, ...args) => {
+      const value = await write(file, ...args);
+      if (String(file).includes(`${stagedPath}.dfc-stage-`)) await write(file, '{"forged":"after staging"}\n');
+      return value;
+    });
+    syncBuiltinESMExports();
+    try {
+      await assert.rejects(apply(fixture, result), { code: 'plan-stale' });
+      assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+    } finally { t.mock.restoreAll(); syncBuiltinESMExports(); }
   });
-  syncBuiltinESMExports();
-  try {
-    await assert.rejects(apply(fixture, result), { code: 'plan-stale' });
+});
+
+test('C014 receipt attributes preserve unrelated bytes and skip already effective rules', async (t) => {
+  const rule = `${RECONCILIATION_FILE} text eol=lf`;
+  for (const initial of ['', '# Consumer rules\n*.txt text eol=crlf\n', '# Consumer rules\r\n*.txt text eol=crlf\r\n',
+    '*.txt -text', `${rule}\n*.txt -text\n`, '# Broad existing policy\r\n*.json text eol=lf\r\n']) await t.test(JSON.stringify(initial), async (t) => {
+    const fixture = await configured142(t, false, initial); const { c } = fixture;
+    const before = await listTree(c.root);
+    const result = await plan(fixture);
+    assert.equal(result.plan.status, 'ready', JSON.stringify(result.plan.blockers));
+    assert.deepEqual(result.bytes, (await plan(fixture)).bytes);
+    const effective = initial.includes(rule) || initial.includes('*.json text eol=lf');
+    const newline = initial.includes('\r\n') ? '\r\n' : '\n';
+    const expected = effective ? initial : `${initial}${initial && !initial.endsWith('\n') ? newline : ''}${rule}${newline}`;
+    const write = result.ops.writes.find((item) => item.path === '.gitattributes');
+    if (effective) {
+      assert.equal(write, undefined);
+      assert.ok(!result.plan.merge.some((item) => item.path === '.gitattributes'));
+      assert.ok(!result.plan.create.some((item) => item.path === '.gitattributes'));
+    } else {
+      assert.equal(write.content, expected);
+      assert.equal(result.plan.preconditions['.gitattributes'], sha256(initial));
+      const merge = result.plan.merge.find((item) => item.path === '.gitattributes');
+      assert.equal(merge.before_sha256, sha256(initial)); assert.equal(merge.after_sha256, sha256(expected));
+      assert.equal(merge.diff, makeUnifiedDiff('.gitattributes', initial, expected));
+      assert.equal(JSON.parse(result.plan.create.find((item) => item.path === RECONCILIATION_FILE).content).state.files['.gitattributes'], sha256(expected));
+    }
     assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
-  } finally { t.mock.restoreAll(); syncBuiltinESMExports(); }
+    if (initial.includes('\r\n') && !effective) {
+      const rename = fsPromises.rename;
+      t.mock.method(fsPromises, 'rename', async (...args) => {
+        if (args[1] === path.join(await realpath(c.root), RECONCILIATION_FILE)) throw new Error('fail after attributes merge');
+        return rename(...args);
+      });
+      syncBuiltinESMExports();
+      try {
+        await assert.rejects(apply(fixture, result), { code: 'apply-failed' });
+        assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+        assert.equal(await c.read('.gitattributes'), initial);
+      } finally { t.mock.restoreAll(); syncBuiltinESMExports(); }
+    }
+    await apply(fixture, result);
+    assert.equal(await c.read('.gitattributes'), expected);
+    assert.equal(gitIn(c.root, '-c', 'core.autocrlf=true', 'check-attr', 'text', 'eol', '--', RECONCILIATION_FILE),
+      `${RECONCILIATION_FILE}: text: set\n${RECONCILIATION_FILE}: eol: lf\n`);
+    assert.equal((await createPlan({ root: c.root, adapter: fixture.adapter })).plan.status, 'noop');
+  });
+});
+
+test('C014 unsafe or inconsistent receipt attributes fail closed without consumer writes', async (t) => {
+  for (const kind of ['symlink', 'directory', 'invalid UTF-8', 'NUL', 'bare CR', 'dirty', 'higher priority',
+    'ineffective exact rule', 'filter', 'ident', 'working-tree-encoding']) await t.test(kind, async (t) => {
+    const rule = `${RECONCILIATION_FILE} text eol=lf`;
+    const initial = kind === 'ineffective exact rule' ? `${rule}\n*.json -text\n` :
+      ['filter', 'ident', 'working-tree-encoding'].includes(kind) ? `${RECONCILIATION_FILE} ${kind}${kind === 'ident' ? '' : '=consumer-transform'}\n` : undefined;
+    const fixture = await configured142(t, false, initial); const { c } = fixture;
+    if (kind === 'symlink') await symlink(path.join(c.root, 'src/billing.js'), path.join(c.root, '.gitattributes'));
+    if (kind === 'directory') await mkdir(path.join(c.root, '.gitattributes'));
+    if (kind === 'invalid UTF-8') await c.put('.gitattributes', Buffer.from([0xff]));
+    if (kind === 'NUL') await c.put('.gitattributes', '# Bad\0bytes\n');
+    if (kind === 'bare CR') await c.put('.gitattributes', '# Bad\rline\n');
+    if (kind === 'dirty') await c.put('.gitattributes', '*.txt -text\n');
+    if (kind === 'higher priority') await c.put('.git/info/attributes', '*.json eol=crlf\n');
+    const before = await listTree(c.root);
+    const result = await plan(fixture);
+    assert.equal(result.plan.status, 'blocked');
+    assert.ok(result.plan.blockers.some((item) => item.code === 'upgrade-reconciliation-unsafe'));
+    assert.deepEqual(result.ops.writes, []); assert.deepEqual(result.plan.create, []); assert.deepEqual(result.plan.merge, []);
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  });
+});
+
+test('C014 attributes bind initial absence and bytes through staging', async (t) => {
+  for (const initial of [undefined, '*.txt -text\n']) await t.test(initial === undefined ? 'absent' : 'existing', async (t) => {
+    const fixture = await configured142(t, false, initial); const { c } = fixture;
+    const result = await plan(fixture); assert.equal(result.plan.status, 'ready');
+    const before = await listTree(c.root);
+    const drift = '# Concurrent consumer policy\n';
+    const write = fsPromises.writeFile; let changed = false;
+    t.mock.method(fsPromises, 'writeFile', async (file, ...args) => {
+      const value = await write(file, ...args);
+      if (!changed && String(file).includes('.dfc-stage-')) {
+        changed = true; await write(path.join(c.root, '.gitattributes'), drift);
+      }
+      return value;
+    });
+    syncBuiltinESMExports();
+    try {
+      await assert.rejects(apply(fixture, result), { code: 'plan-stale' });
+      before.set('.gitattributes', sha256(drift));
+      assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+    } finally { t.mock.restoreAll(); syncBuiltinESMExports(); }
+  });
+});
+
+test('C014 plans without a receipt leave attributes untouched', async (t) => {
+  const fixture = await previous142(t); const { c, adapter } = fixture;
+  const refresh = await plan(fixture);
+  assert.equal(refresh.plan.status, 'ready', JSON.stringify(refresh.plan.blockers));
+  assert.ok(!refresh.ops.writes.some((item) => ['.gitattributes', RECONCILIATION_FILE].includes(item.path)));
+  assert.ok(!Object.hasOwn(refresh.plan.preconditions, '.gitattributes'));
+  await apply(fixture, refresh); c.commit();
+  for (const initial of [undefined, '# Consumer policy\n*.json -text\n']) {
+    if (initial !== undefined) { await c.put('.gitattributes', initial); c.commit(); }
+    const before = await listTree(c.root);
+    for (const result of [await createPlan({ root: c.root, adapter }), await createUpgradePlan({ root: c.root, adapter })]) {
+      assert.equal(result.plan.status, 'noop', JSON.stringify(result.plan.blockers));
+      assert.ok(!result.ops.writes.some((item) => ['.gitattributes', RECONCILIATION_FILE].includes(item.path)));
+      assert.ok(!Object.hasOwn(result.plan.preconditions, '.gitattributes'));
+    }
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  }
+});
+
+test('C014 canonical historical receipts need no LF-rule refresh and CRLF tampering remains invalid', async (t) => {
+  const fixture = await configured142(t); const { c } = fixture;
+  await apply(fixture, await plan(fixture));
+  // Fixture for a completed pre-V007 upgrade: historical canonical bytes and
+  // anchor, with no attributes rule or attributes entry in its historical state.
+  await rm(path.join(c.root, '.gitattributes'));
+  const receipt = JSON.parse(await c.read(RECONCILIATION_FILE));
+  delete receipt.state.files['.gitattributes'];
+  const content = canonicalJson(receipt);
+  const mcp = JSON.parse(await c.read('.mcp.json'));
+  mcp.mcpServers['dev-foundry-governance'].env[RECONCILIATION_KEY] = sha256(content);
+  await c.put(RECONCILIATION_FILE, content); await c.put('.mcp.json', `${JSON.stringify(mcp, null, 2)}\n`);
+  c.commit();
+  const options = { root: c.root, adapter: fixture.adapter };
+  const before = await listTree(c.root);
+  for (const result of [await createPlan(options), await createUpgradePlan(options)]) {
+    assert.equal(result.plan.status, 'noop', JSON.stringify(result.plan.blockers));
+    assert.deepEqual(result.ops.writes, []);
+  }
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  assert.equal(await c.read(RECONCILIATION_FILE), content);
+  const crlf = content.replaceAll('\n', '\r\n');
+  for (const reanchor of [false, true]) {
+    await c.put(RECONCILIATION_FILE, crlf);
+    if (reanchor) {
+      mcp.mcpServers['dev-foundry-governance'].env[RECONCILIATION_KEY] = sha256(crlf);
+      await c.put('.mcp.json', `${JSON.stringify(mcp, null, 2)}\n`);
+    }
+    const tampered = await listTree(c.root);
+    for (const result of [await createPlan(options), await createUpgradePlan(options)]) {
+      assert.equal(result.plan.status, 'blocked');
+      assert.ok(result.plan.blockers.some((item) => item.code === 'upgrade-reconciliation-invalid'));
+      assert.deepEqual(result.ops.writes, []);
+    }
+    assert.deepEqual(diffTrees(tampered, await listTree(c.root)), []);
+    assert.equal(await c.read(RECONCILIATION_FILE), crlf);
+  }
 });

@@ -89,7 +89,14 @@ for advanced workflows.
 
 ## 3. start
 
-`start` is the recommended Claude launch command for a configured consumer.
+`start` is an optional convenience launcher for a configured consumer,
+not the sole governance entry point. An independently started, properly
+project-bound Claude Desktop or Claude Code session MAY use the pinned stdio
+governance MCP without running this command. The collector/dashboard are
+observability auxiliaries, not governance authorization; their unavailability
+SHALL NOT itself prevent starting Claude or resolving authorized operations.
+Unsupported host project binding must yield a specific diagnostic, not an
+unfounded instruction to relaunch through this CLI.
 
 It SHALL:
 

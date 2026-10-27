@@ -1,6 +1,7 @@
 import path from 'node:path';
+import os from 'node:os';
 import { currentMigrationMaterial, legacyVersion, migrationRequiresGovernedSession } from './migration.js';
-import { lstat, readFile, realpath } from 'node:fs/promises';
+import { lstat, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { AGENT_PATHS, BOOTSTRAP_PATH, CLAUDE_MD, MCP_FILE, MCP_SERVER_NAME, POP_PATH, PROFILE_PATHS, RECONCILIATION_FILE, RECONCILIATION_KEY, isObject, parseYamlStrict, pathHasSymlink, readContained, readYamlContained } from './common.js';
 import { makeUnifiedDiff } from './diff.js';
 import { git } from './ignore.js';
@@ -11,6 +12,45 @@ import { runtimeUpgradeState } from './runtime.js';
 const exactKeys = (value, keys) => isObject(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const hash = (value) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const resolutionPaths = new Set([...Object.values(AGENT_PATHS), CLAUDE_MD, ...Object.values(PROFILE_PATHS), BOOTSTRAP_PATH]);
+
+// Probe Git's effective attributes, including higher-priority info/attributes,
+// against a proposed root file without writing anything in the consumer.
+async function receiptAttributes(root) {
+  const file = '.gitattributes';
+  const rule = `${RECONCILIATION_FILE} text eol=lf`;
+  if (await pathHasSymlink(root, file)) throw new Error();
+  let exists = true;
+  try { if (!(await lstat(path.join(root, file))).isFile()) throw new Error(); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; exists = false; }
+  const before = await readContained(root, file);
+  if (exists && before === null) throw new Error();
+  const text = before?.toString('utf8') ?? '';
+  if ((before && !before.equals(Buffer.from(text))) || /\u0000|\r(?!\n)/.test(text)) throw new Error();
+  const effective = (workTree) => {
+    const names = ['text', 'eol', 'filter', 'ident', 'working-tree-encoding'];
+    const result = git(root, [...(workTree ? [`--work-tree=${workTree}`] : []), '-c', 'core.autocrlf=true',
+      'check-attr', '-z', ...names, '--', RECONCILIATION_FILE]);
+    if (result.status !== 0 || result.stderr) throw new Error();
+    const fields = result.stdout.split('\0');
+    if (fields.length !== names.length * 3 + 1 || names.some((name, i) => fields[i * 3] !== RECONCILIATION_FILE || fields[i * 3 + 1] !== name)) throw new Error();
+    return names.map((_, i) => fields[i * 3 + 2]);
+  };
+  const safe = ([text, eol, ...transforms]) => text === 'set' && eol === 'lf' &&
+    transforms.every((value) => ['unspecified', 'unset'].includes(value));
+  if (safe(effective())) return null;
+  // An existing exact rule that Git does not honor is inconsistent; do not
+  // duplicate it or try to defeat a consumer's higher-priority policy.
+  if (text.split(/\r?\n/).some((line) => line.trim() === rule)) throw new Error();
+  const newline = text.match(/\r?\n/)?.[0] ?? '\n';
+  const content = `${text}${text && !text.endsWith('\n') ? newline : ''}${rule}${newline}`;
+  const scratch = await mkdtemp(path.join(os.tmpdir(), 'dfc-receipt-attributes-'));
+  try {
+    await writeFile(path.join(scratch, file), content);
+    if (!safe(effective(scratch))) throw new Error();
+  } finally { await rm(scratch, { recursive: true, force: true }); }
+  if (await hasUnresolvedDirtyPaths(root, [file])) throw new Error();
+  return { before, content };
+}
 
 // This is Operator-selected candidate data, not a self-attesting authorization.
 // Explicit application of the reviewed exact plan is the authorization boundary.
@@ -175,13 +215,22 @@ export async function createUpgradePlan({ root: rootArgument, adapter, currentPa
     ? JSON.parse((await readContained(root, RECONCILIATION_FILE)).toString('utf8')) : null;
   const differing = plan.reconciliation?.filter((record) => record.after_sha256 !== record.target_sha256) ?? inherited?.files ?? [];
   if (differing.length) {
-    // No circular hashes: commit the complete deterministic migration candidate
-    // before adding its receipt and the runtime commitment. The final reviewed
-    // plan includes both writes, and apply regenerates that exact final plan.
-    const previousPlanSha256 = sha256(canonicalJson(plan));
-    plan.preconditions[RECONCILIATION_FILE] = sha256(await readContained(root, RECONCILIATION_FILE) ?? Buffer.alloc(0));
-    if (!inherited) plan.preconditions[RECONCILIATION_FILE] = 'absent';
     try {
+      const attributes = await receiptAttributes(root);
+      if (attributes) {
+        const { before, content } = attributes;
+        plan.preconditions['.gitattributes'] = before === null ? 'absent' : sha256(before);
+        if (before === null) plan.create.push({ path: '.gitattributes', sha256: sha256(content), content });
+        else plan.merge.push({ path: '.gitattributes', before_sha256: sha256(before), after_sha256: sha256(content),
+          diff: makeUnifiedDiff('.gitattributes', before.toString('utf8'), content) });
+        ops.writes.push({ path: '.gitattributes', content });
+        plan.merge.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+      }
+      // No circular hashes: bind the complete candidate, including attributes,
+      // before adding its receipt and the runtime commitment.
+      const previousPlanSha256 = sha256(canonicalJson(plan));
+      plan.preconditions[RECONCILIATION_FILE] = sha256(await readContained(root, RECONCILIATION_FILE) ?? Buffer.alloc(0));
+      if (!inherited) plan.preconditions[RECONCILIATION_FILE] = 'absent';
       if (await pathHasSymlink(root, RECONCILIATION_FILE) ||
           (!inherited && await readContained(root, RECONCILIATION_FILE) !== null) ||
           await hasUnresolvedDirtyPaths(root, [RECONCILIATION_FILE])) throw new Error();
@@ -209,7 +258,7 @@ export async function createUpgradePlan({ root: rootArgument, adapter, currentPa
       plan.reconciliationEvidence = { path: RECONCILIATION_FILE, sha256: sha256(content), previousPlanSha256 };
       plan.merge.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
     } catch {
-      block('upgrade-reconciliation-unsafe', 'Upgrade evidence requires an unchanged safe local path and a complete contained authority surface.');
+      block('upgrade-reconciliation-unsafe', 'Upgrade evidence requires safe effective LF attributes, unchanged safe local paths and a complete contained authority surface.');
       plan.status = 'blocked';
       plan.create = []; plan.merge = [];
       ops.writes.length = 0;

@@ -188,14 +188,20 @@ identity and any authority/configuration that defines the new governed runtime.
 
 After a successful cutover, the source session's startup authority/runtime
 fingerprint is stale. That session SHALL perform no further governed project
-work. Subsequent governed-resolution attempts from the stale session SHALL fail
-closed when mechanically detectable. The user SHALL be told to start a new
-session with dev-foundry-claude start.
+work. Subsequent governed-resolution attempts from that session SHALL fail
+closed when mechanically detectable. The user SHALL start a **fresh session
+bound to the selected runtime**, using any supported host (including Claude
+Desktop or Claude Code); `dev-foundry-claude start` is an optional launcher for
+Claude Code with local telemetry, not a required governance entry point.
 
-The new session SHALL independently reobserve the new POP, Authority Index,
-framework release, role/profile bindings and adapter pin before work resumes.
-A session may migrate the project to its successor state; it may not silently
-continue operating as though it had been started under that successor state.
+The fresh session SHALL independently reobserve the current POP, Authority
+Index, framework release, role/profile bindings and adapter pin before work
+resumes. A session may migrate the project to its successor state; it may not
+silently continue under that successor state. Failed initial project/runtime
+discovery or an unresolved upgrade journal SHALL block affected governed work
+with its own truthful diagnostic and recovery action; neither condition alone
+proves the running session became stale. Ordinary task/overview/index authoring
+that does not alter protected runtime bindings is not a runtime cutover.
 
 ## 3. Release migration material
 
