@@ -94,6 +94,85 @@ test('status human and JSON answer readiness and show a concrete next action', a
   assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
 });
 
+test('missing dashboard or failed telemetry preflight degrades observability without blocking valid start', async (t) => {
+  const c = await prepared(t, true);
+  const noDashboard = await mkdtemp(path.join(os.tmpdir(), 'consumer-no-dashboard-'));
+  t.after(() => rm(noDashboard, { recursive: true, force: true }));
+  const before = await listTree(c.root);
+  for (const [dashboard, telemetry] of [[false, true], [true, false], [false, false]]) {
+    const overrides = {
+      packageRoot: dashboard ? presentationPackage.root : noDashboard,
+      env: telemetry ? {} : { DEV_FOUNDRY_TELEMETRY_PORT: '65536' },
+    };
+    for (const command of ['status', 'doctor']) {
+      const result = await invoke(c, command, ['--json'], overrides);
+      const data = JSON.parse(result.text);
+      assert.equal(result.code, 0);
+      assert.equal(data.readyToWork, true);
+      assert.equal(data.integration, 'ready');
+      assert.equal(data.observability, 'degraded');
+      assert.equal(data.telemetry, telemetry ? 'ready-on-start' : 'not-ready');
+      assert.equal(data.dashboardAvailable, dashboard);
+      assert.equal(data.diagnostics.includes('telemetry-not-ready'), !telemetry);
+      assert.equal(data.diagnostics.includes('dashboard-unavailable'), !dashboard);
+      if (command === 'doctor') {
+        assert.equal(data.checks.telemetry, telemetry);
+        assert.equal(data.checks.dashboard, dashboard);
+        for (const key of ['runtimePin', 'managedSurface', 'activation', 'runtime']) assert.equal(data.checks[key], true);
+      }
+      const human = await invoke(c, command, [], overrides);
+      assert.match(human.text, /Ready to work: yes/);
+      assert.match(human.text, /observability.*degraded/i);
+      if (command === 'doctor') assert.match(human.text, /operation-ready; observability degraded/);
+    }
+    let calls = 0;
+    const result = await invoke(c, 'start', ['--runtime', 'dial', '--', '-p', 'literal payload'], {
+      ...overrides,
+      launcher: async (options) => {
+        calls++;
+        assert.deepEqual(options.argv, ['--runtime', 'dial', '--', '-p', 'literal payload']);
+        assert.equal(options.projectRoot, await realpath(c.root));
+        assert.equal(options.telemetryPreflight, telemetry);
+        assert.equal(options.env, overrides.env);
+        if (telemetry) options.onReady({ port: 12345 });
+        return 0;
+      },
+    });
+    assert.equal(result.code, 0);
+    assert.equal(calls, 1);
+    assert.match(result.text, /Warning: optional/);
+    if (!dashboard) assert.doesNotMatch(result.text, /dashboard --port/);
+    if (!telemetry) assert.doesNotMatch(result.text, /preflight passed|Local telemetry is ready/);
+  }
+  assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+});
+
+test('degraded observability never hides inactive integration, exact payload mismatch or missing runtime', async (t) => {
+  const active = await prepared(t, true);
+  const inactive = await prepared(t);
+  const mismatch = { ...adapterIdentity, payloadRoot: 'e'.repeat(64), expect: `${adapterIdentity.version}:sha256:${'e'.repeat(64)}` };
+  for (const [c, overrides, expected] of [
+    [inactive, {}, /owner.*approve/],
+    [active, { getAdapter: () => mismatch }, /brought into sync/],
+    [active, { executableAvailable: () => false }, /executable is unavailable/],
+  ]) {
+    const before = await listTree(c.root);
+    let calls = 0;
+    const options = { env: { DEV_FOUNDRY_TELEMETRY_PORT: 'invalid' }, ...overrides };
+    const result = await invoke(c, 'start', [], { ...options, launcher: async () => { calls++; return 0; } });
+    assert.equal(result.code, 2);
+    assert.equal(calls, 0);
+    assert.match(result.text, expected);
+    const status = await invoke(c, 'doctor', ['--json'], options);
+    const data = JSON.parse(status.text);
+    assert.equal(status.code, 2);
+    assert.equal(data.readyToWork, false);
+    assert.equal(data.observability, 'degraded');
+    if (overrides.getAdapter) assert.ok(data.diagnostics.includes('adapter-runtime-mismatch'));
+    assert.deepEqual(diffTrees(before, await listTree(c.root)), []);
+  }
+});
+
 test('setup managed preparation preserves an already active project and recommends start', async (t) => {
   const c = await prepared(t, true);
   const authority = await readSetSnapshot(c.root);
@@ -127,6 +206,7 @@ test('diagnostics handle missing runtime, invalid telemetry port, symlink teleme
   assert.equal(JSON.parse(missing.text).checks.runtime, false); assert.equal(missing.code, 2);
   const port = await invoke(c, 'doctor', ['--json'], { env: { DEV_FOUNDRY_TELEMETRY_PORT: '65536' } });
   assert.equal(JSON.parse(port.text).checks.telemetry, false);
+  assert.equal(port.code, 0); assert.equal(JSON.parse(port.text).readyToWork, true);
   const scratch = await mkdtemp(path.join(os.tmpdir(), 'consumer-telemetry-')); t.after(() => rm(scratch, { recursive: true, force: true }));
   await mkdir(path.join(c.root, '.dev-foundry/telemetry'), { recursive: true });
   await symlink(scratch, path.join(c.root, '.dev-foundry/telemetry/local'), 'dir');
@@ -149,11 +229,18 @@ test('guided upgrade keeps compatible pin-only flow and requires explicit apply 
 });
 
 test('canonical help covers all topics; CLI output is exactly the resource content', async () => {
+  assert.equal(Object.keys(helpTopics).length, 7);
   for (const topic of Object.keys(helpTopics)) {
     const result = await invoke({ root: os.tmpdir() }, 'help', [topic]);
     assert.equal(result.text + '\n', renderHelp(topic)); assert.equal(helpUri(topic), `dev-foundry://help/${topic}`);
   }
   assert.match((await invoke({ root: os.tmpdir() }, 'help')).text, /setup[\s\S]*start/);
+  assert.match(renderHelp('start'), /collector and dashboard are optional/);
+  assert.match(renderHelp('start'), /Claude Desktop[\s\S]*preconfigured valid[\s\S]*without start/);
+  for (const topic of ['getting-started', 'start', 'upgrade', 'cutover']) {
+    assert.match(renderHelp(topic), /fresh host session/);
+    assert.match(renderHelp(topic), /start is optional/);
+  }
 });
 
 test('primary command option validation refuses ambiguity without mutation', async (t) => {

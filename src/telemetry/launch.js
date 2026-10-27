@@ -2,6 +2,7 @@ import { spawn as nodeSpawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { constants } from 'node:os';
 import path from 'node:path';
+import { pathHasSymlink } from '../adopt/common.js';
 import { buildTelemetryEnvironment, startCollector as defaultStartCollector } from './telemetry.js';
 
 export const RUNTIMES = Object.freeze(['direct', 'dial', 'codemie']);
@@ -34,6 +35,7 @@ export async function runLauncher({
   stderr = (message) => console.error(message),
   killTimeoutMs = 5000,
   onReady = () => {},
+  telemetryPreflight = true,
 } = {}) {
   let plan;
   let runtime;
@@ -49,16 +51,22 @@ export async function runLauncher({
   const telemetryDir = path.join(projectRoot, '.dev-foundry/telemetry/local');
   let collector;
   try {
-    const portOption = env.DEV_FOUNDRY_TELEMETRY_PORT;
-    if (portOption !== undefined && !/^\d+$/.test(portOption)) throw new Error('Invalid port.');
-    collector = await startCollector({
-      host: '127.0.0.1',
-      port: portOption === undefined ? 0 : Number(portOption),
-      telemetryDir,
-      telemetryRunId,
-    });
-    const childEnv = buildTelemetryEnvironment({ telemetryDir, telemetryRunId, port: collector.port, baseEnv: env, launchMode: runtime });
-    onReady({ runtime, port: collector.port, telemetryDir });
+    let childEnv = env;
+    try {
+      const portOption = env.DEV_FOUNDRY_TELEMETRY_PORT;
+      if (!telemetryPreflight || await pathHasSymlink(projectRoot, '.dev-foundry/telemetry/local')) throw new Error();
+      if (portOption !== undefined && (!/^\d+$/.test(portOption) || Number(portOption) > 65535)) throw new Error();
+      collector = await startCollector({
+        host: '127.0.0.1',
+        port: portOption === undefined ? 0 : Number(portOption),
+        telemetryDir,
+        telemetryRunId,
+      });
+      childEnv = buildTelemetryEnvironment({ telemetryDir, telemetryRunId, port: collector.port, baseEnv: env, launchMode: runtime });
+    } catch {
+      stderr('Warning: optional local telemetry is degraded; continuing without telemetry injection.');
+    }
+    if (childEnv !== env) onReady({ runtime, port: collector.port, telemetryDir });
     const child = spawn(plan.executable, plan.args, { stdio: 'inherit', cwd: projectRoot, env: childEnv, shell: false });
     let killTimer;
     const forwardSignal = (signal) => {
@@ -86,9 +94,12 @@ export async function runLauncher({
       signalTarget.off('SIGTERM', onTerminate);
     }
   } catch {
-    stderr('Telemetry launcher failed to start.');
+    stderr('Unable to launch the selected Claude Code runtime executable.');
     return 1;
   } finally {
-    if (collector) await collector.close();
+    if (collector) {
+      try { await collector.close(); }
+      catch { stderr('Warning: optional local telemetry cleanup failed.'); }
+    }
   }
 }

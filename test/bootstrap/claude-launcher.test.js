@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { access, constants, mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
+import { access, constants, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -118,16 +118,80 @@ test('default launch uses an OS-selected loopback port and passes it to the chil
   assert.equal(call.options.env.DEV_FOUNDRY_CLAUDE_LAUNCH_MODE, 'dial');
 });
 
-test('DEV_FOUNDRY_TELEMETRY_PORT is honored when numeric and rejected otherwise', async (t) => {
+test('DEV_FOUNDRY_TELEMETRY_PORT is honored when valid; invalid optional ports still launch', async (t) => {
   const projectRoot = await temporaryDirectory(t);
   const seen = [];
   const startFake = async (options) => { seen.push(options.port); return { port: options.port || 40000, host: '127.0.0.1', close: async () => {} }; };
   const { spawn, calls } = fakeSpawn();
   await runLauncher({ argv: ['--runtime', 'direct', '--'], projectRoot, spawn, startCollector: startFake, env: { DEV_FOUNDRY_TELEMETRY_PORT: '43210' } });
   assert.deepEqual(seen, [43210]);
-  const code = await runLauncher({ argv: ['--runtime', 'direct', '--'], projectRoot, spawn, startCollector: startFake, env: { DEV_FOUNDRY_TELEMETRY_PORT: 'abc' }, stderr: () => {} });
-  assert.equal(code, 1);
-  assert.equal(calls.length, 1);
+  for (const port of ['abc', '-1', '65536', 'Infinity', '']) {
+    const env = { DEV_FOUNDRY_TELEMETRY_PORT: port, KEEP: 'inherited' };
+    const messages = [];
+    const code = await runLauncher({ argv: ['--runtime', 'direct', '--', ...tricky], projectRoot, spawn, startCollector: startFake, env, stderr: (m) => messages.push(m), onReady: () => assert.fail('collector not ready') });
+    assert.equal(code, 0);
+    assert.deepEqual(calls.at(-1).args, tricky);
+    assert.equal(calls.at(-1).executable, 'claude');
+    assert.deepEqual(calls.at(-1).options, { stdio: 'inherit', cwd: projectRoot, env, shell: false });
+    assert.equal(calls.at(-1).options.env.OTEL_EXPORTER_OTLP_ENDPOINT, undefined);
+    assert.deepEqual(messages, ['Warning: optional local telemetry is degraded; continuing without telemetry injection.']);
+  }
+  assert.deepEqual(seen, [43210]);
+  assert.equal(calls.length, 6);
+});
+
+test('collector failure launches only the exact selected runtime with inherited env and exit status', async (t) => {
+  const projectRoot = await temporaryDirectory(t);
+  const env = { PATH: '/runtime/bin', KEEP: 'secret-value', OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: 'inherited-endpoint' };
+  for (const runtime of RUNTIMES) {
+    const { spawn, calls } = fakeSpawn({ code: 7 });
+    const messages = [];
+    let attempts = 0;
+    let collectorOptions;
+    const code = await runLauncher({
+      argv: ['--runtime', runtime, '--', ...tricky], projectRoot, env, spawn,
+      startCollector: async (options) => {
+        attempts++;
+        collectorOptions = options;
+        throw new Error('/secret/path secret-value EADDRINUSE');
+      },
+      stderr: (m) => messages.push(m), onReady: () => assert.fail('collector not ready'),
+    });
+    assert.equal(code, 7);
+    assert.equal(attempts, 1);
+    assert.equal(collectorOptions.host, '127.0.0.1');
+    assert.equal(collectorOptions.port, 0);
+    assert.equal(collectorOptions.telemetryDir, path.join(projectRoot, '.dev-foundry/telemetry/local'));
+    assert.equal(calls.length, 1);
+    const { child, ...call } = calls[0];
+    assert.deepEqual(call, { ...buildLaunchPlan(runtime, tricky), options: { stdio: 'inherit', cwd: projectRoot, env, shell: false } });
+    assert.equal(call.options.env.OTEL_EXPORTER_OTLP_ENDPOINT, undefined);
+    assert.equal(call.options.env.DEV_FOUNDRY_TELEMETRY_DIR, undefined);
+    assert.deepEqual(messages, ['Warning: optional local telemetry is degraded; continuing without telemetry injection.']);
+  }
+  assert.deepEqual(await readdir(projectRoot), []);
+});
+
+test('failed preflight and symlinked telemetry storage skip the collector but still launch', async (t) => {
+  const projectRoot = await temporaryDirectory(t);
+  const outside = await temporaryDirectory(t);
+  for (const telemetryPreflight of [false, true]) {
+    if (telemetryPreflight) {
+      await mkdir(path.join(projectRoot, '.dev-foundry/telemetry'), { recursive: true });
+      await symlink(outside, path.join(projectRoot, '.dev-foundry/telemetry/local'), 'dir');
+    }
+    const { spawn, calls } = fakeSpawn();
+    let attempts = 0;
+    const code = await runLauncher({
+      argv: ['--runtime', 'dial', '--'], projectRoot, env: {}, spawn, telemetryPreflight,
+      startCollector: async () => { attempts++; throw new Error(); }, stderr: () => {},
+    });
+    assert.equal(code, 0);
+    assert.equal(attempts, 0);
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].options.env, {});
+    assert.deepEqual(await readdir(outside), []);
+  }
 });
 
 test('privacy policy env is identical across modes except the launch mode', async (t) => {
@@ -194,7 +258,7 @@ test('collector is closed after child exit and the exit status is preserved', as
 
 test('spawn failure exits 1 with a message naming no paths, and still closes the collector', async (t) => {
   const projectRoot = await temporaryDirectory(t);
-  const { spawn } = fakeSpawn({ error: true });
+  const { spawn, calls } = fakeSpawn({ error: true });
   const messages = [];
   let closed = 0;
   const code = await runLauncher({
@@ -202,8 +266,64 @@ test('spawn failure exits 1 with a message naming no paths, and still closes the
     startCollector: async () => ({ port: 45000, host: '127.0.0.1', close: async () => { closed += 1; } }),
   });
   assert.equal(code, 1);
+  assert.equal(calls.length, 1);
   assert.equal(closed, 1);
   assert.ok(messages.length >= 1 && messages.every((m) => !m.includes('/') && !m.includes('secret')));
+});
+
+test('runtime spawn errors never retry or change executable, including with degraded telemetry', async (t) => {
+  const projectRoot = await temporaryDirectory(t);
+  for (const runtime of RUNTIMES) {
+    for (const telemetryFails of [false, true]) {
+      for (const synchronous of [false, true]) {
+        const fake = fakeSpawn({ error: true });
+        let attempts = 0;
+        let executable;
+        let closed = 0;
+        const messages = [];
+        const spawn = (...args) => {
+          attempts++;
+          executable = args[0];
+          if (synchronous) throw new Error('/secret/path ENOENT');
+          return fake.spawn(...args);
+        };
+        const code = await runLauncher({
+          argv: ['--runtime', runtime, '--'], projectRoot, env: {}, spawn, stderr: (m) => messages.push(m),
+          startCollector: async () => {
+            if (telemetryFails) throw new Error('/secret/path EACCES');
+            return { port: 45000, close: async () => { closed++; } };
+          },
+        });
+        assert.equal(code, 1);
+        assert.equal(attempts, 1);
+        assert.equal(executable, buildLaunchPlan(runtime).executable);
+        assert.equal(closed, telemetryFails ? 0 : 1);
+        assert.equal(messages.at(-1), 'Unable to launch the selected Claude Code runtime executable.');
+        assert.ok(messages.every((m) => !m.includes('/secret/path') && !m.includes('ENOENT')));
+      }
+    }
+  }
+});
+
+test('collector cleanup runs once and cannot replace the child exit code or signal', async (t) => {
+  const projectRoot = await temporaryDirectory(t);
+  for (const cleanupFails of [false, true]) {
+    for (const [outcome, expected] of [[{ code: 0 }, 0], [{ code: 7 }, 7], [{ code: null, signal: 'SIGTERM' }, 143]]) {
+      const { spawn } = fakeSpawn(outcome);
+      const messages = [];
+      let closed = 0;
+      const code = await runLauncher({
+        argv: ['--runtime', 'codemie', '--'], projectRoot, env: {}, spawn, stderr: (m) => messages.push(m),
+        startCollector: async () => ({ port: 45000, close: async () => {
+          closed++;
+          if (cleanupFails) throw new Error('/secret/path cleanup failed');
+        } }),
+      });
+      assert.equal(code, expected);
+      assert.equal(closed, 1);
+      assert.deepEqual(messages, cleanupFails ? ['Warning: optional local telemetry cleanup failed.'] : []);
+    }
+  }
 });
 
 test('SIGINT and SIGTERM are forwarded and handlers are removed afterwards', async (t) => {

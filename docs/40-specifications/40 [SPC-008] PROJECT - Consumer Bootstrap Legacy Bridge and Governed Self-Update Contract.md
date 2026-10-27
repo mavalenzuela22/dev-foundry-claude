@@ -219,10 +219,23 @@ The stale session MAY report completion and the restart instruction. It SHALL
 NOT author, implement, validate, audit, promote or close subsequent governed
 work.
 
-The required next action is dev-foundry-claude start.
+The required next action is a fresh, independently bound session using any
+supported Claude host; `dev-foundry-claude start` is one optional Claude Code
+launcher, not a prerequisite for MCP governance or a substitute for resolving
+current authority. The new session SHALL resolve authority from current
+repository state and SHALL not inherit the old session's governance resolution
+by conversation alone. Invalid or unavailable startup context, and an actually
+pending runtime-recovery journal, SHALL return their respective actionable
+diagnostics; they SHALL NOT be labeled `STALE_SESSION` unless a previously
+established session identity subsequently changed.
 
-The new session SHALL resolve authority from current repository state and SHALL
-not inherit the old session's governance resolution by conversation alone.
+A completed adapter upgrade receipt is historical transition evidence, not an
+immutable snapshot of ordinary ongoing project documentation. Later valid
+TSK/OVR/index authoring SHALL NOT require receipt refresh or another adapter
+upgrade. Runtime pin, verified payload, managed integration bytes, active
+framework/role bindings and transaction safety remain checked by their
+existing applicable guards. A pending or ambiguous journal still blocks the
+governed mutation it protects; no automatic rollback or guard bypass follows.
 
 ## 8. Framework-version migration
 

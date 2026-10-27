@@ -5,12 +5,87 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import { makeBrownfieldProject, makeProject } from './fixture.js';
+import { makeBrownfieldProject, makeProject, makeV3Project } from './fixture.js';
 import { helpTopics, helpUri, renderHelp } from '../../src/consumer/help.js';
 import { execFileSync } from 'node:child_process';
+import { parse, stringify } from 'yaml';
+import { canonicalJson, sha256 } from '../../src/adopt/pin.js';
+import { beginRuntimeUpgrade } from '../../src/adopt/runtime.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const serverPath = path.join(repoRoot, 'src/governance-mcp/server.js');
+
+test('consumer MCP propagates distinct session denials and recovery actions to readiness', async (t) => {
+  const sourcePin = `1.5.5:sha256:${'a'.repeat(64)}`;
+  const targetPin = `1.5.6:sha256:${'b'.repeat(64)}`;
+  const mcp = (pin) => canonicalJson({ mcpServers: { 'dev-foundry-governance': { command: 'dev-foundry-claude', args: ['mcp', '--expect', pin] } } });
+  const read = (project, file) => readFile(path.join(project.root, file), 'utf8');
+  const start = `globalThis[Symbol.for('dev-foundry-claude.consumer-mode-guard')] = true;
+    globalThis[Symbol.for('dev-foundry-claude.consumer-runtime-pin')] = ${JSON.stringify(sourcePin)};
+    await import(${JSON.stringify(serverPath)});`;
+  for (const [name, expected] of [
+    ['missing host root', 'PROJECT_CONTEXT_UNAVAILABLE'],
+    ['corrupt binding', 'RUNTIME_BINDING_INVALID'],
+    ['pending upgrade', 'RUNTIME_RECOVERY_REQUIRED'],
+    ['blocked cutover', 'CUTOVER_RECOVERY_REQUIRED'],
+    ['runtime drift', 'STALE_SESSION'],
+    ['inactive activation', 'BINDING_INACTIVE'],
+  ]) await t.test(name, async (st) => {
+    const project = await makeV3Project();
+    st.after(project.cleanup);
+    await project.write('.mcp.json', mcp(sourcePin));
+    // Complete the fixture's host role activation for the direct MCP path.
+    const pop = JSON.parse(await read(project, '.dev-foundry/profiles/project-operating-profile.yaml'));
+    const bootstrapPath = pop.platform_bootstraps['claude-code'].path;
+    const bootstrap = JSON.parse(await read(project, bootstrapPath));
+    bootstrap.actor_resolution.eligible_profiles = [pop.actor_bindings['governance-author'].profile, pop.actor_bindings['evidence-custodian'].profile];
+    if (name !== 'inactive activation') await project.write(bootstrapPath, canonicalJson(bootstrap));
+    if (name === 'corrupt binding') await project.write('.mcp.json', '{PRIVATE_SECRET');
+    if (name === 'pending upgrade') {
+      const bytes = Buffer.from(canonicalJson({ mode: 'upgrade', status: 'ready', current: { expect: sourcePin }, target: { expect: targetPin }, create: [],
+        merge: [{ path: '.mcp.json', before_sha256: sha256(mcp(sourcePin)), after_sha256: sha256(mcp(targetPin)) }] }));
+      await beginRuntimeUpgrade({ root: project.root, planBytes: bytes, planSha256: sha256(bytes), writes: [{ path: '.mcp.json', content: mcp(targetPin) }] });
+    }
+    if (name === 'blocked cutover') await project.write('.dfc-cutover/intent.json', '{PRIVATE_SECRET');
+    const transport = new StdioClientTransport({ command: process.execPath, args: ['--input-type=module', '--eval', start],
+      env: { CLAUDE_PROJECT_DIR: name === 'missing host root' ? '' : project.root }, cwd: '/tmp' });
+    const client = new Client({ name: 'session-diagnostics', version: '1.0.0' });
+    const call = async (name, args) => JSON.parse((await client.callTool({ name, arguments: args })).content[0].text);
+    const request = { requestedAction: 'implement', targetProject: 'fixture-project', taskId: 'TSK-029' };
+    try {
+      await client.connect(transport);
+      if (name === 'runtime drift') {
+        assert.equal((await call('resolve_governed_operation', request)).ok, true);
+        // The resolver must still observe task edits within a valid session.
+        const taskPath = 'docs/tasks/task.md';
+        const task = await read(project, taskPath);
+        await project.write(taskPath, task.replace('status: IN_PROGRESS', 'status: CLOSED'));
+        const current = await call('resolve_governed_operation', request);
+        assert.equal(current.ok, false);
+        assert.notEqual(current.errorCode, 'STALE_SESSION');
+        await project.write(taskPath, task);
+        const indexPath = '.dev-foundry/authority-index.yaml';
+        const index = parse(await read(project, indexPath));
+        index.artifact_version = 'ordinary-index-edit';
+        await project.write(indexPath, stringify(index));
+        assert.equal((await call('resolve_governed_operation', request)).ok, true);
+        await project.write('.mcp.json', mcp(targetPin));
+      }
+      const denied = await call('resolve_governed_operation', request);
+      assert.equal(denied.errorCode, expected);
+      const readiness = await call('assess_predelegation_readiness', { targetProject: request.targetProject, taskId: request.taskId });
+      assert.equal(readiness.outcome, 'BLOCKED');
+      assert.deepEqual(readiness.reasonCodes, [expected === 'BINDING_INACTIVE' ? 'ACTIVATION_INACTIVE' : expected]);
+      if (denied.nextAction) assert.deepEqual(readiness.nextActions, [denied.nextAction]);
+      assert.equal(readiness.nonAuthorizing, true);
+      assert.equal(readiness.dispatchAllowed, false);
+      assert.equal(readiness.contextFingerprint, null);
+      assert.equal(readiness.handoff, null);
+      assert.equal(JSON.stringify({ denied, readiness }).includes(project.root), false);
+      assert.doesNotMatch(JSON.stringify({ denied, readiness }), /PRIVATE_SECRET/);
+    } finally { await client.close(); }
+  });
+});
 
 test('read-only MCP help and installed CLI render the same canonical versioned content', async () => {
   const transport = new StdioClientTransport({ command: process.execPath, args: [serverPath], cwd: '/tmp' });

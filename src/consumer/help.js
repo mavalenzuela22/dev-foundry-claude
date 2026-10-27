@@ -10,11 +10,11 @@ Then:
   cd <project>
   dev-foundry-claude setup
   dev-foundry-claude setup --yes
-  dev-foundry-claude start
+  dev-foundry-claude start  (optional Claude Code launcher)
 setup inspects first and tells you the next step. Use setup --yes only after reviewing its managed-file plan. Your application code is not changed.
 Commands: setup, start, status, upgrade, doctor, cutover, help.
 Next: dev-foundry-claude setup
-Three paths: no DEV FOUNDRY -> setup preview -> setup --yes -> start. Legacy pre-1.4.0 -> one-time verified bridge -> 1.4.0 -> start. 1.4.0+ governance migration -> current governed Claude session -> target cutover -> mandatory fresh start.
+Three paths: no DEV FOUNDRY -> setup preview -> setup --yes -> supported Claude host. Legacy pre-1.4.0 -> one-time verified bridge -> 1.4.0 -> supported Claude host. 1.4.0+ governance migration -> current governed Claude session -> target cutover -> mandatory fresh host session bound to the selected runtime. start is optional; local collector and dashboard are optional observability auxiliaries.
 Advanced commands: adopt, upgrade status/plan/apply, migration, mcp, run, dashboard, --version.`,
   setup: `Usage: dev-foundry-claude setup [--yes|--apply] [--root <project>] [--project <name>] [--classification greenfield|brownfield] [--operator <human-name>] [--json|--verbose]
 Inspect the project before preparing Claude integration. Without --yes or --apply, nothing is written.
@@ -23,20 +23,21 @@ With no existing governance, preview the project name, greenfield/brownfield cla
 The immutable framework is carried by the installed package; no producer checkout or network lookup is needed. Replanning successful setup makes no further changes.
 A prepared project still needs its owner to approve Claude activation through the project's existing decision process. Review dev-foundry-claude cutover plan, authorize its exact hash under consumer authority, then use cutover prepare and commit. setup never applies that proposal.
 After activation: dev-foundry-claude status
-When ready: dev-foundry-claude start
+When ready: open a supported Claude host, or optionally dev-foundry-claude start
 Advanced proposal export: dev-foundry-claude adopt plan --root <project> --out <file-outside-project>`,
   start: `Usage: dev-foundry-claude start [--runtime direct|dial|codemie] [--root <project>] [--verbose] [-- <Claude args>]
-Launch Claude in this project with local telemetry using the packaged launcher. direct is the default; the selected executable must already be installed and authenticated by you.
+Optionally launch Claude Code in this project with optional local telemetry using the packaged launcher. direct is the default; the selected executable must already be installed and authenticated by you.
 The project must be prepared, approved for Claude and pinned to this adapter. If it is not ready, run the recovery command shown.
-Telemetry binds only to 127.0.0.1 and lasts for the Claude session. Readiness before launch is a preflight; collection is confirmed after the collector starts.
+The collector and dashboard are optional observability auxiliaries. Their failure warns and does not block an otherwise valid launch. Telemetry binds only to 127.0.0.1 and lasts for the Claude session. Readiness before launch is a preflight; collection is confirmed after the collector starts.
+An independently opened Claude Desktop or Claude Code host can use its preconfigured valid project-bound governance MCP without start. After a real cutover, a fresh host session bound to the selected runtime is required; start is optional.
 In another terminal: dev-foundry-claude dashboard --port 4319
 Open the URL printed by dashboard. If that port is occupied, select another local port.
 Example: dev-foundry-claude start --runtime dial -- --resume
 Next if launch fails: dev-foundry-claude doctor`,
   status: `Usage: dev-foundry-claude status [--root <project>] [--json|--verbose]
 Read a compact view of the project, integration, installed and selected adapter, telemetry preflight, dashboard availability and readiness to work.
-No files are changed. Telemetry preflight does not mean a collector is already running.
-Next when ready: dev-foundry-claude start`,
+No files are changed. Operational readiness is separate from optional observability diagnostics. Telemetry preflight does not mean a collector is already running.
+Next when ready: open a supported Claude host, or optionally dev-foundry-claude start`,
   upgrade: `Usage: dev-foundry-claude upgrade [--root <project>] [--from-package <previous-package-directory>] [--resolution-file <file-outside-project>] [--plan-sha256 <reviewed-hash>] [--yes|--apply] [--json|--verbose]
 Keep the running source release available. Stage a target release side-by-side outside the project and outside the source installation, for example npm install --prefix <isolated-target> <release-tarball> --offline --ignore-scripts. Invoke the staged package bin/dev-foundry-claude.js with Node. Installing it does not change your project. The target migration command verifies and describes its integrity-bound migration material; upgrade inspects the current pin and plans the move to that exact installed target.
 A compatible upgrade changes only the runtime pin. A managed refresh updates only DEV FOUNDRY-owned files, preserving your application code and project rules.
@@ -44,16 +45,16 @@ For a refresh, keep or unpack the previous released package outside the project 
 For a known managed conflict, explicitly select --resolution-file. Preview first, review its base/current/target/after diffs and plan hash, then repeat the selection with --plan-sha256 <reviewed-hash> --yes to authorize application. Resolved conflicts require that reviewed hash; changed input bytes or repository state require another preview and review. JSON data does not authenticate or authorize an Operator; fields such as authorizedBy are rejected. Configured authority still requires its governed migration path.
 The resolution is a UTF-8 JSON object with exactly these keys: format ("dev-foundry.managed-resolution.v1"), repository ({root: exact canonical project root, head: exact Git HEAD}), source (exact current expect pin), target (exact target expect pin), files (nonempty array). Each file has exactly path, before_sha256, base_sha256, current_sha256, target_sha256, resolved_sha256, resolved_content. Use the fingerprints from the refused plan; before_sha256 binds the full current file. resolved_content is the explicit complete UTF-8 agent file or only the single CLAUDE.md managed span, including its markers and trailing newline when present; resolved_sha256 hashes those exact UTF-8 bytes. Only the two named adapter agents and CLAUDE.md are allowed, once each, and only for verified conflicts. Agent canonical name and span identity must remain unchanged. Keep the decision outside the project at a regular path without symlinks. All fields and exact input file bytes are bound to the plan.
 The one-time legacy bridge into 1.4.0 supports only the declared exact 1.2.2 TSK-018, 1.3.0 validation-artifact and v1.3.0 public-tag builds. It always requires the exact previous package. Prepared projects retain their existing active governance runtime, authority and history. Unknown builds or modified owned bytes stop safely.
-For 1.4.0+ targets requiring semantic or configured-authority reconciliation, continue in the currently governed Claude session under source authority. Node cannot decide project-specific governance choices. Keep the source runtime and project selection unchanged until an authorized validated cutover. After cutover the old MCP session refuses governed work; restart with dev-foundry-claude start.
+For 1.4.0+ targets requiring semantic or configured-authority reconciliation, continue in the currently governed Claude session under source authority. Node cannot decide project-specific governance choices. Keep the source runtime and project selection unchanged until an authorized validated cutover. After cutover the old MCP session refuses governed work; open a fresh host session bound to the selected runtime, using Claude Desktop or Claude Code with its preconfigured valid MCP. dev-foundry-claude start is optional.
 Without --yes or --apply, the plan is read-only. With explicit intent, the exact generated plan and hash are rechecked before apply. Commit or restore pending managed-file changes before upgrading.
 Advanced: upgrade status|plan|apply --root <project>; plan accepts --from-package <previous-package-directory>, --out <file-outside-project> and optional --resolution-file <file-outside-project>; apply requires --plan <file> --plan-sha256 <reviewed-hash> and accepts --resolution-file <file-outside-project>. For a resolved plan, select the same exact resolution file path and bytes in both plan and apply, and supply the matching reviewed plan hash. Apply refuses an omitted, changed or invalid selection.
 Next after upgrade: dev-foundry-claude status`,
   doctor: `Usage: dev-foundry-claude doctor [--root <project>] [--runtime direct|dial|codemie] [--json|--verbose]
 Run read-only checks of the repository, project configuration, package integrity, runtime pin, managed files, Claude activation, selected runtime executable, local telemetry and packaged dashboard.
-No repair or listener is started. Technical details are available with --verbose or --json.
+Operational readiness is separate from optional collector/dashboard diagnostics. No repair or listener is started. Technical details are available with --verbose or --json.
 Follow the one recovery command printed. To understand setup: dev-foundry-claude help setup`,
   concepts: `DEV FOUNDRY keeps project decisions and work limits durable. The adapter connects those rules to Claude; it does not approve changes.
-Prepared means integration files exist. Active means the project owner has approved Claude's roles. Ready means activation, package pin, managed files and launch preflight all pass.
+Prepared means integration files exist. Active means the project owner has approved Claude's roles. Ready means activation, exact package pin, managed files, secure project/cutover state and selected executable checks pass. Optional collector/dashboard failures are reported separately as degraded observability.
 Your project's approved rules are authority. This help is explanatory product content, never authority.
 Advanced vocabulary: POP = Project Operating Profile; Authority Index = routes to approved documents; Actor Profile = role responsibilities; Capability Profile = implementation limits; TSK = task; MTP = bounded material plan. These records are managed through the project's decision process, not required as manual steps for routine adapter commands.
 Next: dev-foundry-claude setup`,
@@ -66,7 +67,7 @@ First prepare ordinary adapter integration with setup and record those changes t
 2. The consumer's governed process must approve this exact candidate, close or hand off source work, resolve choices and establish validation/audit disposition. Package installation, MCP selection, setup --yes and upgrade --yes do not authorize this switch.
 3. cutover prepare --plan <file> --plan-sha256 <hash> --authorization <approval-json> stages inert bytes in .dfc-cutover outside configured authority.
 4. cutover commit --plan-sha256 <hash> --authorization <approval-json> rechecks the full set, blocks startup and promotes independent paths with the POP activated last.
-5. Start a fresh session: dev-foundry-claude start. Old Claude/MCP sessions cannot continue governed work.
+5. Open a fresh host session bound to the selected runtime using Claude Desktop or Claude Code with its preconfigured valid MCP; dev-foundry-claude start is optional. Old Claude/MCP sessions cannot continue governed work.
 Approval JSON format: dev-foundry.cutover-authorization.v1. Required fields: project, operator (exact POP human identity), planSha256, sourceHead, sourceBranch, targetExpect, actorBindings, bootstrap and allowedPaths (exact plan target/manifest); operatorApproved, governedApproval and decisionsResolved must be true; sourceWorkDisposition is closed or handed-off. task is {path, sha256} for the routed IN_PROGRESS consumer TSK; validation is {status: PASS, path, sha256}; audit is {status: PASS, path, sha256} or {status: not-required, reason}. These are explicit consumer attestations and hash-bound evidence, not approvals created by the adapter.
 Interrupted operation: cutover status is read-only JSON. Use cutover recover --outcome source|target --plan-sha256 <hash> --authorization <approval-json>. Recovery verifies journal, package, branch/HEAD, authority and evidence; its selected direction is durable and repeatable. Unknown or modified data stays blocked. A failed recovery is never readiness.
 This is a recoverable logical transition, not filesystem-wide atomicity. The inactive POP protects gaps between renames. Runtime journal, staged bytes and backups are retained; do not edit/delete them or commit them as authority. Directory durability depends on filesystem support, particularly on Windows. An external Windows runner may observe read-only and has no active ChatGPT role after success.

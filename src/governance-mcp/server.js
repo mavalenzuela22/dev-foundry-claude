@@ -111,10 +111,8 @@ server.registerTool('assess_predelegation_readiness', {
 }, async (input) => {
   const denied = await guardGovernedCall();
   if (denied) return contentResult({
-    outcome: 'BLOCKED', reasonCodes: [denied.errorCode === 'STALE_SESSION' ? 'STALE_SESSION' : 'ACTIVATION_INACTIVE'],
-    nextActions: [denied.errorCode === 'STALE_SESSION'
-      ? 'Start a fresh Claude session with the current project runtime binding.'
-      : 'Complete the project-scoped Claude role activation before assessing readiness.'],
+    outcome: 'BLOCKED', reasonCodes: [denied.errorCode === 'BINDING_INACTIVE' ? 'ACTIVATION_INACTIVE' : denied.errorCode],
+    nextActions: [denied.nextAction ?? 'Complete the project-scoped Claude role activation before assessing readiness.'],
     contextFingerprint: null, handoff: null, nonAuthorizing: true, dispatchAllowed: false,
   });
   return contentResult(await assessPredelegationReadiness(input, { projectRoot }));
